@@ -48,14 +48,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // getSession reads from local storage/cookie — no network, instant
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: import('@supabase/supabase-js').Session | null } }) => {
       const user = session?.user ?? null
       setAuthUser(user)
       if (user) fetchAppUser(user.id).finally(() => setLoading(false))
       else setLoading(false)
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event: import('@supabase/supabase-js').AuthChangeEvent, session: import('@supabase/supabase-js').Session | null) => {
       const user = session?.user ?? null
       setAuthUser(user)
       if (user) fetchAppUser(user.id)

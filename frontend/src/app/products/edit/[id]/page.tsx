@@ -26,6 +26,7 @@ export default function EditProductPage() {
     base_price: '',
     price: '',
     stock: '',
+    is_discontinued: false,
   })
   const [fetching, setFetching] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -33,14 +34,14 @@ export default function EditProductPage() {
   const [success, setSuccess] = useState(false)
 
   useEffect(() => {
-    supabase.from('categories').select('id, name').order('name').then(({ data }) => setCategories(data ?? []))
+    supabase.from('categories').select('id, name').order('name').then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
 
     supabase
       .from('products')
-      .select('id, code, name, category_id, base_price, price, stock')
+      .select('id, code, name, category_id, base_price, price, stock, is_discontinued')
       .eq('id', id)
       .single()
-      .then(({ data }) => {
+      .then(({ data }: { data: { code: string | null; name: string; category_id: number; base_price: number; price: number; stock: number; is_discontinued: boolean } | null }) => {
         if (data) {
           setForm({
             code: data.code ?? '',
@@ -49,6 +50,7 @@ export default function EditProductPage() {
             base_price: String(data.base_price ?? ''),
             price: String(data.price ?? ''),
             stock: String(data.stock ?? ''),
+            is_discontinued: data.is_discontinued ?? false,
           })
         }
         setFetching(false)
@@ -70,6 +72,7 @@ export default function EditProductPage() {
         base_price: parseFloat(form.base_price) || 0,
         price: parseFloat(form.price) || 0,
         stock: parseInt(form.stock) || 0,
+        is_discontinued: form.is_discontinued,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -191,6 +194,25 @@ export default function EditProductPage() {
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#121358]"
               />
             </div>
+          </div>
+
+          {/* Discontinued toggle */}
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <p className="text-sm text-gray-700 font-medium">Discontinued</p>
+              <p className="text-xs text-gray-400">Tandai produk yang tidak dijual lagi</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, is_discontinued: !form.is_discontinued })}
+              className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none ${
+                form.is_discontinued ? 'bg-red-400' : 'bg-gray-200'
+              }`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                form.is_discontinued ? 'translate-x-5' : 'translate-x-0'
+              }`} />
+            </button>
           </div>
 
           <button

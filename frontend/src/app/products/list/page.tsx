@@ -41,14 +41,14 @@ export default function ProductListPage() {
       .from('categories')
       .select('id, name')
       .order('name')
-      .then(({ data }) => setCategories(data ?? []))
+      .then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
 
     supabase
       .from('products')
       .select('id, code, name, base_price, price, stock, categories(name)')
       .order('name')
-      .then(({ data }) => {
-        setProducts((data as unknown as Product[]) ?? [])
+      .then(({ data }: { data: Product[] | null }) => {
+        setProducts(data ?? [])
         setFetching(false)
       })
   }, [])

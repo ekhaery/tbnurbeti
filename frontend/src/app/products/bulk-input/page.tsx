@@ -17,6 +17,7 @@ type ProductRow = {
   base_price: string
   price: string
   stock: string
+  is_discontinued: boolean
 }
 
 type Payload = {
@@ -25,6 +26,7 @@ type Payload = {
   base_price: number
   price: number
   stock: number
+  is_discontinued: boolean
 }
 
 const emptyRow = (): ProductRow => ({
@@ -32,6 +34,7 @@ const emptyRow = (): ProductRow => ({
   base_price: '',
   price: '',
   stock: '0',
+  is_discontinued: false,
 })
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
@@ -60,17 +63,18 @@ export default function BulkInputPage() {
       .from('categories')
       .select('id, name, is_price_required')
       .order('name')
-      .then(({ data }) => setCategories(data ?? []))
+      .then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
 
     supabase
       .from('products')
       .select('name')
-      .then(({ data }) => setExistingNames([...new Set((data ?? []).map((p: { name: string }) => p.name.toLowerCase()))]))
+      .then(({ data }: { data: { name: string }[] | null }) => setExistingNames([...new Set((data ?? []).map((p) => p.name.toLowerCase()))]))
   }, [])
 
-  const updateRow = (index: number, field: keyof ProductRow, value: string) => {
+  const updateRow = (index: number, field: keyof ProductRow, value: string | boolean) => {
+    const parsed = field === 'is_discontinued' ? value === true || value === 'true' : value
     setRows((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
+      prev.map((row, i) => (i === index ? { ...row, [field]: parsed } : row))
     )
   }
 
@@ -110,6 +114,7 @@ export default function BulkInputPage() {
       base_price: parseFloat(r.base_price) || 0,
       price: isPriceRequired ? parseFloat(r.price) : (parseFloat(r.price) || 0),
       stock: parseInt(r.stock) || 0,
+      is_discontinued: r.is_discontinued,
     }))
 
     setPendingPayload(payload)
@@ -227,6 +232,22 @@ export default function BulkInputPage() {
                   {row.name.trim() && existingNames.includes(toTitleCase(row.name.trim()).toLowerCase()) && (
                     <p className="text-xs text-red-500 mt-1">⚠ Produk ini sudah ada.</p>
                   )}
+                </div>
+
+                {/* Discontinued toggle */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Discontinued</span>
+                  <button
+                    type="button"
+                    onClick={() => updateRow(i, 'is_discontinued', row.is_discontinued ? 'false' : 'true')}
+                    className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none ${
+                      row.is_discontinued ? 'bg-red-400' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                      row.is_discontinued ? 'translate-x-5' : 'translate-x-0'
+                    }`} />
+                  </button>
                 </div>
 
                 <div className={`grid gap-3 ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
