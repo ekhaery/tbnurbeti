@@ -113,12 +113,12 @@ export default function ProductListPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari nama atau kode..."
-            className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
-            className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="border border-gray-300 rounded-xl px-3 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Semua</option>
             {categories.map((cat) => (

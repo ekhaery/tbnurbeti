@@ -24,3 +24,19 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+::placeholder {
+  color: #4b5563; /* gray-600 — dark grey */
+  opacity: 1;
+}
+
+input, select, textarea {
+  -webkit-text-fill-color: #111827; /* gray-900 — ensure black on iOS */
+  color: #111827;
+}
+
+input::placeholder,
+textarea::placeholder {
+  -webkit-text-fill-color: #4b5563;
+  color: #4b5563;
+}

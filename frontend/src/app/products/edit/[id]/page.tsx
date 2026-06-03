@@ -125,7 +125,7 @@ export default function EditProductPage() {
               type="text"
               value={form.code}
               onChange={(e) => setForm({ ...form, code: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
 
@@ -137,7 +137,7 @@ export default function EditProductPage() {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               required
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
 
@@ -148,7 +148,7 @@ export default function EditProductPage() {
               value={form.category_id}
               onChange={(e) => setForm({ ...form, category_id: e.target.value })}
               required
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               <option value="">-- Pilih Kategori --</option>
               {categories.map((cat) => (
@@ -167,7 +167,7 @@ export default function EditProductPage() {
                   value={form.base_price}
                   onChange={(e) => setForm({ ...form, base_price: e.target.value })}
                   min="0"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
             )}
@@ -179,7 +179,7 @@ export default function EditProductPage() {
                 onChange={(e) => setForm({ ...form, price: e.target.value })}
                 required
                 min="0"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
             <div>
@@ -188,7 +188,7 @@ export default function EditProductPage() {
                 type="number"
                 value={form.stock}
                 onChange={(e) => setForm({ ...form, stock: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
           </div>
