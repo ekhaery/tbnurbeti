@@ -29,7 +29,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4 -mt-20">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Selamat datang</h1>

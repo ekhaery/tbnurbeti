@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
+
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPenToSquare } from '@fortawesome/free-solid-svg-icons'
 
@@ -24,7 +25,7 @@ type Category = {
 
 export default function ProductListPage() {
   const supabase = createClient()
-  const { appUser, loading, signOut } = useAuth()
+  const { appUser, loading } = useAuth()
   const router = useRouter()
 
   const [products, setProducts] = useState<Product[]>([])
@@ -70,26 +71,7 @@ export default function ProductListPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div>
-          <h1 className="text-base font-bold text-gray-800">Produk</h1>
-          <p className="text-xs text-gray-400 flex items-center gap-1">
-            {appUser?.name}
-            <span className={`font-semibold px-1.5 py-0.5 rounded-full text-[10px] ${isAdmin ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-              {appUser?.role}
-            </span>
-          </p>
-        </div>
-        <button
-          onClick={async () => { await signOut(); router.push('/login') }}
-          className="text-xs text-gray-400 hover:text-red-500 transition"
-        >
-          Keluar
-        </button>
-      </div>
-
-      <div className="px-4 py-4 max-w-2xl mx-auto space-y-4">
+      <div className="px-4 pt-3 pb-4 max-w-2xl mx-auto space-y-4">
         {/* Title + action */}
         <div className="flex items-center justify-between">
           <div>
