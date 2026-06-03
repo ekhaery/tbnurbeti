@@ -89,8 +89,10 @@ export default function BuatPurchasingPage() {
     const code = generateCode(selectedSupplier!.name, date)
 
     // 1. Insert purchasing header
+    const totalValue = validItems.reduce((sum, r) => sum + (parseFloat(r.base_price) || 0) * (parseInt(r.qty) || 0), 0)
+
     const { data: pur, error: purErr } = await supabase.from('purchasing')
-      .insert({ code, supplier_id: supplierId, date, notes: notes.trim() || null, period: parseInt(period) || 0, created_by: appUser?.id })
+      .insert({ code, supplier_id: supplierId, date, notes: notes.trim() || null, period: parseInt(period) || 0, total: totalValue, created_by: appUser?.id })
       .select('id').single()
 
     if (purErr || !pur) { setError(purErr?.message ?? 'Gagal menyimpan.'); setSubmitting(false); return }
@@ -120,8 +122,33 @@ export default function BuatPurchasingPage() {
     const { error: batchErr } = await supabase.from('stock_batches').insert(batches)
     if (batchErr) { setError(batchErr.message); setSubmitting(false); return }
 
+    // 4. Generate bills if period > 0
+    const periodVal = parseInt(period) || 0
+    if (periodVal > 0) {
+      const installment = Math.round((totalValue / periodVal) * 100) / 100
+      const purchaseDate = new Date(date)
+      const bills = Array.from({ length: periodVal }, (_, i) => {
+        const dueDate = new Date(purchaseDate)
+        dueDate.setMonth(dueDate.getMonth() + i + 1)
+        const month = dueDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        const dueDateStr = dueDate.toISOString().slice(0, 10)
+        return {
+          purchasing_id: pur.id,
+          supplier_id: Number(supplierId),
+          due_date: dueDateStr,
+          month,
+          installment,
+          paid_amount: 0,
+          bill_no: `BILL-${code}-${i + 1}`,
+        }
+      })
+
+      const { error: billErr } = await supabase.from('bills').insert(bills)
+      if (billErr) { setError(billErr.message); setSubmitting(false); return }
+    }
+
     setSubmitting(false)
-    setSuccess(`Purchasing ${code} berhasil disimpan.`)
+    setSuccess(`Purchasing ${code} berhasil disimpan.${periodVal > 0 ? ` ${periodVal} tagihan dibuat.` : ''}`)
     setSupplierId('')
     setNotes('')
     setPeriod('')

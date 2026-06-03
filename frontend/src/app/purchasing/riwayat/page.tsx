@@ -17,6 +17,7 @@ type Purchasing = {
   date: string
   notes: string | null
   period: number
+  total: number
   suppliers: { name: string } | null
   purchasing_items: PurchasingItem[]
 }
@@ -32,7 +33,7 @@ export default function RiwayatPurchasingPage() {
   useEffect(() => {
     supabase
       .from('purchasing')
-      .select('id, code, date, notes, period, suppliers(name), purchasing_items(id, qty, base_price, products(name))')
+      .select('id, code, date, notes, period, total, suppliers(name), purchasing_items(id, qty, base_price, products(name))')
       .order('date', { ascending: false })
       .then(({ data }: { data: Purchasing[] | null }) => {
         setList(data ?? [])
@@ -59,7 +60,7 @@ export default function RiwayatPurchasingPage() {
         ) : (
           <div className="space-y-2">
             {list.map(p => {
-              const total = p.purchasing_items.reduce((sum, item) => sum + item.qty * item.base_price, 0)
+              const total = p.total
               const isOpen = expanded === p.id
               return (
                 <div key={p.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
