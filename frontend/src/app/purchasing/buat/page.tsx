@@ -31,6 +31,7 @@ export default function BuatPurchasingPage() {
   const [supplierId, setSupplierId] = useState<number | ''>('')
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [notes, setNotes] = useState('')
+  const [period, setPeriod] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem()])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -89,7 +90,7 @@ export default function BuatPurchasingPage() {
 
     // 1. Insert purchasing header
     const { data: pur, error: purErr } = await supabase.from('purchasing')
-      .insert({ code, supplier_id: supplierId, date, notes: notes.trim() || null, created_by: appUser?.id })
+      .insert({ code, supplier_id: supplierId, date, notes: notes.trim() || null, period: parseInt(period) || 0, created_by: appUser?.id })
       .select('id').single()
 
     if (purErr || !pur) { setError(purErr?.message ?? 'Gagal menyimpan.'); setSubmitting(false); return }
@@ -123,6 +124,7 @@ export default function BuatPurchasingPage() {
     setSuccess(`Purchasing ${code} berhasil disimpan.`)
     setSupplierId('')
     setNotes('')
+    setPeriod('')
     setItems([emptyItem()])
   }
 
@@ -202,6 +204,22 @@ export default function BuatPurchasingPage() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
                 required
               />
+            </div>
+
+            {/* Period */}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Jangka Bayar <span className="text-gray-400">(bulan)</span></label>
+              <input
+                type="number"
+                value={period}
+                onChange={e => setPeriod(e.target.value)}
+                placeholder="0 = lunas saat beli"
+                min="0"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
+              />
+              {period && parseInt(period) > 0 && (
+                <p className="text-xs text-amber-600 mt-1">Pembayaran dalam {period} bulan.</p>
+              )}
             </div>
 
             {/* Notes */}

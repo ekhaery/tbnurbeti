@@ -16,6 +16,7 @@ type Purchasing = {
   code: string
   date: string
   notes: string | null
+  period: number
   suppliers: { name: string } | null
   purchasing_items: PurchasingItem[]
 }
@@ -31,7 +32,7 @@ export default function RiwayatPurchasingPage() {
   useEffect(() => {
     supabase
       .from('purchasing')
-      .select('id, code, date, notes, suppliers(name), purchasing_items(id, qty, base_price, products(name))')
+      .select('id, code, date, notes, period, suppliers(name), purchasing_items(id, qty, base_price, products(name))')
       .order('date', { ascending: false })
       .then(({ data }: { data: Purchasing[] | null }) => {
         setList(data ?? [])
@@ -71,6 +72,11 @@ export default function RiwayatPurchasingPage() {
                       <p className="text-xs text-gray-400 mt-0.5">
                         {p.suppliers?.name ?? '-'} · {new Date(p.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
+                      {p.period > 0 && (
+                        <span className="inline-block mt-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600">
+                          Bayar {p.period} bln
+                        </span>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold text-[#121358]">Rp {fmt(total)}</p>
