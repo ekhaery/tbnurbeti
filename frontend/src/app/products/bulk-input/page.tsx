@@ -64,7 +64,7 @@ export default function BulkInputPage() {
     supabase
       .from('products')
       .select('name')
-      .then(({ data }) => setExistingNames((data ?? []).map((p: { name: string }) => p.name.toLowerCase())))
+      .then(({ data }) => setExistingNames([...new Set((data ?? []).map((p: { name: string }) => p.name.toLowerCase()))]))
   }, [])
 
   const updateRow = (index: number, field: keyof ProductRow, value: string) => {

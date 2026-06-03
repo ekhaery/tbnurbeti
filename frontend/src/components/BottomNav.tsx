@@ -5,21 +5,21 @@ import { usePathname } from 'next/navigation'
 
 const navItems = [
   {
+    label: 'Input Produk',
+    href: '/products/bulk-input',
+    icon: (active: boolean) => (
+      <svg xmlns="http://www.w3.org/2000/svg" className={`w-5 h-5 ${active ? 'text-blue-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+      </svg>
+    ),
+  },
+  {
     label: 'Daftar Produk',
     href: '/products/list',
     icon: (active: boolean) => (
       <svg xmlns="http://www.w3.org/2000/svg" className={`w-5 h-5 ${active ? 'text-blue-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Input Produk',
-    href: '/products/bulk-input',
-    icon: (active: boolean) => (
-      <svg xmlns="http://www.w3.org/2000/svg" className={`w-5 h-5 ${active ? 'text-blue-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
       </svg>
     ),
   },
