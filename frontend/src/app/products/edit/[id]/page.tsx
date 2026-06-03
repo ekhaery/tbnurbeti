@@ -64,7 +64,7 @@ export default function EditProductPage() {
     const { error: updateError } = await supabase
       .from('products')
       .update({
-        code: form.code,
+        code: form.code.trim() || null,
         name: toTitleCase(form.name),
         category_id: Number(form.category_id),
         base_price: parseFloat(form.base_price) || 0,
