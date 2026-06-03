@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faBars, faRightFromBracket, faXmark, faGear, faUsers } from '@fortawesome/free-solid-svg-icons'
+import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 
@@ -39,6 +39,8 @@ export default function Navbar() {
   const isSettingsActive = pathname.startsWith('/settings')
   const isProdukActive = pathname.startsWith('/products')
 
+  if (!appUser) return null
+
   return (
     <>
       <nav className="bg-[#121358] fixed top-0 left-0 right-0 z-50 h-14">
@@ -54,23 +56,6 @@ export default function Navbar() {
             </button>
           )}
 
-          {/* Brand */}
-          <div className="shrink-0 flex flex-col leading-tight">
-            <Link
-              href="/products/list"
-              className="font-bold text-white text-sm tracking-wide hover:opacity-75 transition-opacity"
-            >
-              TB NURBETI
-            </Link>
-            {appUser && (
-              <div className="flex items-center gap-1 mt-0.5">
-                <span className="text-white/60 text-[10px]">{appUser.name}</span>
-                <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full ${isAdmin ? 'bg-blue-400/30 text-[#a8aaee]' : 'bg-white/10 text-white/60'}`}>
-                  {appUser.role}
-                </span>
-              </div>
-            )}
-          </div>
 
           {/* Nav links — right aligned */}
           <div className="flex flex-1 items-center justify-end gap-1">
@@ -115,9 +100,14 @@ export default function Navbar() {
         {/* Drawer header */}
         <div className="flex items-center justify-between px-5 py-4 bg-[#121358]">
           <div>
-            <p className="text-white font-bold text-base">Menu</p>
+            <p className="text-white font-bold text-base tracking-wide">TB NURBETI</p>
             {appUser && (
-              <p className="text-white/60 text-xs mt-0.5">{appUser.name} · {appUser.role}</p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="text-white/70 text-xs">{appUser.name}</span>
+                <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${isAdmin ? 'bg-blue-400/30 text-[#a8aaee]' : 'bg-white/10 text-white/60'}`}>
+                  {appUser.role}
+                </span>
+              </div>
             )}
           </div>
           <button
@@ -128,23 +118,43 @@ export default function Navbar() {
           </button>
         </div>
 
-        {/* Settings section */}
-        <div className="flex-1 overflow-y-auto py-4">
-          <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Settings</p>
-          {settingsLinks.map((item) => (
+        {/* Drawer body */}
+        <div className="flex-1 overflow-y-auto py-4 space-y-4">
+
+          {/* Purchasing */}
+          <div>
+            <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Purchasing</p>
             <Link
-              key={item.href}
-              href={item.href}
+              href="/purchasing"
               className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
-                pathname === item.href
+                pathname.startsWith('/purchasing')
                   ? 'text-[#121358] bg-[#121358]/8 font-semibold'
                   : 'text-gray-700 hover:bg-gray-50'
               }`}
             >
-              <FontAwesomeIcon icon={item.icon} className="w-4 h-4 text-gray-400" />
-              {item.label}
+              <FontAwesomeIcon icon={faCartShopping} className="w-4 h-4 text-gray-400" />
+              Purchasing
             </Link>
-          ))}
+          </div>
+
+          {/* Settings */}
+          <div>
+            <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Settings</p>
+              {settingsLinks.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                  pathname === item.href
+                    ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <FontAwesomeIcon icon={item.icon} className="w-4 h-4 text-gray-400" />
+                {item.label}
+              </Link>
+            ))}
+          </div>
         </div>
 
         {/* Logout */}
