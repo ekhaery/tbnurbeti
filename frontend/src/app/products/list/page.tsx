@@ -82,7 +82,7 @@ export default function ProductListPage() {
           </div>
           <button
             onClick={() => router.push('/products/bulk-input')}
-            className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-2 rounded-lg transition"
+            className="text-xs bg-[#121358] hover:bg-[#1a1c6e] text-white font-semibold px-3 py-2 rounded-lg transition"
           >
             + Tambah
           </button>
@@ -95,12 +95,12 @@ export default function ProductListPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari nama atau kode..."
-            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
           />
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
-            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
           >
             <option value="">Semua</option>
             {categories.map((cat) => (
@@ -133,7 +133,7 @@ export default function ProductListPage() {
                       Modal: <span className="font-medium text-gray-600">Rp {p.base_price.toLocaleString('id-ID')}</span>
                     </p>
                   )}
-                  <p className="text-sm font-bold text-blue-600">
+                  <p className="text-sm font-bold text-[#121358]">
                     Rp {p.price.toLocaleString('id-ID')}
                   </p>
                   <p className={`text-xs font-medium ${p.stock <= 0 ? 'text-red-400' : 'text-green-600'}`}>
@@ -141,7 +141,7 @@ export default function ProductListPage() {
                   </p>
                   <button
                     onClick={() => router.push(`/products/edit/${p.id}`)}
-                    className="mt-1 w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-blue-100 text-gray-400 hover:text-blue-600 transition"
+                    className="mt-1 w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-[#121358]/10 text-gray-400 hover:text-[#121358] transition"
                     title="Edit produk"
                   >
                     <FontAwesomeIcon icon={faPenToSquare} className="w-3.5 h-3.5" />

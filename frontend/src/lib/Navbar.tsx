@@ -62,7 +62,7 @@ export default function Navbar() {
           {appUser && (
             <div className="flex items-center gap-1 mt-0.5">
               <span className="text-white/60 text-[10px]">{appUser.name}</span>
-              <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full ${isAdmin ? 'bg-blue-400/30 text-blue-200' : 'bg-white/10 text-white/60'}`}>
+              <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full ${isAdmin ? 'bg-blue-400/30 text-[#a8aaee]' : 'bg-white/10 text-white/60'}`}>
                 {appUser.role}
               </span>
             </div>

@@ -171,7 +171,7 @@ export default function BulkInputPage() {
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(Number(e.target.value))}
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white text-gray-900"
               required
             >
               <option value="">-- Pilih Kategori --</option>
@@ -213,7 +213,7 @@ export default function BulkInputPage() {
                     className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 bg-gray-50 ${
                       row.name.trim() && existingNames.includes(toTitleCase(row.name.trim()).toLowerCase())
                         ? 'border-red-300 focus:ring-red-300'
-                        : 'border-gray-200 focus:ring-blue-400'
+                        : 'border-gray-200 focus:ring-[#121358]'
                     }`}
                   />
                   <datalist id={`products-list-${i}`}>
@@ -236,7 +236,7 @@ export default function BulkInputPage() {
                         onChange={(e) => updateRow(i, 'base_price', e.target.value)}
                         placeholder="0"
                         min="0"
-                        className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
+                        className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white text-gray-900"
                       />
                     </div>
                   )}
@@ -250,7 +250,7 @@ export default function BulkInputPage() {
                       onChange={(e) => updateRow(i, 'price', e.target.value)}
                       placeholder="0"
                       min="0"
-                      className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
+                      className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white text-gray-900"
                     />
                   </div>
                   <div>
@@ -260,7 +260,7 @@ export default function BulkInputPage() {
                       value={row.stock}
                       onChange={(e) => updateRow(i, 'stock', e.target.value)}
                       placeholder="0"
-                      className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
+                      className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white text-gray-900"
                     />
                   </div>
                 </div>
@@ -271,7 +271,7 @@ export default function BulkInputPage() {
           <button
             type="button"
             onClick={addRow}
-            className="w-full border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm text-blue-500 hover:border-blue-300 hover:bg-blue-50 transition font-medium"
+            className="w-full border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm text-[#121358] hover:border-[#121358]/30 hover:bg-[#121358]/5 transition font-medium"
           >
             + Tambah Produk
           </button>
@@ -279,7 +279,7 @@ export default function BulkInputPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-3 rounded-xl transition text-sm"
+            className="w-full bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white font-semibold py-3 rounded-xl transition text-sm"
           >
             {submitting ? 'Menyimpan...' : 'Simpan Produk'}
           </button>
@@ -312,7 +312,7 @@ export default function BulkInputPage() {
                     {isAdmin && (
                       <p className="text-[11px] text-gray-400">Modal: Rp {fmt(p.base_price)}</p>
                     )}
-                    <p className="text-sm font-semibold text-blue-600">Rp {fmt(p.price)}</p>
+                    <p className="text-sm font-semibold text-[#121358]">Rp {fmt(p.price)}</p>
                   </div>
                 </div>
               ))}
@@ -328,7 +328,7 @@ export default function BulkInputPage() {
               </button>
               <button
                 onClick={confirmSave}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition"
+                className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] text-white text-sm font-semibold transition"
               >
                 Ya, Simpan
               </button>
