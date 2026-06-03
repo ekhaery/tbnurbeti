@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faEllipsisVertical, faRightFromBracket, faXmark, faGear, faUsers } from '@fortawesome/free-solid-svg-icons'
+import { faBars, faRightFromBracket, faXmark, faGear, faUsers } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 
@@ -50,7 +50,7 @@ export default function Navbar() {
               className={`mr-2 ${linkClass(isSettingsActive && !drawerOpen)} px-2`}
               title="Menu"
             >
-              <FontAwesomeIcon icon={faEllipsisVertical} className="w-4 h-4" />
+              <FontAwesomeIcon icon={faBars} className="w-4 h-4" />
             </button>
           )}
 
@@ -58,7 +58,7 @@ export default function Navbar() {
           <div className="shrink-0 flex flex-col leading-tight">
             <Link
               href="/products/list"
-              className="font-bold text-white text-base tracking-wide hover:opacity-75 transition-opacity"
+              className="font-bold text-white text-sm tracking-wide hover:opacity-75 transition-opacity"
             >
               TB NURBETI
             </Link>
