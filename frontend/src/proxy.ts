@@ -33,9 +33,7 @@ export async function proxy(request: NextRequest) {
   const isLoginPage = pathname === '/login'
   const isApiRoute = pathname.startsWith('/api/')
 
-  if (isApiRoute) return supabaseResponse
-
-  if (!user && !isLoginPage) {
+  if (!user && !isLoginPage && !isApiRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
