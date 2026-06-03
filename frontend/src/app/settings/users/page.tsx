@@ -55,35 +55,16 @@ export default function UsersPage() {
     setAdding(true)
     setError(null)
 
-    const email = `${newName.trim().toLowerCase().replace(/\s+/g, '_')}@tbnurbeti.com`
-
-    // create auth user via admin API isn't available client-side; use a fake email approach
-    const { data: authData, error: authError } = await supabase.auth.admin?.createUser
-      ? { data: null, error: { message: 'not supported' } }
-      : { data: null, error: { message: 'not supported' } }
-
-    // fallback: insert directly using signUp then confirm
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password: newPassword,
-      options: { data: { name: newName.trim() } },
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName.trim(), password: newPassword, role_id: newRoleId }),
     })
 
-    if (signUpError || !signUpData.user) {
-      setError(signUpError?.message ?? 'Gagal membuat user.')
-      setAdding(false)
-      return
-    }
-
-    const { error: insertError } = await supabase.from('users').insert({
-      name: newName.trim(),
-      email,
-      role_id: newRoleId,
-      auth_id: signUpData.user.id,
-    })
-
+    const json = await res.json()
     setAdding(false)
-    if (insertError) { setError(insertError.message); return }
+
+    if (!res.ok) { setError(json.error ?? 'Gagal membuat user.'); return }
 
     setNewName('')
     setNewPassword('')
