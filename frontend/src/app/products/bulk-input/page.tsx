@@ -191,7 +191,7 @@ export default function BulkInputPage() {
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(Number(e.target.value))}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
               required
             >
               <option value="">-- Pilih Kategori --</option>
@@ -256,7 +256,7 @@ export default function BulkInputPage() {
                         onChange={(e) => updateRow(i, 'base_price', e.target.value)}
                         placeholder="0"
                         min="0"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
                       />
                     </div>
                   )}
@@ -270,7 +270,7 @@ export default function BulkInputPage() {
                       onChange={(e) => updateRow(i, 'price', e.target.value)}
                       placeholder="0"
                       min="0"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
                     />
                   </div>
                   <div>
@@ -280,7 +280,7 @@ export default function BulkInputPage() {
                       value={row.stock}
                       onChange={(e) => updateRow(i, 'stock', e.target.value)}
                       placeholder="0"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
                     />
                   </div>
                 </div>
