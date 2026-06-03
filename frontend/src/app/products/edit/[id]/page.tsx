@@ -200,7 +200,7 @@ export default function EditProductPage() {
           <div className="flex items-center justify-between py-1">
             <div>
               <p className="text-sm text-gray-700 font-medium">Discontinued</p>
-              <p className="text-xs text-gray-400">Tandai produk yang tidak dijual lagi</p>
+              <p className="text-xs text-gray-400">Tandai produk jika tidak restock lagi</p>
             </div>
             <button
               type="button"
