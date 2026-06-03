@@ -8,11 +8,6 @@ import { faGear, faChevronDown, faRightFromBracket } from '@fortawesome/free-sol
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 
-const navLinks = [
-  { label: '+', href: '/products/bulk-input' },
-  { label: 'Produk', href: '/products/list' },
-]
-
 const settingsLinks = [
   { label: 'Category', href: '/settings/categories' },
   { label: 'Users', href: '/settings/users' },
@@ -23,13 +18,13 @@ export default function Navbar() {
   const router = useRouter()
   const { appUser, signOut } = useAuth()
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const settingsRef = useRef<HTMLDivElement>(null)
   const isAdmin = appUser?.role === 'admin'
 
   // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
         setSettingsOpen(false)
       }
     }
@@ -48,6 +43,7 @@ export default function Navbar() {
     }`
 
   const isSettingsActive = pathname.startsWith('/settings')
+  const isProdukActive = pathname.startsWith('/products')
 
   return (
     <nav className="bg-[#121358] fixed top-0 left-0 right-0 z-50 h-14">
@@ -72,15 +68,11 @@ export default function Navbar() {
 
         {/* Nav links — right aligned */}
         <div className="flex flex-1 items-center justify-end gap-1">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={linkClass(pathname === link.href)}
-            >
-              {link.label}
-            </Link>
-          ))}
+
+          {/* Produk link */}
+          <Link href="/products/list" className={linkClass(isProdukActive)}>
+            Produk
+          </Link>
 
           {/* Logout — non-admin only */}
           {!isAdmin && (
@@ -95,7 +87,7 @@ export default function Navbar() {
 
           {/* Settings dropdown — admin only */}
           {isAdmin && (
-            <div className="relative" ref={dropdownRef}>
+            <div className="relative" ref={settingsRef}>
               <button
                 onClick={() => setSettingsOpen((o) => !o)}
                 className={`${linkClass(isSettingsActive)} flex items-center gap-1.5`}

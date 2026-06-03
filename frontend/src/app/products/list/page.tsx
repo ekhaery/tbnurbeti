@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPenToSquare } from '@fortawesome/free-solid-svg-icons'
+import { faPenToSquare, faArrowUpAZ } from '@fortawesome/free-solid-svg-icons'
+import ProductTabs from '@/lib/ProductTabs'
 
 type Product = {
   id: number
@@ -15,12 +16,29 @@ type Product = {
   base_price: number
   price: number
   stock: number
+  updated_at: string
   categories: { name: string } | null
 }
 
 type Category = {
   id: number
   name: string
+}
+
+type SortOption = 'updated_desc' | 'name_asc' | 'stock_asc'
+
+const sortLabels: Record<SortOption, string> = {
+  updated_desc: 'Terbaru Diupdate',
+  name_asc: 'Nama A→Z',
+  stock_asc: 'Stok Terendah',
+}
+
+function sortProducts(products: Product[], sort: SortOption): Product[] {
+  const arr = [...products]
+  if (sort === 'updated_desc') return arr.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+  if (sort === 'name_asc') return arr.sort((a, b) => a.name.localeCompare(b.name))
+  if (sort === 'stock_asc') return arr.sort((a, b) => a.stock - b.stock)
+  return arr
 }
 
 export default function ProductListPage() {
@@ -32,7 +50,10 @@ export default function ProductListPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState<number | ''>('')
+  const [sort, setSort] = useState<SortOption>('updated_desc')
+  const [sortOpen, setSortOpen] = useState(false)
   const [fetching, setFetching] = useState(true)
+  const sortRef = useRef<HTMLDivElement>(null)
 
   const isAdmin = appUser?.role === 'admin'
 
@@ -45,21 +66,34 @@ export default function ProductListPage() {
 
     supabase
       .from('products')
-      .select('id, code, name, base_price, price, stock, categories(name)')
-      .order('name')
+      .select('id, code, name, base_price, price, stock, updated_at, categories(name)')
       .then(({ data }: { data: Product[] | null }) => {
         setProducts(data ?? [])
         setFetching(false)
       })
   }, [])
 
-  const filtered = products.filter((p) => {
-    const matchSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.code?.toLowerCase().includes(search.toLowerCase())
-    const matchCategory = categoryId === '' || categories.find((c) => c.id === categoryId)?.name === p.categories?.name
-    return matchSearch && matchCategory
-  })
+  // Close sort dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
+        setSortOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const filtered = sortProducts(
+    products.filter((p) => {
+      const matchSearch =
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.code?.toLowerCase().includes(search.toLowerCase())
+      const matchCategory = categoryId === '' || categories.find((c) => c.id === categoryId)?.name === p.categories?.name
+      return matchSearch && matchCategory
+    }),
+    sort
+  )
 
   if (loading) {
     return (
@@ -72,7 +106,10 @@ export default function ProductListPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-4 max-w-2xl mx-auto space-y-4">
-        {/* Title + action */}
+        {/* Tabs */}
+        <ProductTabs />
+
+        {/* Title + sort */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-gray-800">Daftar Produk</h2>
@@ -80,12 +117,38 @@ export default function ProductListPage() {
               {fetching ? '...' : `${filtered.length} produk ditemukan`}
             </p>
           </div>
-          <button
-            onClick={() => router.push('/products/bulk-input')}
-            className="text-xs bg-[#121358] hover:bg-[#1a1c6e] text-white font-semibold px-3 py-2 rounded-lg transition"
-          >
-            + Tambah
-          </button>
+
+          {/* Sort button */}
+          <div className="relative" ref={sortRef}>
+            <button
+              onClick={() => setSortOpen((o) => !o)}
+              className={`w-9 h-9 flex items-center justify-center rounded-xl transition ${
+                sortOpen ? 'bg-[#121358] text-white' : 'bg-white shadow-sm text-gray-500 hover:text-[#121358]'
+              }`}
+              title="Urutkan"
+            >
+              <FontAwesomeIcon icon={faArrowUpAZ} className="w-4 h-4" />
+            </button>
+
+            {sortOpen && (
+              <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl border border-gray-200 shadow-lg py-1 z-50">
+                {(Object.entries(sortLabels) as [SortOption, string][]).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => { setSort(key); setSortOpen(false) }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition ${
+                      sort === key
+                        ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {label}
+                    {sort === key && <span className="float-right text-[#121358]">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Search + Category filter */}

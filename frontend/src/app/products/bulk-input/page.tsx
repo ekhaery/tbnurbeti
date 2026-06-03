@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { toTitleCase } from '@/lib/utils'
+import ProductTabs from '@/lib/ProductTabs'
 
 type Category = {
   id: number
@@ -153,6 +154,9 @@ export default function BulkInputPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-4 max-w-xl mx-auto space-y-4">
+        {/* Tabs */}
+        <ProductTabs />
+
         <div>
           <h2 className="text-lg font-bold text-gray-800">Buat Produk Baru</h2>
           <p className="text-xs text-gray-400 mt-0.5">Membuat banyak produk dalam satu kategori yang sama.</p>
