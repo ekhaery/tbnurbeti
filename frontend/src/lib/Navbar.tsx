@@ -4,12 +4,13 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping } from '@fortawesome/free-solid-svg-icons'
+import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 
 const settingsLinks = [
   { label: 'Category', href: '/settings/categories', icon: faGear },
+  { label: 'Supplier', href: '/settings/suppliers', icon: faTruck },
   { label: 'Users', href: '/settings/users', icon: faUsers },
 ]
 
