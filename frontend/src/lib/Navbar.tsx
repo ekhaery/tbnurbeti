@@ -15,6 +15,7 @@ const navLinks = [
 
 const settingsLinks = [
   { label: 'Category', href: '/settings/categories' },
+  { label: 'Users', href: '/settings/users' },
 ]
 
 export default function Navbar() {
@@ -81,46 +82,59 @@ export default function Navbar() {
             </Link>
           ))}
 
-          {/* Settings dropdown */}
-          <div className="relative" ref={dropdownRef}>
+          {/* Logout — non-admin only */}
+          {!isAdmin && (
             <button
-              onClick={() => setSettingsOpen((o) => !o)}
-              className={`${linkClass(isSettingsActive)} flex items-center gap-1.5`}
+              onClick={async () => { await signOut(); router.push('/login') }}
+              className="px-3 py-1.5 rounded-md text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+              title="Keluar"
             >
-              <FontAwesomeIcon icon={faGear} className="w-3.5 h-3.5" />
-              <FontAwesomeIcon
-                icon={faChevronDown}
-                className={`w-3 h-3 transition-transform duration-200 ${settingsOpen ? 'rotate-180' : ''}`}
-              />
+              <FontAwesomeIcon icon={faRightFromBracket} className="w-4 h-4" />
             </button>
+          )}
 
-            {settingsOpen && (
-              <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg border border-gray-200 shadow-lg py-1 z-50">
-                {settingsLinks.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-2 px-4 py-2 text-sm ${
-                      pathname === item.href
-                        ? 'text-[#121358] bg-[#121358]/10'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-                <div className="border-t border-gray-100 mt-1 pt-1">
-                  <button
-                    onClick={async () => { await signOut(); router.push('/login') }}
-                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
-                  >
-                    <FontAwesomeIcon icon={faRightFromBracket} className="w-3.5 h-3.5" />
-                    Keluar
-                  </button>
+          {/* Settings dropdown — admin only */}
+          {isAdmin && (
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setSettingsOpen((o) => !o)}
+                className={`${linkClass(isSettingsActive)} flex items-center gap-1.5`}
+              >
+                <FontAwesomeIcon icon={faGear} className="w-3.5 h-3.5" />
+                <FontAwesomeIcon
+                  icon={faChevronDown}
+                  className={`w-3 h-3 transition-transform duration-200 ${settingsOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {settingsOpen && (
+                <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg border border-gray-200 shadow-lg py-1 z-50">
+                  {settingsLinks.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-2 px-4 py-2 text-sm ${
+                        pathname === item.href
+                          ? 'text-[#121358] bg-[#121358]/10'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                  <div className="border-t border-gray-100 mt-1 pt-1">
+                    <button
+                      onClick={async () => { await signOut(); router.push('/login') }}
+                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                    >
+                      <FontAwesomeIcon icon={faRightFromBracket} className="w-3.5 h-3.5" />
+                      Keluar
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </nav>

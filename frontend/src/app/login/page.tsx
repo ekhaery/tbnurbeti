@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase-browser'
 export default function LoginPage() {
   const supabase = createClient()
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -17,11 +17,26 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data: userData, error: lookupError } = await supabase
+      .from('users')
+      .select('email')
+      .ilike('name', username.trim())
+      .single()
+
+    if (lookupError || !userData?.email) {
+      setLoading(false)
+      setError('Username tidak ditemukan.')
+      return
+    }
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: userData.email,
+      password,
+    })
     setLoading(false)
 
-    if (error) {
-      setError(error.message)
+    if (authError) {
+      setError('Password salah.')
     } else {
       router.push('/products/bulk-input')
       router.refresh()
@@ -47,8 +62,8 @@ export default function LoginPage() {
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">Username</label>
             <input
               type="text"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
               placeholder="Masukkan username"
               className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] focus:border-transparent"

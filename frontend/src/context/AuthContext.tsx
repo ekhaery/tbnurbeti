@@ -7,7 +7,6 @@ import type { User } from '@supabase/supabase-js'
 type AppUser = {
   id: number
   name: string
-  email: string
   role: 'admin' | 'user'
 }
 
@@ -34,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchAppUser = async (authId: string) => {
     const { data } = await supabase
       .from('users')
-      .select('id, name, email, roles(name)')
+      .select('id, name, roles(name)')
       .eq('auth_id', authId)
       .single()
 
@@ -42,14 +41,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAppUser({
         id: data.id,
         name: data.name,
-        email: data.email,
         role: (data.roles as unknown as { name: string }).name as 'admin' | 'user',
       })
     }
   }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    // getSession reads from local storage/cookie — no network, instant
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = session?.user ?? null
       setAuthUser(user)
       if (user) fetchAppUser(user.id).finally(() => setLoading(false))
       else setLoading(false)
