@@ -107,18 +107,18 @@ export default function ProductListPage() {
         </div>
 
         {/* Search + Category filter */}
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari nama atau kode..."
-            className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
-            className="border border-gray-300 rounded-xl px-3 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Semua</option>
             {categories.map((cat) => (
