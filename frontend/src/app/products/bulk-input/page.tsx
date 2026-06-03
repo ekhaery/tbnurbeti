@@ -9,6 +9,7 @@ import { toTitleCase } from '@/lib/utils'
 type Category = {
   id: number
   name: string
+  is_price_required: boolean
 }
 
 type ProductRow = {
@@ -57,7 +58,7 @@ export default function BulkInputPage() {
   useEffect(() => {
     supabase
       .from('categories')
-      .select('id, name')
+      .select('id, name, is_price_required')
       .order('name')
       .then(({ data }) => setCategories(data ?? []))
 
@@ -89,7 +90,7 @@ export default function BulkInputPage() {
       return
     }
 
-    const validRows = rows.filter((r) => r.name.trim() && r.price)
+    const validRows = rows.filter((r) => isPriceRequired ? (r.name.trim() && r.price) : r.name.trim())
     if (validRows.length === 0) {
       setError('Isi minimal satu produk.')
       return
@@ -107,7 +108,7 @@ export default function BulkInputPage() {
       name: toTitleCase(r.name.trim()),
       category_id: categoryId,
       base_price: parseFloat(r.base_price) || 0,
-      price: parseFloat(r.price),
+      price: isPriceRequired ? parseFloat(r.price) : (parseFloat(r.price) || 0),
       stock: parseInt(r.stock) || 0,
     }))
 
@@ -132,7 +133,9 @@ export default function BulkInputPage() {
     }
   }
 
-  const categoryName = categories.find((c) => c.id === categoryId)?.name ?? '-'
+  const selectedCategory = categories.find((c) => c.id === categoryId)
+  const categoryName = selectedCategory?.name ?? '-'
+  const isPriceRequired = selectedCategory?.is_price_required ?? true
 
   if (loading) {
     return (
@@ -242,7 +245,7 @@ export default function BulkInputPage() {
                   )}
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">
-                      Harga Jual <span className="text-red-500">*</span>
+                      Harga Jual {isPriceRequired && <span className="text-red-500">*</span>}
                     </label>
                     <input
                       type="number"
@@ -250,6 +253,7 @@ export default function BulkInputPage() {
                       onChange={(e) => updateRow(i, 'price', e.target.value)}
                       placeholder="0"
                       min="0"
+                      required={isPriceRequired}
                       className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white text-gray-900"
                     />
                   </div>
