@@ -155,6 +155,7 @@ export default function BuatTransaksiPage() {
         .from('stock_batches')
         .select('id, qty_remaining, base_price')
         .eq('product_id', productId)
+        .eq('is_available', true)
         .gt('qty_remaining', 0)
         .order('received_at', { ascending: true })
         .order('id', { ascending: true })

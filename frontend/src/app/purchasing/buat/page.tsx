@@ -10,9 +10,10 @@ import { toTitleCase } from '@/lib/utils'
 
 type Supplier = { id: number; name: string }
 type Product = { id: number; name: string; categories: { name: string } | null }
-type ItemRow = { product_id: number | ''; qty: string; base_price: string }
+type ItemRow = { product_id: number | ''; query: string; qty: string; base_price: string }
+type AutocompleteState = { open: boolean; focused: number }
 
-const emptyItem = (): ItemRow => ({ product_id: '', qty: '', base_price: '' })
+const emptyItem = (): ItemRow => ({ product_id: '', query: '', qty: '', base_price: '' })
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
 
@@ -33,6 +34,7 @@ export default function BuatPurchasingPage() {
   const [notes, setNotes] = useState('')
   const [period, setPeriod] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem()])
+  const [autocomplete, setAutocomplete] = useState<AutocompleteState[]>([{ open: false, focused: -1 }])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -53,8 +55,30 @@ export default function BuatPurchasingPage() {
     setItems(prev => prev.map((row, idx) => idx === i ? { ...row, [field]: value } : row))
   }
 
-  const addItem = () => setItems(prev => [...prev, emptyItem()])
-  const removeItem = (i: number) => setItems(prev => prev.filter((_, idx) => idx !== i))
+  const addItem = () => {
+    setItems(prev => [...prev, emptyItem()])
+    setAutocomplete(prev => [...prev, { open: false, focused: -1 }])
+  }
+  const removeItem = (i: number) => {
+    setItems(prev => prev.filter((_, idx) => idx !== i))
+    setAutocomplete(prev => prev.filter((_, idx) => idx !== i))
+  }
+
+  const selectProduct = (i: number, product: Product) => {
+    setItems(prev => prev.map((row, idx) => idx === i
+      ? { ...row, product_id: product.id, query: product.name }
+      : row
+    ))
+    setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: false, focused: -1 } : s))
+  }
+
+  const filteredProducts = (query: string) =>
+    query.trim() === ''
+      ? products
+      : products.filter(p =>
+          p.name.toLowerCase().includes(query.toLowerCase()) ||
+          (p.categories?.name ?? '').toLowerCase().includes(query.toLowerCase())
+        )
 
   const handleAddSupplier = async () => {
     if (!newSupplierName.trim()) return
@@ -117,6 +141,7 @@ export default function BuatPurchasingPage() {
       qty_remaining: item.qty,
       base_price: item.base_price,
       received_at: date,
+      is_available: false,
     }))
 
     const { error: batchErr } = await supabase.from('stock_batches').insert(batches)
@@ -283,21 +308,58 @@ export default function BuatPurchasingPage() {
                   </button>
                 </div>
 
-                <div>
+                <div className="relative">
                   <label className="block text-xs text-gray-500 mb-1">Produk <span className="text-red-500">*</span></label>
-                  <select
-                    value={row.product_id}
-                    onChange={e => updateItem(i, 'product_id', Number(e.target.value))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
-                    required
-                  >
-                    <option value="">-- Pilih Produk --</option>
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}{p.categories?.name ? ` (${p.categories.name})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    type="text"
+                    value={row.query}
+                    onChange={e => {
+                      setItems(prev => prev.map((r, idx) => idx === i ? { ...r, product_id: '', query: e.target.value } : r))
+                      setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: true, focused: -1 } : s))
+                    }}
+                    onFocus={() => setAutocomplete(prev => prev.map((s, idx) => idx === i ? { ...s, open: true } : s))}
+                    onBlur={() => setTimeout(() => setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: false, focused: -1 } : s)), 150)}
+                    onKeyDown={e => {
+                      const opts = filteredProducts(row.query)
+                      const ac = autocomplete[i]
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault()
+                        setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: true, focused: Math.min(s.focused + 1, opts.length - 1) } : s))
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault()
+                        setAutocomplete(prev => prev.map((s, idx) => idx === i ? { ...s, focused: Math.max(s.focused - 1, 0) } : s))
+                      } else if (e.key === 'Enter' && ac.focused >= 0) {
+                        e.preventDefault()
+                        selectProduct(i, opts[ac.focused])
+                      } else if (e.key === 'Escape') {
+                        setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: false, focused: -1 } : s))
+                      }
+                    }}
+                    placeholder="Cari produk..."
+                    autoComplete="off"
+                    className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${row.product_id ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-300'}`}
+                  />
+                  {autocomplete[i]?.open && filteredProducts(row.query).length > 0 && (
+                    <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                      {filteredProducts(row.query).map((p, optIdx) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onMouseDown={() => selectProduct(i, p)}
+                          className={`w-full text-left px-4 py-2.5 text-sm transition flex items-center justify-between gap-3 ${
+                            autocomplete[i].focused === optIdx ? 'bg-[#121358] text-white' : 'hover:bg-gray-50 text-gray-700'
+                          }`}
+                        >
+                          <span className="font-medium">{p.name}</span>
+                          {p.categories?.name && (
+                            <span className={`text-xs shrink-0 ${autocomplete[i].focused === optIdx ? 'text-white/70' : 'text-gray-400'}`}>
+                              {p.categories.name}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
