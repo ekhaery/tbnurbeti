@@ -17,8 +17,15 @@ type Product = {
 
 type ItemRow = {
   product_id: number | ''
+  query: string
   qty: string
   price_sold: string
+  discount: string
+}
+
+type AutocompleteState = {
+  open: boolean
+  focused: number // focused option index
 }
 
 type StockBatch = {
@@ -27,7 +34,7 @@ type StockBatch = {
   base_price: number
 }
 
-const emptyItem = (): ItemRow => ({ product_id: '', qty: '', price_sold: '' })
+const emptyItem = (): ItemRow => ({ product_id: '', query: '', qty: '', price_sold: '', discount: '' })
 const fmt = (n: number) => n.toLocaleString('id-ID')
 
 function generateCode() {
@@ -45,6 +52,7 @@ export default function BuatTransaksiPage() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem()])
+  const [autocomplete, setAutocomplete] = useState<AutocompleteState[]>([{ open: false, focused: -1 }])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -72,11 +80,32 @@ export default function BuatTransaksiPage() {
     }))
   }
 
-  const addItem = () => setItems(prev => [...prev, emptyItem()])
-  const removeItem = (i: number) => setItems(prev => prev.filter((_, idx) => idx !== i))
+  const addItem = () => {
+    setItems(prev => [...prev, emptyItem()])
+    setAutocomplete(prev => [...prev, { open: false, focused: -1 }])
+  }
+  const removeItem = (i: number) => {
+    setItems(prev => prev.filter((_, idx) => idx !== i))
+    setAutocomplete(prev => prev.filter((_, idx) => idx !== i))
+  }
+
+  const selectProduct = (i: number, product: Product) => {
+    setItems(prev => prev.map((row, idx) => idx === i
+      ? { ...row, product_id: product.id, query: product.name, price_sold: String(product.price) }
+      : row
+    ))
+    setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: false, focused: -1 } : s))
+  }
+
+  const filteredProducts = (query: string) =>
+    query.trim() === ''
+      ? products
+      : products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()) ||
+          (p.categories?.name ?? '').toLowerCase().includes(query.toLowerCase()))
 
   const validItems = items.filter(r => r.product_id && r.qty && r.price_sold)
-  const total = validItems.reduce((sum, r) => sum + (parseFloat(r.price_sold) || 0) * (parseInt(r.qty) || 0), 0)
+  const subtotal = (r: ItemRow) => (parseFloat(r.price_sold) || 0) * (parseInt(r.qty) || 0) - (parseFloat(r.discount) || 0)
+  const total = validItems.reduce((sum, r) => sum + subtotal(r), 0)
 
   const stockError = (i: number): string | null => {
     const row = items[i]
@@ -118,7 +147,8 @@ export default function BuatTransaksiPage() {
     for (const row of validItems) {
       const productId = Number(row.product_id)
       const qtyNeeded = parseInt(row.qty)
-      const priceSold = parseFloat(row.price_sold)
+      const discount = parseFloat(row.discount) || 0
+      const priceSold = (parseFloat(row.price_sold) || 0) * qtyNeeded - discount
 
       // Fetch batches oldest first
       const { data: batches, error: batchErr } = await supabase
@@ -147,7 +177,7 @@ export default function BuatTransaksiPage() {
       // Insert transaction_item
       const { data: txItem, error: txItemErr } = await supabase
         .from('transaction_items')
-        .insert({ transaction_id: trx.id, product_id: productId, qty: qtyNeeded, price_sold: priceSold, cogs: totalCogs })
+        .insert({ transaction_id: trx.id, product_id: productId, qty: qtyNeeded, price_sold: priceSold, cogs: totalCogs, discount })
         .select('id').single()
 
       if (txItemErr || !txItem) { setError(txItemErr?.message ?? 'Gagal menyimpan item.'); setSubmitting(false); return }
@@ -249,29 +279,75 @@ export default function BuatTransaksiPage() {
                     </button>
                   </div>
 
-                  <div>
+                  <div className="relative">
                     <label className="block text-xs text-gray-500 mb-1">Produk <span className="text-red-500">*</span></label>
-                    <select
-                      value={row.product_id}
-                      onChange={e => updateItem(i, 'product_id', Number(e.target.value))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
-                      required
-                    >
-                      <option value="">-- Pilih Produk --</option>
-                      {products.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}{p.categories?.name ? ` (${p.categories.name})` : ''} — stok: {p.stock}
-                        </option>
-                      ))}
-                    </select>
+                    <input
+                      type="text"
+                      value={row.query}
+                      onChange={e => {
+                        updateItem(i, 'query', e.target.value)
+                        // clear selected product if user types
+                        setItems(prev => prev.map((r, idx) => idx === i ? { ...r, product_id: '', query: e.target.value } : r))
+                        setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: true, focused: -1 } : s))
+                      }}
+                      onFocus={() => setAutocomplete(prev => prev.map((s, idx) => idx === i ? { ...s, open: true } : s))}
+                      onBlur={() => setTimeout(() => setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: false, focused: -1 } : s)), 150)}
+                      onKeyDown={e => {
+                        const opts = filteredProducts(row.query)
+                        const ac = autocomplete[i]
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault()
+                          setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: true, focused: Math.min(s.focused + 1, opts.length - 1) } : s))
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault()
+                          setAutocomplete(prev => prev.map((s, idx) => idx === i ? { ...s, focused: Math.max(s.focused - 1, 0) } : s))
+                        } else if (e.key === 'Enter' && ac.focused >= 0) {
+                          e.preventDefault()
+                          selectProduct(i, opts[ac.focused])
+                        } else if (e.key === 'Escape') {
+                          setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: false, focused: -1 } : s))
+                        }
+                      }}
+                      placeholder="Cari produk..."
+                      autoComplete="off"
+                      className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${row.product_id ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-300'}`}
+                    />
+                    {autocomplete[i]?.open && filteredProducts(row.query).length > 0 && (
+                      <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                        {filteredProducts(row.query).map((p, optIdx) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onMouseDown={() => selectProduct(i, p)}
+                            className={`w-full text-left px-4 py-2.5 text-sm transition flex items-center justify-between gap-3 ${
+                              autocomplete[i].focused === optIdx ? 'bg-[#121358] text-white' : 'hover:bg-gray-50 text-gray-700'
+                            }`}
+                          >
+                            <span>
+                              <span className="font-medium">{p.name}</span>
+                              {p.categories?.name && (
+                                <span className={`ml-1 text-xs ${autocomplete[i].focused === optIdx ? 'text-white/70' : 'text-gray-400'}`}>
+                                  ({p.categories.name})
+                                </span>
+                              )}
+                            </span>
+                            <span className={`text-xs shrink-0 ${autocomplete[i].focused === optIdx ? 'text-white/70' : 'text-gray-400'}`}>
+                              stok: {p.stock}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {selectedProduct && (
                       <p className="text-xs text-gray-400 mt-1">
                         Harga jual: <span className="font-semibold text-gray-600">Rp {fmt(selectedProduct.price)}</span>
+                        <span className="mx-1">·</span>
+                        Stok: <span className="font-semibold text-gray-600">{selectedProduct.stock}</span>
                       </p>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">Qty <span className="text-red-500">*</span></label>
                       <input
@@ -285,11 +361,21 @@ export default function BuatTransaksiPage() {
                       {sErr && <p className="text-xs text-red-500 mt-1">{sErr}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Harga Jual <span className="text-red-500">*</span></label>
+                      <label className="block text-xs text-gray-500 mb-1">Harga Jual</label>
                       <input
                         type="number"
                         value={row.price_sold}
-                        onChange={e => updateItem(i, 'price_sold', e.target.value)}
+                        disabled
+                        placeholder="0"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 text-gray-400 cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Diskon</label>
+                      <input
+                        type="number"
+                        value={row.discount}
+                        onChange={e => updateItem(i, 'discount', e.target.value)}
                         placeholder="0"
                         min="0"
                         className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
@@ -299,7 +385,7 @@ export default function BuatTransaksiPage() {
 
                   {row.qty && row.price_sold && (
                     <p className="text-xs text-gray-400 text-right">
-                      Subtotal: <span className="font-semibold text-gray-700">Rp {fmt((parseInt(row.qty) || 0) * (parseFloat(row.price_sold) || 0))}</span>
+                      Subtotal: <span className="font-semibold text-gray-700">Rp {fmt(subtotal(row))}</span>
                     </p>
                   )}
                 </div>

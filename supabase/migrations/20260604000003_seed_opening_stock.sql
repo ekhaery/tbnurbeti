@@ -8,10 +8,10 @@ do $$ begin
     return;
   end if;
 
-  -- 1. Create dummy supplier
-  insert into suppliers (name)
-  values ('Opening Stock')
-  on conflict (name) do nothing;
+  -- 1. Create dummy supplier if not exists
+  if not exists (select 1 from suppliers where name = 'Opening Stock') then
+    insert into suppliers (name) values ('Opening Stock');
+  end if;
 
   -- 2. Create dummy purchasing
   insert into purchasing (code, supplier_id, date, notes, period, total, created_by)
