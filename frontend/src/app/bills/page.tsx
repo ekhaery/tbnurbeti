@@ -100,7 +100,7 @@ export default function BillsPage() {
 
         {/* Header */}
         <div>
-          <h2 className="text-lg font-bold text-gray-800">Bills</h2>
+          <h2 className="text-lg font-bold text-gray-800">Tagihan</h2>
           <p className="text-xs text-gray-400 mt-0.5">Tagihan dari purchasing berjangka.</p>
         </div>
 

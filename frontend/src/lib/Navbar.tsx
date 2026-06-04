@@ -145,7 +145,7 @@ export default function Navbar() {
               }`}
             >
               <FontAwesomeIcon icon={faFileInvoiceDollar} className="w-4 h-4 text-gray-400" />
-              Bills
+              Tagihan
             </Link>
           </div>
 
