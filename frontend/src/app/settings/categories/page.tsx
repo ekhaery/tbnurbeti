@@ -76,7 +76,7 @@ export default function CategoriesPage() {
         {/* Header */}
         <div>
           <h2 className="text-lg font-bold text-gray-800">Kategori</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{fetching ? '...' : `${categories.length} kategori`}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{fetching ? '...' : `${categories.length} kategori`}</p>
         </div>
 
         {/* Error */}

@@ -216,7 +216,7 @@ export default function RiwayatPurchasingPage() {
 
         <div>
           <h2 className="text-lg font-bold text-gray-800">Riwayat Purchasing</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{fetching ? '...' : `${list.length} purchasing`}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{fetching ? '...' : `${list.length} purchasing`}</p>
         </div>
 
         {fetching ? (
@@ -240,7 +240,7 @@ export default function RiwayatPurchasingPage() {
                   >
                     <div>
                       <p className="text-sm font-semibold text-gray-800 font-mono">{p.code}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="text-xs text-gray-500 mt-0.5">
                         {p.suppliers?.name ?? '-'} · {new Date(p.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
                       <div className="flex items-center gap-1.5 mt-1">

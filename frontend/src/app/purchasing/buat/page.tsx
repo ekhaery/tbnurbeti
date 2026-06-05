@@ -208,7 +208,7 @@ export default function BuatPurchasingPage() {
 
         <div>
           <h2 className="text-lg font-bold text-gray-800">Buat Purchasing</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Catat pembelian stok dari supplier.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Catat pembelian stok dari supplier.</p>
         </div>
 
         {success && (

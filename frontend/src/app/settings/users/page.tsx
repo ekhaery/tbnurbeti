@@ -106,7 +106,7 @@ export default function UsersPage() {
         {/* Header */}
         <div>
           <h2 className="text-lg font-bold text-gray-800">Users</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{fetching ? '...' : `${users.length} pengguna`}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{fetching ? '...' : `${users.length} pengguna`}</p>
         </div>
 
         {error && (

@@ -222,7 +222,7 @@ export default function BuatTransaksiPage() {
 
         <div>
           <h2 className="text-lg font-bold text-gray-800">Buat Transaksi</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Catat penjualan produk.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Catat penjualan produk.</p>
         </div>
 
         {success && (

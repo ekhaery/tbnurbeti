@@ -52,7 +52,7 @@ export default function RiwayatTransaksiPage() {
 
         <div>
           <h2 className="text-lg font-bold text-gray-800">Riwayat Transaksi</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Semua transaksi penjualan.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Semua transaksi penjualan.</p>
         </div>
 
         {fetching ? (
@@ -72,7 +72,7 @@ export default function RiwayatTransaksiPage() {
                   <div className="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-mono font-semibold text-[#121358]">{trx.code}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="text-xs text-gray-500 mt-0.5">
                         {new Date(trx.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                         {trx.users?.name && <span> · {trx.users.name}</span>}
                       </p>
@@ -92,13 +92,13 @@ export default function RiwayatTransaksiPage() {
                       <div key={item.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-700 truncate">{item.products?.name ?? '-'}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">
+                          <p className="text-xs text-gray-500 mt-0.5">
                             qty: {item.qty}
                           </p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-sm font-semibold text-gray-800">Rp {fmt(item.price_sold)}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">
+                          <p className="text-xs text-gray-500 mt-0.5">
                             COGS: Rp {fmt(item.cogs)}
                           </p>
                         </div>

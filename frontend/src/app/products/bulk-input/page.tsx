@@ -159,7 +159,7 @@ export default function BulkInputPage() {
 
         <div>
           <h2 className="text-lg font-bold text-gray-800">Buat Produk Baru</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Membuat banyak produk dalam satu kategori yang sama.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Membuat banyak produk dalam satu kategori yang sama.</p>
         </div>
 
         {/* Feedback */}
@@ -322,7 +322,7 @@ export default function BulkInputPage() {
             {/* Modal header */}
             <div className="px-5 py-4 border-b border-gray-100">
               <h3 className="text-base font-bold text-gray-800">Konfirmasi Simpan</h3>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="text-xs text-gray-500 mt-0.5">
                 Kategori: <span className="font-medium text-gray-600">{categoryName}</span>
                 {' · '}
                 <span className="font-medium text-gray-600">{pendingPayload.length} produk</span>

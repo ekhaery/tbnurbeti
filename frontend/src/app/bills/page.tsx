@@ -143,8 +143,8 @@ export default function BillsPage() {
 
         {/* Header */}
         <div>
-          <h2 className="text-lg font-bold text-gray-800">Tagihan</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Tagihan dari purchasing berjangka.</p>
+          <h2 className="text-lg font-bold text-gray-800">Tagihan Dagang</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Tagihan dari pengadaan berjangka.</p>
         </div>
 
         {/* Summary cards */}
@@ -258,7 +258,7 @@ export default function BillsPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-800">{b.suppliers?.name ?? '-'}</p>
                       <p className="text-xs text-gray-400 font-mono mt-0.5">{b.bill_no ?? b.purchasing?.code}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="text-xs text-gray-500 mt-0.5">
                         {b.installment_due_date ? fmtDate(b.installment_due_date) : '-'} · Jatuh tempo: {fmtDate(b.due_date)}
                       </p>
                       {b.paid_amount > 0 && !b.is_paid && (
@@ -307,7 +307,7 @@ export default function BillsPage() {
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-gray-800">Bayar Tagihan</h3>
-                <p className="text-xs text-gray-400 mt-0.5">{payingBill.suppliers?.name} · {payingBill.month}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{payingBill.suppliers?.name} · {payingBill.month}</p>
               </div>
               <button onClick={() => setPayingBill(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition">
                 <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />

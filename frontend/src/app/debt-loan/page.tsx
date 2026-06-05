@@ -230,7 +230,7 @@ export default function DebtLoanPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-gray-800">Debt & Loan</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Daftar hutang dan pinjaman.</p>
+            <p className="text-xs text-gray-500 mt-0.5">Daftar hutang dan pinjaman.</p>
           </div>
           <button onClick={() => { setShowForm(true); setError(null) }}
             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
@@ -252,10 +252,10 @@ export default function DebtLoanPage() {
                       <p className="text-sm font-semibold text-gray-800">{d.bank_account}</p>
                       <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#9FA1FF]/20 text-[#121358]">{d.debt_type}</span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{fmtDate(d.date)}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Cicilan: {installmentLabel(d.installment_type)} · Rp {fmt(d.installment_amount)}</p>
-                    {d.due_date && <p className="text-xs text-gray-400 mt-0.5">Lunas: {fmtDate(d.due_date)}</p>}
-                    {d.period && <p className="text-xs text-gray-400 mt-0.5">{d.period.days} hari · {d.period.weeks} minggu · {d.period.month} bulan</p>}
+                    <p className="text-xs text-gray-500 mt-0.5">{fmtDate(d.date)}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Cicilan: {installmentLabel(d.installment_type)} · Rp {fmt(d.installment_amount)}</p>
+                    {d.due_date && <p className="text-xs text-gray-500 mt-0.5">Lunas: {fmtDate(d.due_date)}</p>}
+                    {d.period && <p className="text-xs text-gray-500 mt-0.5">{d.period.days} hari · {d.period.weeks} minggu · {d.period.month} bulan</p>}
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-[#121358]">Rp {fmt(d.debt_amount)}</p>

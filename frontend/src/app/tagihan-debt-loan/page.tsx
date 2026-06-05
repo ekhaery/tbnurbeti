@@ -89,7 +89,7 @@ export default function TagihanDebtLoanPage() {
 
         <div>
           <h2 className="text-lg font-bold text-gray-800">Tagihan Debt & Loan</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Detail tagihan cicilan hutang.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Detail tagihan cicilan hutang.</p>
         </div>
 
         {/* Summary */}
@@ -202,10 +202,10 @@ export default function TagihanDebtLoanPage() {
                       </div>
                       {d.code && <p className="text-xs text-gray-400 font-mono mt-0.5">{d.code}</p>}
                       {d.installment_due_date && (
-                        <p className="text-xs text-gray-400 mt-0.5">Cicilan: {fmtDate(d.installment_due_date)}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Cicilan: {fmtDate(d.installment_due_date)}</p>
                       )}
                       {d.due_date && (
-                        <p className="text-xs text-gray-400 mt-0.5">Jatuh tempo: {fmtDate(d.due_date)}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Jatuh tempo: {fmtDate(d.due_date)}</p>
                       )}
                       {d.is_paid && d.payment_date && (
                         <p className="text-xs text-green-600 mt-0.5">Dibayar: {fmtDate(d.payment_date)}</p>
@@ -240,7 +240,7 @@ export default function TagihanDebtLoanPage() {
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-gray-800">Konfirmasi Pembayaran</h3>
-                <p className="text-xs text-gray-400 mt-0.5">
+                <p className="text-xs text-gray-500 mt-0.5">
                   {paying.debt_loan?.bank_account} · {paying.installment_due_date ? fmtDate(paying.installment_due_date) : '-'}
                 </p>
               </div>

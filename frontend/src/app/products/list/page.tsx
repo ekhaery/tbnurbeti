@@ -113,7 +113,7 @@ export default function ProductListPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-gray-800">Daftar Produk</h2>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-500 mt-0.5">
               {fetching ? '...' : `${filtered.length} produk ditemukan`}
             </p>
           </div>
@@ -185,7 +185,7 @@ export default function ProductListPage() {
               <div key={p.id} className="bg-white rounded-xl shadow-sm p-4 flex items-start justify-between gap-3 relative">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800 truncate">{p.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{p.code}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{p.code}</p>
                   <span className="inline-block mt-1 text-[10px] font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
                     {p.categories?.name ?? '-'}
                   </span>

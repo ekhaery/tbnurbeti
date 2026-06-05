@@ -111,7 +111,7 @@ export default function SuppliersPage() {
 
         <div>
           <h2 className="text-lg font-bold text-gray-800">Supplier</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{fetching ? '...' : `${suppliers.length} supplier`}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{fetching ? '...' : `${suppliers.length} supplier`}</p>
         </div>
 
         {error && (
