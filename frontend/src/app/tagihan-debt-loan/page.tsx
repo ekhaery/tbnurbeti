@@ -94,18 +94,20 @@ export default function TagihanDebtLoanPage() {
 
         {/* Summary */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-xl shadow-sm p-3">
-            <p className="text-xs text-gray-400">Belum Lunas</p>
-            <p className="text-base font-bold text-red-500 mt-0.5">Rp {fmt(totalUnpaid)}</p>
+          <div className="bg-[#121358] rounded-xl shadow-sm p-3">
+            <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Belum Lunas</p>
+            <p className="text-base font-bold mt-0.5" style={{ color: '#FCB7C7' }}>Rp {fmt(totalUnpaid)}</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm p-3">
-            <p className="text-xs text-gray-400">Sudah Lunas</p>
-            <p className="text-base font-bold text-green-600 mt-0.5">Rp {fmt(totalPaid)}</p>
+          <div className="bg-[#121358] rounded-xl shadow-sm p-3">
+            <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Sudah Lunas</p>
+            <p className="text-base font-bold mt-0.5" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaid)}</p>
           </div>
         </div>
 
         {/* Filter card */}
         <div className="rounded-2xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
+
+          <p className="text-xs font-semibold text-[#121358]">Apply Filter:</p>
 
           {/* Status tabs */}
           <div className="bg-gray-100 rounded-xl p-1 flex gap-1">
