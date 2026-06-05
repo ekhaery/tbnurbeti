@@ -167,9 +167,10 @@ export default function TagihanDebtLoanPage() {
         </div>
 
         {/* Yearly total */}
-        <p className="text-xs text-gray-500 px-1">
-          Total hutang tahunan: <span className="font-bold text-[#121358]">Rp {fmt(filtered.reduce((s, d) => s + d.installment_amount, 0))}</span>
-        </p>
+        <div className="rounded-xl px-4 py-2.5 flex items-center justify-between bg-[#121358]">
+          <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Total hutang tahunan</p>
+          <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(filtered.reduce((s, d) => s + d.installment_amount, 0))}</p>
+        </div>
 
         {/* List grouped by month */}
         {fetching ? (
