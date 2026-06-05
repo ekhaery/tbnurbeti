@@ -134,7 +134,7 @@ export default function BuatPurchasingPage() {
     const status: PurchasingStatus = transformationPhase ? 'init' : 'created'
 
     const { data: pur, error: purErr } = await supabase.from('purchasing')
-      .insert({ code, supplier_id: supplierId, date, notes: notes.trim() || null, period: periodWeeks, total: totalValue, created_by: appUser?.id, status })
+      .insert({ code, supplier_id: supplierId, date, notes: notes.trim() || null, total: totalValue, created_by: appUser?.id, status, due_date: jatuhTempo || null })
       .select('id').single()
 
     if (purErr || !pur) { setError(purErr?.message ?? 'Gagal menyimpan.'); setSubmitting(false); return }

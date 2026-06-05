@@ -22,8 +22,8 @@ type Purchasing = {
   id: number
   code: string
   date: string
+  due_date: string | null
   notes: string | null
-  period: number
   total: number
   status: string
   supplier_id: number
@@ -69,7 +69,7 @@ export default function RiwayatPurchasingPage() {
   const fetchData = async () => {
     const { data } = await supabase
       .from('purchasing')
-      .select('id, code, date, notes, period, total, status, supplier_id, suppliers(name), purchasing_items(id, qty, base_price, products(name), stock_batches(id, is_available))')
+      .select('id, code, date, due_date, notes, total, status, supplier_id, suppliers(name), purchasing_items(id, qty, base_price, products(name), stock_batches(id, is_available))')
       .order('date', { ascending: false })
     setList((data as Purchasing[]) ?? [])
     setFetching(false)
@@ -101,14 +101,7 @@ export default function RiwayatPurchasingPage() {
     setEditing(p)
     setEditSupplierId(p.supplier_id)
     setEditDate(p.date)
-    // Reconstruct jatuh tempo from date + period months
-    if (p.period > 0) {
-      const d = new Date(p.date)
-      d.setDate(d.getDate() + p.period * 7)
-      setEditJatuhTempo(d.toISOString().slice(0, 10))
-    } else {
-      setEditJatuhTempo('')
-    }
+    setEditJatuhTempo(p.due_date ?? '')
     setEditNotes(p.notes ?? '')
     setEditItems(p.purchasing_items.map(i => ({
       id: i.id,
@@ -149,9 +142,9 @@ export default function RiwayatPurchasingPage() {
       .update({
         supplier_id: editSupplierId,
         date: editDate,
-        period: editPeriodWeeks,
         notes: editNotes.trim() || null,
         total: newTotal,
+        due_date: editJatuhTempo || null,
       })
       .eq('id', editing.id)
 
@@ -244,9 +237,9 @@ export default function RiwayatPurchasingPage() {
                         {p.suppliers?.name ?? '-'} · {new Date(p.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
                       <div className="flex items-center gap-1.5 mt-1">
-                        {p.period > 0 && (
+                        {p.due_date && (
                           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600">
-                            Bayar {p.period} bln
+                            JT: {new Date(p.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
                         )}
                         {isInit || isCreated ? (

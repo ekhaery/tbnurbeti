@@ -21,6 +21,16 @@ type Bill = {
 
 type FilterStatus = 'all' | 'unpaid' | 'paid'
 
+type PurchasingRow = {
+  id: number
+  code: string
+  date: string
+  due_date: string | null
+  total: number
+  status: string
+  suppliers: { name: string } | null
+}
+
 const fmt = (n: number) => n.toLocaleString('id-ID')
 
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -51,6 +61,9 @@ export default function BillsPage() {
   const [fetching, setFetching] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('unpaid')
   const [weeklyExpanded, setWeeklyExpanded] = useState(false)
+  const [billsTab, setBillsTab] = useState<'cicilan' | 'jatuh_tempo'>('cicilan')
+  const [purchasing, setPurchasing] = useState<PurchasingRow[]>([])
+  const [fetchingPurchasing, setFetchingPurchasing] = useState(false)
   const now = new Date()
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const [monthFilter, setMonthFilter] = useState(defaultMonth)
@@ -84,6 +97,20 @@ export default function BillsPage() {
 
   useEffect(() => { fetchData() }, [])
   useEffect(() => { if (payingBill) setTimeout(() => inputRef.current?.focus(), 100) }, [payingBill])
+
+  useEffect(() => {
+    if (billsTab !== 'jatuh_tempo') return
+    setFetchingPurchasing(true)
+    supabase
+      .from('purchasing')
+      .select('id, code, date, due_date, total, status, suppliers(name)')
+      .not('due_date', 'is', null)
+      .order('due_date', { ascending: true })
+      .then(({ data }: { data: PurchasingRow[] | null }) => {
+        setPurchasing(data ?? [])
+        setFetchingPurchasing(false)
+      })
+  }, [billsTab])
 
   const supplierNames = Array.from(new Set(bills.map(b => b.suppliers?.name ?? '').filter(Boolean))).sort()
 
@@ -136,10 +163,18 @@ export default function BillsPage() {
 
   const remaining = (b: Bill) => b.installment - b.paid_amount
 
-  // Group by month
+  // Group by month (Cicilan tab) or due_date month (Jatuh Tempo tab)
   const grouped = filtered.reduce<Record<string, Bill[]>>((acc, b) => {
-    if (!acc[b.month]) acc[b.month] = []
-    acc[b.month].push(b)
+    let key: string
+    if (billsTab === 'jatuh_tempo') {
+      key = b.due_date
+        ? new Date(b.due_date).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+        : 'Tanpa Jatuh Tempo'
+    } else {
+      key = b.month
+    }
+    if (!acc[key]) acc[key] = []
+    acc[key].push(b)
     return acc
   }, {})
 
@@ -297,8 +332,62 @@ export default function BillsPage() {
           </div>
         )}
 
-        {/* Bill list grouped by month */}
-        {fetching ? (
+        {/* Tabs */}
+        <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1">
+          {(['cicilan', 'jatuh_tempo'] as const).map(t => (
+            <button key={t} onClick={() => setBillsTab(t)}
+              className={`flex-1 text-center text-sm font-medium py-2 rounded-xl transition-colors ${billsTab === t ? 'bg-slate-800 text-white' : 'bg-slate-200 sm:bg-transparent text-slate-500 sm:hover:bg-slate-200'}`}>
+              {t === 'cicilan' ? 'Cicilan' : 'Jatuh Tempo'}
+            </button>
+          ))}
+        </div>
+
+        {/* Jatuh Tempo tab */}
+        {billsTab === 'jatuh_tempo' && (
+          fetchingPurchasing ? (
+            <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
+          ) : (() => {
+            const filteredPurchasing = purchasing.filter(p => {
+              if (!p.due_date) return false
+              if (monthFilter && p.due_date.slice(0, 7) !== monthFilter) return false
+              return true
+            })
+            const groupedPurchasing = filteredPurchasing.reduce<Record<string, PurchasingRow[]>>((acc, p) => {
+              const key = new Date(p.due_date!).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+              if (!acc[key]) acc[key] = []
+              acc[key].push(p)
+              return acc
+            }, {})
+            return filteredPurchasing.length === 0 ? (
+              <div className="text-center text-sm text-gray-400 py-10">Tidak ada data.</div>
+            ) : Object.entries(groupedPurchasing).map(([month, items]) => (
+              <div key={month} className="space-y-2">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-1">{month}</p>
+                {items.map(p => (
+                  <div key={p.id} className="bg-white rounded-xl shadow-sm p-4 border-l-4 border-[#9FA1FF]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">{p.suppliers?.name ?? '-'}</p>
+                        <p className="text-xs text-gray-400 font-mono mt-0.5">{p.code}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Tanggal: {fmtDate(p.date)}</p>
+                        {p.due_date && <p className="text-xs text-gray-500 mt-0.5">Jatuh tempo: {fmtDate(p.due_date)}</p>}
+                        <span className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                          p.status === 'completed' ? 'bg-green-100 text-green-600' :
+                          p.status === 'created' ? 'bg-blue-100 text-blue-600' :
+                          'bg-orange-100 text-orange-500'
+                        }`}>{p.status}</span>
+                      </div>
+                      <p className="text-sm font-bold text-[#121358] shrink-0">Rp {fmt(p.total)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
+          })()
+        )}
+
+        {/* Cicilan tab — Bill list */}
+        {billsTab === 'cicilan' && (fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
         ) : filtered.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-10">Tidak ada tagihan.</div>
@@ -351,7 +440,7 @@ export default function BillsPage() {
               ))}
             </div>
           ))
-        )}
+        ))}
       </div>
 
       {/* Weekly Calendar Modal */}
