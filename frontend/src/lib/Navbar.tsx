@@ -4,13 +4,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck, faFileInvoiceDollar, faHandHoldingDollar, faMoneyCheckDollar, faReceipt } from '@fortawesome/free-solid-svg-icons'
+import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck, faFileInvoiceDollar, faHandHoldingDollar, faMoneyCheckDollar, faReceipt, faUserGroup } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 
 const settingsLinks = [
   { label: 'Category', href: '/settings/categories', icon: faGear },
-  { label: 'Supplier', href: '/settings/suppliers', icon: faTruck },
   { label: 'Users', href: '/settings/users', icon: faUsers },
 ]
 
@@ -207,6 +206,33 @@ export default function Navbar() {
             >
               <FontAwesomeIcon icon={faReceipt} className="w-4 h-4 text-gray-400" />
               Tagihan Debt & Loan
+            </Link>
+          </div>
+
+          {/* Masterdata */}
+          <div>
+            <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Masterdata</p>
+            <Link
+              href="/customers"
+              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                pathname.startsWith('/customers')
+                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FontAwesomeIcon icon={faUserGroup} className="w-4 h-4 text-gray-400" />
+              Customer
+            </Link>
+            <Link
+              href="/settings/suppliers"
+              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                pathname.startsWith('/settings/suppliers')
+                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FontAwesomeIcon icon={faTruck} className="w-4 h-4 text-gray-400" />
+              Supplier
             </Link>
           </div>
 
