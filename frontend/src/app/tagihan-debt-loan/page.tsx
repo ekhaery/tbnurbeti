@@ -104,61 +104,70 @@ export default function TagihanDebtLoanPage() {
           </div>
         </div>
 
-        {/* Filter tabs */}
-        <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1">
-          {(['unpaid', 'paid', 'all'] as FilterStatus[]).map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`flex-1 text-center text-sm font-medium py-2 rounded-xl transition-colors ${filter === f ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
-              {f === 'unpaid' ? 'Belum Lunas' : f === 'paid' ? 'Lunas' : 'Semua'}
-            </button>
-          ))}
-        </div>
+        {/* Filter card */}
+        <div className="rounded-2xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
 
-        {/* Year filter */}
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <button onClick={() => setYearFilter('')}
-            className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition ${!yearFilter ? 'bg-[#121358] text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
-            Semua Tahun
-          </button>
-          {years.map(y => (
-            <button key={y} onClick={() => setYearFilter(y)}
-              className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition ${yearFilter === y ? 'bg-[#121358] text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
-              {y}
-            </button>
-          ))}
-        </div>
-
-        {/* Bank filter autocomplete */}
-        <div className="relative">
-          <input type="text" value={bankQuery}
-            onChange={e => { setBankQuery(e.target.value); setBankFilter(''); setBankDropdown(true) }}
-            onFocus={() => setBankDropdown(true)}
-            onBlur={() => setTimeout(() => setBankDropdown(false), 150)}
-            placeholder="Filter bank..."
-            autoComplete="off"
-            className={`w-full bg-white border rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358] shadow-sm ${bankFilter ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-200'}`}
-          />
-          {bankQuery && (
-            <button onClick={() => { setBankQuery(''); setBankFilter('') }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-              <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
-            </button>
-          )}
-          {bankDropdown && (
-            <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-              <button onMouseDown={() => { setBankFilter(''); setBankQuery(''); setBankDropdown(false) }}
-                className={`w-full text-left px-4 py-2.5 text-sm transition ${!bankFilter ? 'bg-[#121358] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
-                Semua Bank
+          {/* Status tabs */}
+          <div className="bg-gray-100 rounded-xl p-1 flex gap-1">
+            {(['unpaid', 'paid', 'all'] as FilterStatus[]).map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className={`flex-1 text-center text-sm font-medium py-2 rounded-xl transition-colors ${filter === f ? 'bg-slate-800 text-white' : 'bg-slate-200 sm:bg-transparent text-slate-500 sm:hover:bg-slate-200'}`}>
+                {f === 'unpaid' ? 'Belum Lunas' : f === 'paid' ? 'Lunas' : 'Semua'}
               </button>
-              {bankNames.filter(n => n.toLowerCase().includes(bankQuery.toLowerCase())).map(name => (
-                <button key={name} onMouseDown={() => { setBankFilter(name); setBankQuery(name); setBankDropdown(false) }}
-                  className={`w-full text-left px-4 py-2.5 text-sm transition ${bankFilter === name ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
-                  {name}
+            ))}
+          </div>
+
+          {/* Year filter */}
+          <div className="flex gap-2 overflow-x-auto pb-0.5">
+            <button onClick={() => setYearFilter('')}
+              className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition ${!yearFilter ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
+              Semua Tahun
+            </button>
+            {years.map(y => (
+              <button key={y} onClick={() => setYearFilter(y)}
+                className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition ${yearFilter === y ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                {y}
+              </button>
+            ))}
+          </div>
+
+          {/* Bank filter autocomplete */}
+          <div className="relative">
+            <input type="text" value={bankQuery}
+              onChange={e => { setBankQuery(e.target.value); setBankFilter(''); setBankDropdown(true) }}
+              onFocus={() => setBankDropdown(true)}
+              onBlur={() => setTimeout(() => setBankDropdown(false), 150)}
+              placeholder="Filter bank..."
+              autoComplete="off"
+              className={`w-full bg-gray-50 border rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358] ${bankFilter ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-200'}`}
+            />
+            {bankQuery && (
+              <button onClick={() => { setBankQuery(''); setBankFilter('') }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+              </button>
+            )}
+            {bankDropdown && (
+              <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                <button onMouseDown={() => { setBankFilter(''); setBankQuery(''); setBankDropdown(false) }}
+                  className={`w-full text-left px-4 py-2.5 text-sm transition ${!bankFilter ? 'bg-[#121358] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                  Semua Bank
                 </button>
-              ))}
-            </div>
-          )}
+                {bankNames.filter(n => n.toLowerCase().includes(bankQuery.toLowerCase())).map(name => (
+                  <button key={name} onMouseDown={() => { setBankFilter(name); setBankQuery(name); setBankDropdown(false) }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition ${bankFilter === name ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Yearly total */}
+        <p className="text-xs text-gray-500 px-1">
+          Total hutang tahunan: <span className="font-bold text-[#121358]">Rp {fmt(filtered.reduce((s, d) => s + d.installment_amount, 0))}</span>
+        </p>
 
         {/* List grouped by month */}
         {fetching ? (
