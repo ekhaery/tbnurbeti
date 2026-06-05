@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faMoneyBillWave, faCheck, faXmark, faCalendarDays, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
+import { faMoneyBillWave, faCheck, faXmark, faCalendarDays, faChevronDown, faChevronUp, faEye } from '@fortawesome/free-solid-svg-icons'
 
 type Bill = {
   id: number
@@ -71,7 +71,7 @@ export default function BillsPage() {
   const [supplierQuery, setSupplierQuery] = useState('')
   const [supplierDropdown, setSupplierDropdown] = useState(false)
 
-  // Calendar
+  // Weekly calendar
   const [showCalendar, setShowCalendar] = useState(false)
   const [calendarWeekStart, setCalendarWeekStart] = useState(() => {
     const d = new Date()
@@ -79,6 +79,13 @@ export default function BillsPage() {
     d.setHours(0, 0, 0, 0)
     return d
   })
+
+  // Monthly calendar
+  const [showMonthCalendar, setShowMonthCalendar] = useState(false)
+  const [monthCalendarDate, setMonthCalendarDate] = useState(new Date())
+
+  // Calendar dropdown
+  const [showCalendarMenu, setShowCalendarMenu] = useState(false)
 
   // Pay modal
   const [payingBill, setPayingBill] = useState<Bill | null>(null)
@@ -171,7 +178,9 @@ export default function BillsPage() {
         ? new Date(b.due_date).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
         : 'Tanpa Jatuh Tempo'
     } else {
-      key = b.month
+      key = b.installment_due_date
+        ? new Date(b.installment_due_date).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+        : 'Tanpa Tanggal'
     }
     if (!acc[key]) acc[key] = []
     acc[key].push(b)
@@ -201,9 +210,30 @@ export default function BillsPage() {
             <h2 className="text-lg font-bold text-gray-800">Tagihan Dagang</h2>
             <p className="text-xs text-gray-500 mt-0.5">Tagihan dari pengadaan berjangka.</p>
           </div>
-          <button onClick={() => setShowCalendar(true)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#121358] text-white hover:bg-[#1a1c6e] transition shadow-sm">
-            <FontAwesomeIcon icon={faCalendarDays} className="w-4 h-4 text-white" />
-          </button>
+          <div className="relative">
+            <button onClick={() => setShowCalendarMenu(v => !v)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#121358] text-white hover:bg-[#1a1c6e] transition shadow-sm">
+              <FontAwesomeIcon icon={faCalendarDays} className="w-4 h-4 text-white" />
+            </button>
+            {showCalendarMenu && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setShowCalendarMenu(false)} />
+                <div className="absolute right-0 top-10 z-40 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden w-36">
+                  <button
+                    onClick={() => { setShowCalendarMenu(false); setShowCalendar(true) }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    Mingguan
+                  </button>
+                  <button
+                    onClick={() => { setShowCalendarMenu(false); setMonthCalendarDate(new Date()); setShowMonthCalendar(true) }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition border-t border-gray-100"
+                  >
+                    Bulanan
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Summary cards */}
@@ -392,9 +422,30 @@ export default function BillsPage() {
         ) : filtered.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-10">Tidak ada tagihan.</div>
         ) : (
-          Object.entries(grouped).map(([month, monthBills]) => (
+          Object.entries(grouped).map(([month, monthBills]) => {
+            // Get Monday of the first bill's week in this group
+            const firstDate = monthBills[0]?.installment_due_date
+            const getMonday = (dateStr: string) => {
+              const d = new Date(dateStr)
+              const day = d.getDay() === 0 ? 6 : d.getDay() - 1
+              d.setDate(d.getDate() - day)
+              d.setHours(0, 0, 0, 0)
+              return d
+            }
+            return (
             <div key={month} className="space-y-2">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-1">{month}</p>
+              <div className="flex items-center justify-between px-1">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{month}</p>
+                {firstDate && (
+                  <button
+                    onClick={() => { setMonthCalendarDate(new Date(firstDate)); setShowMonthCalendar(true) }}
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition" style={{ backgroundColor: '#AEE2FF', color: '#121358' }}
+                  >
+                    <FontAwesomeIcon icon={faEye} className="w-2.5 h-2.5" />
+                    Kalender
+                  </button>
+                )}
+              </div>
               {monthBills.map(b => (
                 <div key={b.id} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${b.is_paid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
                   <div className="flex items-start justify-between gap-3">
@@ -439,9 +490,101 @@ export default function BillsPage() {
                 </div>
               ))}
             </div>
-          ))
+            )
+          })
         ))}
       </div>
+
+      {/* Monthly Calendar Modal */}
+      {showMonthCalendar && (() => {
+        const year = monthCalendarDate.getFullYear()
+        const month = monthCalendarDate.getMonth()
+        const firstDay = new Date(year, month, 1)
+        const lastDay = new Date(year, month + 1, 0)
+        // Start from Monday before the 1st
+        const startOffset = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1
+        const startDate = new Date(firstDay); startDate.setDate(1 - startOffset)
+        // Build 6 weeks × 7 days
+        const cells = Array.from({ length: 42 }, (_, i) => {
+          const d = new Date(startDate); d.setDate(startDate.getDate() + i); return d
+        })
+        const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
+        const todayStr = new Date().toISOString().slice(0, 10)
+        const prevMonth = () => setMonthCalendarDate(new Date(year, month - 1, 1))
+        const nextMonth = () => setMonthCalendarDate(new Date(year, month + 1, 1))
+        const monthLabel = firstDay.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
+            <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden">
+
+              {/* Header */}
+              <div className="px-5 py-4 flex items-center justify-between bg-[#121358]">
+                <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold">‹</button>
+                <p className="text-sm font-semibold text-white capitalize">{monthLabel}</p>
+                <div className="flex items-center gap-2">
+                  <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold">›</button>
+                  <button onClick={() => setShowMonthCalendar(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                    <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Day name headers */}
+              <div className="grid grid-cols-7 border-b border-gray-100">
+                {dayNames.map(d => (
+                  <div key={d} className="py-2 text-center text-[10px] font-semibold text-gray-400">{d}</div>
+                ))}
+              </div>
+
+              {/* Calendar grid */}
+              <div className="grid grid-cols-7 divide-x divide-gray-100 max-h-[55vh] overflow-y-auto">
+                {cells.map((day, idx) => {
+                  const dateStr = day.toISOString().slice(0, 10)
+                  const isCurrentMonth = day.getMonth() === month
+                  const isToday = dateStr === todayStr
+                  const dayBills = bills.filter(b => b.installment_due_date === dateStr)
+
+                  return (
+                    <div key={idx} className={`min-h-[72px] p-1 border-b border-gray-100 ${!isCurrentMonth ? 'bg-gray-50' : ''}`}>
+                      <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-semibold mb-1 ${
+                        isToday ? 'bg-[#121358] text-white' : isCurrentMonth ? 'text-gray-700' : 'text-gray-300'
+                      }`}>
+                        {day.getDate()}
+                      </div>
+                      <div className="space-y-0.5">
+                        {dayBills.length > 0 && (
+                          <p className="text-[8px] font-bold text-[#121358] pb-0.5">
+                            Rp {fmt(dayBills.reduce((s, b) => s + b.installment, 0))}
+                          </p>
+                        )}
+                        {dayBills.map(b => (
+                          <div key={b.id} className={`rounded px-1 py-0.5 text-[8px] font-semibold leading-tight truncate ${b.is_paid ? 'bg-green-100 text-green-700' : 'text-white'}`}
+                            style={b.is_paid ? {} : { backgroundColor: '#9FA1FF' }}>
+                            {b.suppliers?.name ?? '-'}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="px-5 py-3 border-t border-gray-100 flex items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded" style={{ backgroundColor: '#9FA1FF' }}></span>
+                  <span className="text-xs text-gray-500">Belum Lunas</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-green-100"></span>
+                  <span className="text-xs text-gray-500">Lunas</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Weekly Calendar Modal */}
       {showCalendar && (() => {
