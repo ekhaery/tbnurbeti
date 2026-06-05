@@ -50,6 +50,9 @@ export default function BillsPage() {
   const [bills, setBills] = useState<Bill[]>([])
   const [fetching, setFetching] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('unpaid')
+  const now = new Date()
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const [monthFilter, setMonthFilter] = useState(defaultMonth)
   const [supplierFilter, setSupplierFilter] = useState('')
   const [supplierQuery, setSupplierQuery] = useState('')
   const [supplierDropdown, setSupplierDropdown] = useState(false)
@@ -72,13 +75,31 @@ export default function BillsPage() {
   useEffect(() => { fetchData() }, [])
   useEffect(() => { if (payingBill) setTimeout(() => inputRef.current?.focus(), 100) }, [payingBill])
 
-  // Unique supplier names for filter dropdown
   const supplierNames = Array.from(new Set(bills.map(b => b.suppliers?.name ?? '').filter(Boolean))).sort()
+
+  // Unique months from installment_due_date sorted ASC
+  const months = Array.from(new Set(
+    bills.map(b => {
+      if (!b.installment_due_date) return ''
+      const d = new Date(b.installment_due_date)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    }).filter(Boolean)
+  )).sort()
+
+  const monthLabel = (m: string) => {
+    const [y, mo] = m.split('-')
+    return new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString('id-ID', { month: 'short' })
+  }
 
   const filtered = sortBills(bills.filter(b => {
     if (filter === 'paid' && !b.is_paid) return false
     if (filter === 'unpaid' && b.is_paid) return false
     if (supplierFilter && b.suppliers?.name !== supplierFilter) return false
+    if (monthFilter && b.installment_due_date) {
+      const d = new Date(b.installment_due_date)
+      const bMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      if (bMonth !== monthFilter) return false
+    }
     return true
   }))
 
@@ -128,33 +149,46 @@ export default function BillsPage() {
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-xl shadow-sm p-3">
-            <p className="text-xs text-gray-400">Belum Lunas</p>
-            <p className="text-base font-bold text-red-500 mt-0.5">Rp {fmt(totalUnpaid)}</p>
+          <div className="bg-[#121358] rounded-xl shadow-sm p-3">
+            <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Belum Lunas</p>
+            <p className="text-base font-bold mt-0.5" style={{ color: '#FCB7C7' }}>Rp {fmt(totalUnpaid)}</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm p-3">
-            <p className="text-xs text-gray-400">Sudah Lunas</p>
-            <p className="text-base font-bold text-green-600 mt-0.5">Rp {fmt(totalPaid)}</p>
+          <div className="bg-[#121358] rounded-xl shadow-sm p-3">
+            <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Sudah Lunas</p>
+            <p className="text-base font-bold mt-0.5" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaid)}</p>
           </div>
         </div>
 
-        {/* Filter tabs */}
-        <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1">
-          {(['unpaid', 'paid', 'all'] as FilterStatus[]).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`flex-1 text-center text-sm font-medium py-2 rounded-xl transition-colors ${
-                filter === f ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100'
-              }`}
-            >
-              {f === 'unpaid' ? 'Belum Lunas' : f === 'paid' ? 'Lunas' : 'Semua'}
+        {/* Filter card */}
+        <div className="rounded-2xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
+          <p className="text-xs font-semibold text-[#121358]">Apply Filter:</p>
+
+          {/* Status tabs */}
+          <div className="bg-gray-100 rounded-xl p-1 flex gap-1">
+            {(['unpaid', 'paid', 'all'] as FilterStatus[]).map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className={`flex-1 text-center text-sm font-medium py-2 rounded-xl transition-colors ${filter === f ? 'bg-slate-800 text-white' : 'bg-slate-200 sm:bg-transparent text-slate-500 sm:hover:bg-slate-200'}`}>
+                {f === 'unpaid' ? 'Belum Lunas' : f === 'paid' ? 'Lunas' : 'Semua'}
+              </button>
+            ))}
+          </div>
+
+          {/* Month filter */}
+          <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => setMonthFilter('')}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full transition ${!monthFilter ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
+              {now.getFullYear()}
             </button>
-          ))}
-        </div>
+            {months.map(m => (
+              <button key={m} onClick={() => setMonthFilter(m)}
+                className={`text-xs font-semibold px-2.5 py-1 rounded-full transition ${monthFilter === m ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                {monthLabel(m)}
+              </button>
+            ))}
+          </div>
 
-        {/* Supplier filter — autocomplete */}
-        <div className="relative">
+          {/* Supplier filter — autocomplete */}
+          <div className="relative">
           <input
             type="text"
             value={supplierQuery}
@@ -198,7 +232,16 @@ export default function BillsPage() {
                 ))}
             </div>
           )}
+          </div>
         </div>
+
+        {/* Total bulanan — only when a month is selected */}
+        {monthFilter && (
+          <div className="rounded-xl px-4 py-2.5 flex items-center justify-between bg-[#121358]">
+            <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Total Tagihan Bulanan</p>
+            <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(filtered.reduce((s, b) => s + b.installment, 0))}</p>
+          </div>
+        )}
 
         {/* Bill list grouped by month */}
         {fetching ? (
