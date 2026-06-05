@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faMoneyBillWave, faCheck, faXmark, faCalendarDays } from '@fortawesome/free-solid-svg-icons'
+import { faMoneyBillWave, faCheck, faXmark, faCalendarDays, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
 
 type Bill = {
   id: number
@@ -50,6 +50,7 @@ export default function BillsPage() {
   const [bills, setBills] = useState<Bill[]>([])
   const [fetching, setFetching] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('unpaid')
+  const [weeklyExpanded, setWeeklyExpanded] = useState(false)
   const now = new Date()
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const [monthFilter, setMonthFilter] = useState(defaultMonth)
@@ -88,11 +89,7 @@ export default function BillsPage() {
 
   // Unique months from installment_due_date sorted ASC
   const months = Array.from(new Set(
-    bills.map(b => {
-      if (!b.installment_due_date) return ''
-      const d = new Date(b.installment_due_date)
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    }).filter(Boolean)
+    bills.map(b => b.installment_due_date ? b.installment_due_date.slice(0, 7) : '').filter(Boolean)
   )).sort()
 
   const monthLabel = (m: string) => {
@@ -104,9 +101,9 @@ export default function BillsPage() {
     if (filter === 'paid' && !b.is_paid) return false
     if (filter === 'unpaid' && b.is_paid) return false
     if (supplierFilter && b.suppliers?.name !== supplierFilter) return false
-    if (monthFilter && b.installment_due_date) {
-      const d = new Date(b.installment_due_date)
-      const bMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    if (monthFilter) {
+      if (!b.installment_due_date) return false
+      const bMonth = b.installment_due_date.slice(0, 7) // "YYYY-MM"
       if (bMonth !== monthFilter) return false
     }
     return true
@@ -143,6 +140,19 @@ export default function BillsPage() {
   const grouped = filtered.reduce<Record<string, Bill[]>>((acc, b) => {
     if (!acc[b.month]) acc[b.month] = []
     acc[b.month].push(b)
+    return acc
+  }, {})
+
+  // Group by week (Mon–Sun) for weekly summary
+  const weeklyTotalsMap = filtered.reduce<Record<string, { total: number; monday: Date }>>((acc, b) => {
+    if (!b.installment_due_date) return acc
+    const d = new Date(b.installment_due_date)
+    const day = d.getDay() === 0 ? 6 : d.getDay() - 1 // Mon=0
+    const mon = new Date(d); mon.setDate(d.getDate() - day); mon.setHours(0, 0, 0, 0)
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+    const key = `${mon.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} – ${sun.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`
+    if (!acc[key]) acc[key] = { total: 0, monday: mon }
+    acc[key].total += b.installment
     return acc
   }, {})
 
@@ -251,9 +261,39 @@ export default function BillsPage() {
 
         {/* Total bulanan — only when a month is selected */}
         {monthFilter && (
-          <div className="rounded-xl px-4 py-2.5 flex items-center justify-between bg-[#121358]">
-            <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Total Tagihan Bulanan</p>
-            <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(filtered.reduce((s, b) => s + b.installment, 0))}</p>
+          <div className="space-y-2">
+            <div className="rounded-xl px-4 py-2.5 flex items-center justify-between bg-[#121358]">
+              <div>
+                <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Total Tagihan Bulanan</p>
+                <p className="text-[10px] mt-0.5 text-white">{filtered.length} tagihan</p>
+              </div>
+              <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(filtered.reduce((s, b) => s + b.installment, 0))}</p>
+            </div>
+
+            {/* Weekly breakdown */}
+            <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#B5BAFF' }}>
+              <button
+                onClick={() => setWeeklyExpanded(v => !v)}
+                className="w-full px-4 py-2.5 flex items-center justify-between"
+              >
+                <p className="text-xs font-semibold text-[#121358]">Total Tagihan Mingguan</p>
+                <FontAwesomeIcon icon={weeklyExpanded ? faChevronUp : faChevronDown} className="w-3 h-3 text-[#121358]/50" />
+              </button>
+              {weeklyExpanded && (
+                <div className="border-t border-[#121358]/10 divide-y divide-gray-300 bg-gray-200">
+                  {Object.entries(weeklyTotalsMap).map(([week, { total, monday }]) => (
+                    <button
+                      key={week}
+                      onClick={() => { setCalendarWeekStart(monday); setShowCalendar(true) }}
+                      className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-200 transition text-left"
+                    >
+                      <p className="text-xs text-[#121358]/70">{week}</p>
+                      <p className="text-xs font-semibold text-[#121358]">Rp {fmt(total)}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
