@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import PurchasingTabs from '@/lib/PurchasingTabs'
 import { toTitleCase } from '@/lib/utils'
+import type { PurchasingStatus } from '@/lib/purchasingStatus'
 
 type Supplier = { id: number; name: string }
 type Product = { id: number; name: string; categories: { name: string } | null }
@@ -35,6 +36,7 @@ export default function BuatPurchasingPage() {
   const [period, setPeriod] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem()])
   const [autocomplete, setAutocomplete] = useState<AutocompleteState[]>([{ open: false, focused: -1 }])
+  const [transformationPhase, setTransformationPhase] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -115,8 +117,10 @@ export default function BuatPurchasingPage() {
     // 1. Insert purchasing header
     const totalValue = validItems.reduce((sum, r) => sum + (parseFloat(r.base_price) || 0) * (parseInt(r.qty) || 0), 0)
 
+    const status: PurchasingStatus = transformationPhase ? 'init' : 'created'
+
     const { data: pur, error: purErr } = await supabase.from('purchasing')
-      .insert({ code, supplier_id: supplierId, date, notes: notes.trim() || null, period: parseInt(period) || 0, total: totalValue, created_by: appUser?.id })
+      .insert({ code, supplier_id: supplierId, date, notes: notes.trim() || null, period: parseInt(period) || 0, total: totalValue, created_by: appUser?.id, status })
       .select('id').single()
 
     if (purErr || !pur) { setError(purErr?.message ?? 'Gagal menyimpan.'); setSubmitting(false); return }
@@ -134,18 +138,20 @@ export default function BuatPurchasingPage() {
 
     if (itemsErr || !insertedItems) { setError(itemsErr?.message ?? 'Gagal menyimpan items.'); setSubmitting(false); return }
 
-    // 3. Insert stock_batches
-    const batches = insertedItems.map((item: { id: number; product_id: number; qty: number; base_price: number }) => ({
-      purchasing_item_id: item.id,
-      product_id: item.product_id,
-      qty_remaining: item.qty,
-      base_price: item.base_price,
-      received_at: date,
-      is_available: false,
-    }))
+    // 3. Insert stock_batches (only when transformation phase is OFF)
+    if (!transformationPhase) {
+      const batches = insertedItems.map((item: { id: number; product_id: number; qty: number; base_price: number }) => ({
+        purchasing_item_id: item.id,
+        product_id: item.product_id,
+        qty_remaining: item.qty,
+        base_price: item.base_price,
+        received_at: date,
+        is_available: false,
+      }))
 
-    const { error: batchErr } = await supabase.from('stock_batches').insert(batches)
-    if (batchErr) { setError(batchErr.message); setSubmitting(false); return }
+      const { error: batchErr } = await supabase.from('stock_batches').insert(batches)
+      if (batchErr) { setError(batchErr.message); setSubmitting(false); return }
+    }
 
     // 4. Generate bills if period > 0
     const periodVal = parseInt(period) || 0
@@ -164,7 +170,7 @@ export default function BuatPurchasingPage() {
           month,
           installment,
           paid_amount: 0,
-          bill_no: `BILL-${code}-${i + 1}`,
+          bill_no: `BILL-${code}-${i + 1}/${periodVal}`,
         }
       })
 
@@ -196,6 +202,27 @@ export default function BuatPurchasingPage() {
         {error && (
           <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">⚠️ {error}</div>
         )}
+
+        {/* Transformation Phase Toggle */}
+        <div className={`rounded-xl p-3 flex items-center justify-between gap-3 ${transformationPhase ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50 border border-gray-200'}`}>
+          <div>
+            <p className={`text-xs font-semibold ${transformationPhase ? 'text-amber-700' : 'text-gray-500'}`}>
+              Transformation Phase
+            </p>
+            <p className={`text-xs mt-0.5 ${transformationPhase ? 'text-amber-600' : 'text-gray-400'}`}>
+              {transformationPhase
+                ? 'ON — hanya mencatat tagihan, stok tidak diupdate.'
+                : 'OFF — stok akan diupdate saat barang tiba.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setTransformationPhase(v => !v)}
+            className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${transformationPhase ? 'bg-amber-400' : 'bg-gray-300'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${transformationPhase ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
 
