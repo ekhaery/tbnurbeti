@@ -50,7 +50,7 @@ export default function RiwayatPurchasingPage() {
   const [editing, setEditing] = useState<Purchasing | null>(null)
   const [editSupplierId, setEditSupplierId] = useState<number | ''>('')
   const [editDate, setEditDate] = useState('')
-  const [editPeriod, setEditPeriod] = useState('')
+  const [editJatuhTempo, setEditJatuhTempo] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [editItems, setEditItems] = useState<{ id: number; qty: string; base_price: string; name: string }[]>([])
   const [saving, setSaving] = useState(false)
@@ -101,7 +101,14 @@ export default function RiwayatPurchasingPage() {
     setEditing(p)
     setEditSupplierId(p.supplier_id)
     setEditDate(p.date)
-    setEditPeriod(p.period > 0 ? String(p.period) : '')
+    // Reconstruct jatuh tempo from date + period months
+    if (p.period > 0) {
+      const d = new Date(p.date)
+      d.setDate(d.getDate() + p.period * 7)
+      setEditJatuhTempo(d.toISOString().slice(0, 10))
+    } else {
+      setEditJatuhTempo('')
+    }
     setEditNotes(p.notes ?? '')
     setEditItems(p.purchasing_items.map(i => ({
       id: i.id,
@@ -117,6 +124,19 @@ export default function RiwayatPurchasingPage() {
 
   const editTotal = editItems.reduce((sum, i) => sum + (parseFloat(i.base_price) || 0) * (parseInt(i.qty) || 0), 0)
 
+  const calcEditPeriod = (): { weeks: number; months: number } | null => {
+    if (!editDate || !editJatuhTempo) return null
+    const start = new Date(editDate)
+    const end = new Date(editJatuhTempo)
+    if (end <= start) return null
+    const diffMs = end.getTime() - start.getTime()
+    const weeks = Math.round(diffMs / (1000 * 60 * 60 * 24 * 7))
+    const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
+    return { weeks, months }
+  }
+  const editPeriodCalc = calcEditPeriod()
+  const editPeriodWeeks = editPeriodCalc?.weeks ?? 0
+
   // Save edit
   const handleSave = async () => {
     if (!editing) return
@@ -129,7 +149,7 @@ export default function RiwayatPurchasingPage() {
       .update({
         supplier_id: editSupplierId,
         date: editDate,
-        period: parseInt(editPeriod) || 0,
+        period: editPeriodWeeks,
         notes: editNotes.trim() || null,
         total: newTotal,
       })
@@ -147,17 +167,15 @@ export default function RiwayatPurchasingPage() {
     // Regenerate bills: delete old, insert new
     await supabase.from('bills').delete().eq('purchasing_id', editing.id)
 
-    const periodVal = parseInt(editPeriod) || 0
-    if (periodVal > 0) {
+    const periodVal = editPeriodWeeks
+    if (periodVal > 0 && editJatuhTempo) {
       const installment = Math.round((newTotal / periodVal) * 100) / 100
       const purchaseDate = new Date(editDate)
-      const finalDueDate = new Date(purchaseDate)
-      finalDueDate.setMonth(finalDueDate.getMonth() + periodVal)
-      const finalDueDateStr = finalDueDate.toISOString().slice(0, 10)
-      const finalMonth = finalDueDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      const finalDueDateStr = editJatuhTempo
+      const finalMonth = new Date(editJatuhTempo).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       const bills = Array.from({ length: periodVal }, (_, i) => {
         const installmentDue = new Date(purchaseDate)
-        installmentDue.setMonth(installmentDue.getMonth() + i + 1)
+        installmentDue.setDate(installmentDue.getDate() + (i + 1) * 7)
         return {
           purchasing_id: editing.id,
           supplier_id: Number(editSupplierId),
@@ -365,12 +383,15 @@ export default function RiwayatPurchasingPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Jangka Bayar (bulan)</label>
-                <input type="number" value={editPeriod} onChange={e => setEditPeriod(e.target.value)}
-                  placeholder="0 = lunas saat beli" min="0"
+                <label className="block text-xs text-gray-500 mb-1">Jatuh Tempo</label>
+                <input type="date" value={editJatuhTempo} min={editDate}
+                  onChange={e => setEditJatuhTempo(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
-                {editPeriod && parseInt(editPeriod) > 0 && (
-                  <p className="text-xs text-amber-600 mt-1">Tagihan lama akan dihapus dan dibuat ulang.</p>
+                {editPeriodCalc && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {editPeriodCalc.weeks} minggu&nbsp;|&nbsp;{editPeriodCalc.months} bulan
+                    <span className="text-amber-600 ml-1">· Tagihan lama akan dibuat ulang.</span>
+                  </p>
                 )}
               </div>
               <div>

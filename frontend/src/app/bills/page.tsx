@@ -23,12 +23,36 @@ type FilterStatus = 'all' | 'unpaid' | 'paid'
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
 
+const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+
+// Sort: month → supplier name → bill_no → installment_due_date
+function sortBills(bills: Bill[]): Bill[] {
+  return [...bills].sort((a, b) => {
+    const monthA = a.month ?? ''
+    const monthB = b.month ?? ''
+    if (monthA !== monthB) return monthA.localeCompare(monthB)
+
+    const supA = a.suppliers?.name ?? ''
+    const supB = b.suppliers?.name ?? ''
+    if (supA !== supB) return supA.localeCompare(supB)
+
+    const codeA = a.bill_no ?? ''
+    const codeB = b.bill_no ?? ''
+    if (codeA !== codeB) return codeA.localeCompare(codeB)
+
+    return (a.installment_due_date ?? '').localeCompare(b.installment_due_date ?? '')
+  })
+}
+
 export default function BillsPage() {
   const supabase = createClient()
 
   const [bills, setBills] = useState<Bill[]>([])
   const [fetching, setFetching] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('unpaid')
+  const [supplierFilter, setSupplierFilter] = useState('')
+  const [supplierQuery, setSupplierQuery] = useState('')
+  const [supplierDropdown, setSupplierDropdown] = useState(false)
 
   // Pay modal
   const [payingBill, setPayingBill] = useState<Bill | null>(null)
@@ -41,22 +65,22 @@ export default function BillsPage() {
     const { data } = await supabase
       .from('bills')
       .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, suppliers(name), purchasing(code)')
-      .order('due_date', { ascending: true })
     setBills((data as Bill[]) ?? [])
     setFetching(false)
   }
 
   useEffect(() => { fetchData() }, [])
+  useEffect(() => { if (payingBill) setTimeout(() => inputRef.current?.focus(), 100) }, [payingBill])
 
-  useEffect(() => {
-    if (payingBill) setTimeout(() => inputRef.current?.focus(), 100)
-  }, [payingBill])
+  // Unique supplier names for filter dropdown
+  const supplierNames = Array.from(new Set(bills.map(b => b.suppliers?.name ?? '').filter(Boolean))).sort()
 
-  const filtered = bills.filter(b => {
-    if (filter === 'paid') return b.is_paid
-    if (filter === 'unpaid') return !b.is_paid
+  const filtered = sortBills(bills.filter(b => {
+    if (filter === 'paid' && !b.is_paid) return false
+    if (filter === 'unpaid' && b.is_paid) return false
+    if (supplierFilter && b.suppliers?.name !== supplierFilter) return false
     return true
-  })
+  }))
 
   const totalUnpaid = bills.filter(b => !b.is_paid).reduce((s, b) => s + (b.installment - b.paid_amount), 0)
   const totalPaid = bills.filter(b => b.is_paid).reduce((s, b) => s + b.installment, 0)
@@ -71,16 +95,13 @@ export default function BillsPage() {
     if (!payingBill) return
     const amount = parseFloat(payAmount)
     if (!amount || amount <= 0) { setError('Masukkan jumlah pembayaran.'); return }
-
     const newPaid = payingBill.paid_amount + amount
     if (newPaid > payingBill.installment) { setError(`Melebihi sisa tagihan Rp ${fmt(payingBill.installment - payingBill.paid_amount)}.`); return }
-
     setPaying(true)
     const { error } = await supabase.from('bills')
       .update({ paid_amount: newPaid, payment_date: new Date().toISOString().slice(0, 10) })
       .eq('id', payingBill.id)
     setPaying(false)
-
     if (error) { setError(error.message); return }
     setPayingBill(null)
     fetchData()
@@ -132,6 +153,53 @@ export default function BillsPage() {
           ))}
         </div>
 
+        {/* Supplier filter — autocomplete */}
+        <div className="relative">
+          <input
+            type="text"
+            value={supplierQuery}
+            onChange={e => {
+              setSupplierQuery(e.target.value)
+              setSupplierFilter('')
+              setSupplierDropdown(true)
+            }}
+            onFocus={() => setSupplierDropdown(true)}
+            onBlur={() => setTimeout(() => setSupplierDropdown(false), 150)}
+            placeholder="Filter supplier..."
+            autoComplete="off"
+            className={`w-full bg-white border rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358] shadow-sm ${supplierFilter ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-200'}`}
+          />
+          {supplierQuery && (
+            <button
+              onClick={() => { setSupplierQuery(''); setSupplierFilter(''); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+            </button>
+          )}
+          {supplierDropdown && (
+            <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+              <button
+                onMouseDown={() => { setSupplierFilter(''); setSupplierQuery(''); setSupplierDropdown(false) }}
+                className={`w-full text-left px-4 py-2.5 text-sm transition ${!supplierFilter ? 'bg-[#121358] text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                Semua Supplier
+              </button>
+              {supplierNames
+                .filter(n => n.toLowerCase().includes(supplierQuery.toLowerCase()))
+                .map(name => (
+                  <button
+                    key={name}
+                    onMouseDown={() => { setSupplierFilter(name); setSupplierQuery(name); setSupplierDropdown(false) }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition ${supplierFilter === name ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    {name}
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
+
         {/* Bill list grouped by month */}
         {fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
@@ -148,10 +216,7 @@ export default function BillsPage() {
                       <p className="text-sm font-semibold text-gray-800">{b.suppliers?.name ?? '-'}</p>
                       <p className="text-xs text-gray-400 font-mono mt-0.5">{b.bill_no ?? b.purchasing?.code}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {b.installment_due_date
-                          ? new Date(b.installment_due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
-                          : '-'
-                        } · Jatuh tempo: {new Date(b.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {b.installment_due_date ? fmtDate(b.installment_due_date) : '-'} · Jatuh tempo: {fmtDate(b.due_date)}
                       </p>
                       {b.paid_amount > 0 && !b.is_paid && (
                         <p className="text-xs text-amber-600 mt-0.5">
@@ -196,7 +261,6 @@ export default function BillsPage() {
                 <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
               </button>
             </div>
-
             <div className="px-5 py-4 space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Total Tagihan</span>
@@ -212,7 +276,6 @@ export default function BillsPage() {
                 <span className="text-gray-500">Sisa</span>
                 <span className="font-bold text-red-500">Rp {fmt(remaining(payingBill))}</span>
               </div>
-
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Jumlah Bayar</label>
                 <input
@@ -225,10 +288,8 @@ export default function BillsPage() {
                   className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
                 />
               </div>
-
               {error && <p className="text-xs text-red-500">⚠️ {error}</p>}
             </div>
-
             <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
               <button onClick={() => setPayingBill(null)}
                 className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">

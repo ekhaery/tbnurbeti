@@ -33,7 +33,7 @@ export default function BuatPurchasingPage() {
   const [supplierId, setSupplierId] = useState<number | ''>('')
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [notes, setNotes] = useState('')
-  const [period, setPeriod] = useState('')
+  const [jatuhTempo, setJatuhTempo] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem()])
   const [autocomplete, setAutocomplete] = useState<AutocompleteState[]>([{ open: false, focused: -1 }])
   const [transformationPhase, setTransformationPhase] = useState(true)
@@ -99,6 +99,20 @@ export default function BuatPurchasingPage() {
   const selectedSupplier = suppliers.find(s => s.id === supplierId)
   const previewCode = selectedSupplier ? generateCode(selectedSupplier.name, date) : 'PUR-...'
 
+  // Calculate period from date → jatuhTempo
+  const calcPeriod = (): { weeks: number; months: number } | null => {
+    if (!date || !jatuhTempo) return null
+    const start = new Date(date)
+    const end = new Date(jatuhTempo)
+    if (end <= start) return null
+    const diffMs = end.getTime() - start.getTime()
+    const weeks = Math.round(diffMs / (1000 * 60 * 60 * 24 * 7))
+    const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
+    return { weeks, months }
+  }
+  const periodCalc = calcPeriod()
+  const periodWeeks = periodCalc?.weeks ?? 0
+
   const validItems = items.filter(r => r.product_id && r.qty && r.base_price)
   const total = validItems.reduce((sum, r) => sum + (parseFloat(r.base_price) || 0) * (parseInt(r.qty) || 0), 0)
 
@@ -120,7 +134,7 @@ export default function BuatPurchasingPage() {
     const status: PurchasingStatus = transformationPhase ? 'init' : 'created'
 
     const { data: pur, error: purErr } = await supabase.from('purchasing')
-      .insert({ code, supplier_id: supplierId, date, notes: notes.trim() || null, period: parseInt(period) || 0, total: totalValue, created_by: appUser?.id, status })
+      .insert({ code, supplier_id: supplierId, date, notes: notes.trim() || null, period: periodWeeks, total: totalValue, created_by: appUser?.id, status })
       .select('id').single()
 
     if (purErr || !pur) { setError(purErr?.message ?? 'Gagal menyimpan.'); setSubmitting(false); return }
@@ -153,18 +167,16 @@ export default function BuatPurchasingPage() {
       if (batchErr) { setError(batchErr.message); setSubmitting(false); return }
     }
 
-    // 4. Generate bills if period > 0
-    const periodVal = parseInt(period) || 0
-    if (periodVal > 0) {
+    // 4. Generate bills if period > 0 (period = weeks)
+    const periodVal = periodWeeks
+    if (periodVal > 0 && jatuhTempo) {
       const installment = Math.round((totalValue / periodVal) * 100) / 100
       const purchaseDate = new Date(date)
-      const finalDueDate = new Date(purchaseDate)
-      finalDueDate.setMonth(finalDueDate.getMonth() + periodVal)
-      const finalDueDateStr = finalDueDate.toISOString().slice(0, 10)
-      const finalMonth = finalDueDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      const finalDueDateStr = jatuhTempo
+      const finalMonth = new Date(jatuhTempo).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       const bills = Array.from({ length: periodVal }, (_, i) => {
         const installmentDue = new Date(purchaseDate)
-        installmentDue.setMonth(installmentDue.getMonth() + i + 1)
+        installmentDue.setDate(installmentDue.getDate() + (i + 1) * 7)
         return {
           purchasing_id: pur.id,
           supplier_id: Number(supplierId),
@@ -182,10 +194,10 @@ export default function BuatPurchasingPage() {
     }
 
     setSubmitting(false)
-    setSuccess(`Purchasing ${code} berhasil disimpan.${periodVal > 0 ? ` ${periodVal} tagihan dibuat.` : ''}`)
+    setSuccess(`Purchasing ${code} berhasil disimpan.${periodVal > 0 ? ` ${periodVal} tagihan dibuat.` : ''} `)
     setSupplierId('')
     setNotes('')
-    setPeriod('')
+    setJatuhTempo('')
     setItems([emptyItem()])
   }
 
@@ -288,19 +300,20 @@ export default function BuatPurchasingPage() {
               />
             </div>
 
-            {/* Period */}
+            {/* Jatuh Tempo */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Jangka Bayar <span className="text-gray-400">(bulan)</span></label>
+              <label className="block text-xs text-gray-500 mb-1">Jatuh Tempo</label>
               <input
-                type="number"
-                value={period}
-                onChange={e => setPeriod(e.target.value)}
-                placeholder="0 = lunas saat beli"
-                min="0"
+                type="date"
+                value={jatuhTempo}
+                min={date}
+                onChange={e => setJatuhTempo(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
               />
-              {period && parseInt(period) > 0 && (
-                <p className="text-xs text-amber-600 mt-1">Pembayaran dalam {period} bulan.</p>
+              {periodCalc && (
+                <p className="text-xs text-gray-400 mt-1">
+                  {periodCalc.weeks} minggu&nbsp;|&nbsp;{periodCalc.months} bulan
+                </p>
               )}
             </div>
 
