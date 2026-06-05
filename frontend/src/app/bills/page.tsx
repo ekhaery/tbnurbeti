@@ -210,7 +210,7 @@ export default function BillsPage() {
             <div key={month} className="space-y-2">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-1">{month}</p>
               {monthBills.map(b => (
-                <div key={b.id} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${b.is_paid ? 'border-green-400' : 'border-red-400'}`}>
+                <div key={b.id} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${b.is_paid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-800">{b.suppliers?.name ?? '-'}</p>
@@ -219,25 +219,34 @@ export default function BillsPage() {
                         {b.installment_due_date ? fmtDate(b.installment_due_date) : '-'} · Jatuh tempo: {fmtDate(b.due_date)}
                       </p>
                       {b.paid_amount > 0 && !b.is_paid && (
-                        <p className="text-xs text-amber-600 mt-0.5">
+                        <p className="text-xs mt-0.5" style={{ color: '#9FA1FF' }}>
                           Terbayar: Rp {fmt(b.paid_amount)} · Sisa: Rp {fmt(remaining(b))}
                         </p>
                       )}
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-[#121358]">Rp {fmt(b.installment)}</p>
+                      {!(b.paid_amount > 0 && !b.is_paid) && (
+                        <p className="text-sm font-bold text-[#121358]">Rp {fmt(b.installment)}</p>
+                      )}
                       {b.is_paid ? (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-600 mt-1">
                           <FontAwesomeIcon icon={faCheck} className="w-2.5 h-2.5" /> Lunas
                         </span>
                       ) : (
-                        <button
-                          onClick={() => openPay(b)}
-                          className="mt-1 flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition"
-                        >
-                          <FontAwesomeIcon icon={faMoneyBillWave} className="w-3 h-3" />
-                          Bayar
-                        </button>
+                        <>
+                          {b.paid_amount > 0 && (
+                            <p className="text-sm font-bold mt-0.5" style={{ color: '#9FA1FF' }}>
+                              Rp {fmt(remaining(b))}
+                            </p>
+                          )}
+                          <button
+                            onClick={() => openPay(b)}
+                            className="mt-1 flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition"
+                          >
+                            <FontAwesomeIcon icon={faMoneyBillWave} className="w-3 h-3" />
+                            Bayar
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>

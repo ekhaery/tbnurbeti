@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck, faFileInvoiceDollar } from '@fortawesome/free-solid-svg-icons'
+import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck, faFileInvoiceDollar, faHandHoldingDollar, faMoneyCheckDollar } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 
@@ -19,18 +19,41 @@ export default function Navbar() {
   const router = useRouter()
   const { appUser, signOut } = useAuth()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
   const isAdmin = appUser?.role === 'admin'
 
-  // Close drawer on route change
+  // Detect desktop
   useEffect(() => {
-    setDrawerOpen(false)
-  }, [pathname])
+    const mq = window.matchMedia('(min-width: 768px)')
+    setIsDesktop(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
-  // Prevent body scroll when drawer is open
+  // Close drawer on route change — mobile only
   useEffect(() => {
-    document.body.style.overflow = drawerOpen ? 'hidden' : ''
+    if (!isDesktop) setDrawerOpen(false)
+  }, [pathname, isDesktop])
+
+  // Prevent body scroll when drawer is open — mobile only
+  useEffect(() => {
+    document.body.style.overflow = (drawerOpen && !isDesktop) ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
-  }, [drawerOpen])
+  }, [drawerOpen, isDesktop])
+
+  // Shift main content on desktop
+  useEffect(() => {
+    const main = document.getElementById('main-content')
+    if (!main) return
+    if (drawerOpen && isDesktop) {
+      main.style.marginLeft = '18rem' // w-72 = 288px
+      main.style.transition = 'margin-left 0.3s ease-in-out'
+    } else {
+      main.style.marginLeft = '0'
+      main.style.transition = 'margin-left 0.3s ease-in-out'
+    }
+  }, [drawerOpen, isDesktop])
 
   const linkClass = (active: boolean) =>
     `px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -84,8 +107,8 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Drawer overlay */}
-      {drawerOpen && (
+      {/* Drawer overlay — mobile only */}
+      {drawerOpen && !isDesktop && (
         <div
           className="fixed inset-0 z-40 bg-black/40"
           onClick={() => setDrawerOpen(false)}
@@ -145,7 +168,34 @@ export default function Navbar() {
               }`}
             >
               <FontAwesomeIcon icon={faFileInvoiceDollar} className="w-4 h-4 text-gray-400" />
-              Tagihan
+              Tagihan Dagang
+            </Link>
+          </div>
+
+          {/* Finance */}
+          <div>
+            <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Finance</p>
+            <Link
+              href="/debt-loan"
+              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                pathname.startsWith('/debt-loan')
+                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FontAwesomeIcon icon={faHandHoldingDollar} className="w-4 h-4 text-gray-400" />
+              Debt & Loan
+            </Link>
+            <Link
+              href="/tagihan-giro"
+              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                pathname.startsWith('/tagihan-giro')
+                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FontAwesomeIcon icon={faMoneyCheckDollar} className="w-4 h-4 text-gray-400" />
+              Tagihan Giro
             </Link>
           </div>
 

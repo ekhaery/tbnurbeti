@@ -219,12 +219,12 @@ export default function BuatPurchasingPage() {
         )}
 
         {/* Transformation Phase Toggle */}
-        <div className={`rounded-xl p-3 flex items-center justify-between gap-3 ${transformationPhase ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50 border border-gray-200'}`}>
+        <div className="rounded-xl p-3 flex items-center justify-between gap-3 border-2" style={{ backgroundColor: '#B5BAFF', borderColor: '#9FA1FF' }}>
           <div>
-            <p className={`text-xs font-semibold ${transformationPhase ? 'text-amber-700' : 'text-gray-500'}`}>
+            <p className={`text-xs font-semibold ${transformationPhase ? 'text-[#121358]' : 'text-gray-500'}`}>
               Transformation Phase
             </p>
-            <p className={`text-xs mt-0.5 ${transformationPhase ? 'text-amber-600' : 'text-gray-400'}`}>
+            <p className={`text-xs mt-0.5 ${transformationPhase ? 'text-[#121358]/70' : 'text-gray-400'}`}>
               {transformationPhase
                 ? 'ON — hanya mencatat tagihan, stok tidak diupdate.'
                 : 'OFF — stok akan diupdate saat barang tiba.'}
@@ -233,7 +233,8 @@ export default function BuatPurchasingPage() {
           <button
             type="button"
             onClick={() => setTransformationPhase(v => !v)}
-            className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${transformationPhase ? 'bg-amber-400' : 'bg-gray-300'}`}
+            className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${transformationPhase ? '' : 'bg-gray-300'}`}
+            style={transformationPhase ? { backgroundColor: '#AEE2FF' } : {}}
           >
             <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${transformationPhase ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
