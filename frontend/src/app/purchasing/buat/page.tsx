@@ -158,16 +158,19 @@ export default function BuatPurchasingPage() {
     if (periodVal > 0) {
       const installment = Math.round((totalValue / periodVal) * 100) / 100
       const purchaseDate = new Date(date)
+      const finalDueDate = new Date(purchaseDate)
+      finalDueDate.setMonth(finalDueDate.getMonth() + periodVal)
+      const finalDueDateStr = finalDueDate.toISOString().slice(0, 10)
+      const finalMonth = finalDueDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       const bills = Array.from({ length: periodVal }, (_, i) => {
-        const dueDate = new Date(purchaseDate)
-        dueDate.setMonth(dueDate.getMonth() + i + 1)
-        const month = dueDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-        const dueDateStr = dueDate.toISOString().slice(0, 10)
+        const installmentDue = new Date(purchaseDate)
+        installmentDue.setMonth(installmentDue.getMonth() + i + 1)
         return {
           purchasing_id: pur.id,
           supplier_id: Number(supplierId),
-          due_date: dueDateStr,
-          month,
+          due_date: finalDueDateStr,
+          installment_due_date: installmentDue.toISOString().slice(0, 10),
+          month: finalMonth,
           installment,
           paid_amount: 0,
           bill_no: `BILL-${code}-${i + 1}/${periodVal}`,

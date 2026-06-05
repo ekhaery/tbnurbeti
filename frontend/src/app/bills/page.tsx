@@ -10,6 +10,7 @@ type Bill = {
   bill_no: string | null
   purchasing_id: number
   due_date: string
+  installment_due_date: string | null
   month: string
   installment: number
   paid_amount: number
@@ -39,7 +40,7 @@ export default function BillsPage() {
   const fetchData = async () => {
     const { data } = await supabase
       .from('bills')
-      .select('id, bill_no, purchasing_id, due_date, month, installment, paid_amount, is_paid, suppliers(name), purchasing(code)')
+      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, suppliers(name), purchasing(code)')
       .order('due_date', { ascending: true })
     setBills((data as Bill[]) ?? [])
     setFetching(false)
@@ -147,7 +148,10 @@ export default function BillsPage() {
                       <p className="text-sm font-semibold text-gray-800">{b.suppliers?.name ?? '-'}</p>
                       <p className="text-xs text-gray-400 font-mono mt-0.5">{b.bill_no ?? b.purchasing?.code}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        Jatuh tempo: {new Date(b.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {b.installment_due_date
+                          ? new Date(b.installment_due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+                          : '-'
+                        } · Jatuh tempo: {new Date(b.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
                       {b.paid_amount > 0 && !b.is_paid && (
                         <p className="text-xs text-amber-600 mt-0.5">
