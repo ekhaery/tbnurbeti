@@ -27,6 +27,7 @@ export default function TagihanDebtLoanPage() {
   const [list, setList] = useState<DebtLoanDetail[]>([])
   const [fetching, setFetching] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('unpaid')
+  const [yearFilter, setYearFilter] = useState<string>(new Date().getFullYear().toString())
   const [bankFilter, setBankFilter] = useState('')
   const [bankQuery, setBankQuery] = useState('')
   const [bankDropdown, setBankDropdown] = useState(false)
@@ -47,13 +48,25 @@ export default function TagihanDebtLoanPage() {
   useEffect(() => { fetchData() }, [])
 
   const bankNames = Array.from(new Set(list.map(d => d.debt_loan?.bank_account ?? '').filter(Boolean))).sort()
+  const years = Array.from(new Set(list.map(d => d.installment_due_date ? new Date(d.installment_due_date).getFullYear().toString() : '').filter(Boolean))).sort()
 
   const filtered = list.filter(d => {
     if (filter === 'paid' && !d.is_paid) return false
     if (filter === 'unpaid' && d.is_paid) return false
     if (bankFilter && d.debt_loan?.bank_account !== bankFilter) return false
+    if (yearFilter && d.installment_due_date && new Date(d.installment_due_date).getFullYear().toString() !== yearFilter) return false
     return true
   })
+
+  // Group by month label (e.g. "Juni 2026")
+  const grouped = filtered.reduce<Record<string, DebtLoanDetail[]>>((acc, d) => {
+    const key = d.installment_due_date
+      ? new Date(d.installment_due_date).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+      : 'Tanpa Tanggal'
+    if (!acc[key]) acc[key] = []
+    acc[key].push(d)
+    return acc
+  }, {})
 
   const totalUnpaid = list.filter(d => !d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
   const totalPaid = list.filter(d => d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
@@ -101,6 +114,20 @@ export default function TagihanDebtLoanPage() {
           ))}
         </div>
 
+        {/* Year filter */}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <button onClick={() => setYearFilter('')}
+            className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition ${!yearFilter ? 'bg-[#121358] text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
+            Semua Tahun
+          </button>
+          {years.map(y => (
+            <button key={y} onClick={() => setYearFilter(y)}
+              className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition ${yearFilter === y ? 'bg-[#121358] text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
+              {y}
+            </button>
+          ))}
+        </div>
+
         {/* Bank filter autocomplete */}
         <div className="relative">
           <input type="text" value={bankQuery}
@@ -133,52 +160,64 @@ export default function TagihanDebtLoanPage() {
           )}
         </div>
 
-        {/* List */}
+        {/* List grouped by month */}
         {fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
         ) : filtered.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-10">Tidak ada tagihan.</div>
         ) : (
-          <div className="space-y-2">
-            {filtered.map(d => (
-              <div key={d.id} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${d.is_paid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold text-gray-800">{d.debt_loan?.bank_account ?? '-'}</p>
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#9FA1FF]/20 text-[#121358]">
-                        {d.debt_loan?.debt_type ?? '-'}
-                      </span>
+          Object.entries(grouped).map(([month, items]) => (
+            <div key={month} className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{month}</p>
+                <p className="text-xs font-semibold text-gray-500">
+                  Rp {fmt(items.reduce((s, d) => s + d.installment_amount, 0))}
+                  <span className="text-gray-300 mx-1">·</span>
+                  <span className="text-green-600">{items.filter(d => d.is_paid).length} lunas</span>
+                  <span className="text-gray-300 mx-1">·</span>
+                  <span style={{ color: '#9FA1FF' }}>{items.filter(d => !d.is_paid).length} belum</span>
+                </p>
+              </div>
+              {items.map(d => (
+                <div key={d.id} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${d.is_paid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-gray-800">{d.debt_loan?.bank_account ?? '-'}</p>
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#9FA1FF]/20 text-[#121358]">
+                          {d.debt_loan?.debt_type ?? '-'}
+                        </span>
+                      </div>
+                      {d.code && <p className="text-xs text-gray-400 font-mono mt-0.5">{d.code}</p>}
+                      {d.installment_due_date && (
+                        <p className="text-xs text-gray-400 mt-0.5">Cicilan: {fmtDate(d.installment_due_date)}</p>
+                      )}
+                      {d.due_date && (
+                        <p className="text-xs text-gray-400 mt-0.5">Jatuh tempo: {fmtDate(d.due_date)}</p>
+                      )}
+                      {d.is_paid && d.payment_date && (
+                        <p className="text-xs text-green-600 mt-0.5">Dibayar: {fmtDate(d.payment_date)}</p>
+                      )}
                     </div>
-                    {d.code && <p className="text-xs text-gray-400 font-mono mt-0.5">{d.code}</p>}
-                    {d.installment_due_date && (
-                      <p className="text-xs text-gray-400 mt-0.5">Cicilan: {fmtDate(d.installment_due_date)}</p>
-                    )}
-                    {d.due_date && (
-                      <p className="text-xs text-gray-400 mt-0.5">Jatuh tempo: {fmtDate(d.due_date)}</p>
-                    )}
-                    {d.is_paid && d.payment_date && (
-                      <p className="text-xs text-green-600 mt-0.5">Dibayar: {fmtDate(d.payment_date)}</p>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-[#121358]">Rp {fmt(d.installment_amount)}</p>
-                    {d.is_paid ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-600 mt-1">
-                        <FontAwesomeIcon icon={faCheck} className="w-2.5 h-2.5" /> Lunas
-                      </span>
-                    ) : (
-                      <button onClick={() => setPaying(d)}
-                        className="mt-1 flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
-                        <FontAwesomeIcon icon={faMoneyBillWave} className="w-3 h-3" />
-                        Bayar
-                      </button>
-                    )}
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-[#121358]">Rp {fmt(d.installment_amount)}</p>
+                      {d.is_paid ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-600 mt-1">
+                          <FontAwesomeIcon icon={faCheck} className="w-2.5 h-2.5" /> Lunas
+                        </span>
+                      ) : (
+                        <button onClick={() => setPaying(d)}
+                          className="mt-1 flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
+                          <FontAwesomeIcon icon={faMoneyBillWave} className="w-3 h-3" />
+                          Bayar
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ))
         )}
       </div>
 
