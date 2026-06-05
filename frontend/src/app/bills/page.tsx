@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faMoneyBillWave, faCheck, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faMoneyBillWave, faCheck, faXmark, faCalendarDays } from '@fortawesome/free-solid-svg-icons'
 
 type Bill = {
   id: number
@@ -56,6 +56,15 @@ export default function BillsPage() {
   const [supplierFilter, setSupplierFilter] = useState('')
   const [supplierQuery, setSupplierQuery] = useState('')
   const [supplierDropdown, setSupplierDropdown] = useState(false)
+
+  // Calendar
+  const [showCalendar, setShowCalendar] = useState(false)
+  const [calendarWeekStart, setCalendarWeekStart] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() - d.getDay() + 1) // Monday
+    d.setHours(0, 0, 0, 0)
+    return d
+  })
 
   // Pay modal
   const [payingBill, setPayingBill] = useState<Bill | null>(null)
@@ -142,9 +151,14 @@ export default function BillsPage() {
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
 
         {/* Header */}
-        <div>
-          <h2 className="text-lg font-bold text-gray-800">Tagihan Dagang</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Tagihan dari pengadaan berjangka.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">Tagihan Dagang</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Tagihan dari pengadaan berjangka.</p>
+          </div>
+          <button onClick={() => setShowCalendar(true)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#121358] text-white hover:bg-[#1a1c6e] transition shadow-sm">
+            <FontAwesomeIcon icon={faCalendarDays} className="w-4 h-4 text-white" />
+          </button>
         </div>
 
         {/* Summary cards */}
@@ -299,6 +313,95 @@ export default function BillsPage() {
           ))
         )}
       </div>
+
+      {/* Weekly Calendar Modal */}
+      {showCalendar && (() => {
+        const days = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(calendarWeekStart)
+          d.setDate(d.getDate() + i)
+          return d
+        })
+        const weekEnd = days[6]
+        const prevWeek = () => setCalendarWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })
+        const nextWeek = () => setCalendarWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })
+        const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
+        const todayStr = new Date().toISOString().slice(0, 10)
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
+            <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden">
+
+              {/* Header */}
+              <div className="px-5 py-4 flex items-center justify-between bg-[#121358]">
+                <button onClick={prevWeek} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition text-sm font-bold">‹</button>
+                <p className="text-sm font-semibold text-white">
+                  {calendarWeekStart.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} – {weekEnd.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button onClick={nextWeek} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition text-sm font-bold">›</button>
+                  <button onClick={() => setShowCalendar(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                    <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Day rows */}
+              <div className="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto">
+                {days.map((day, idx) => {
+                  const dateStr = day.toISOString().slice(0, 10)
+                  const isToday = dateStr === todayStr
+                  const dayBills = bills.filter(b => b.installment_due_date === dateStr)
+
+                  return (
+                    <div key={dateStr} className={`flex items-start gap-3 px-4 py-3 ${isToday ? 'bg-[#121358]/5' : ''}`}>
+                      {/* Day label */}
+                      <div className={`shrink-0 w-12 text-center rounded-lg py-1.5 ${isToday ? 'bg-[#121358]' : 'bg-gray-100'}`}>
+                        <p className={`text-[10px] font-semibold ${isToday ? 'text-white/70' : 'text-gray-400'}`}>{dayNames[idx]}</p>
+                        <p className={`text-sm font-bold ${isToday ? 'text-white' : 'text-gray-700'}`}>{day.getDate()}</p>
+                      </div>
+
+                      {/* Bills */}
+                      <div className="flex-1 py-1 min-h-[2rem]">
+                        {dayBills.length === 0 ? (
+                          <p className="text-xs text-gray-300">—</p>
+                        ) : (
+                          <>
+                            <p className="text-xs font-bold text-[#121358] mb-1.5">
+                              Total: Rp {fmt(dayBills.reduce((s, b) => s + b.installment, 0))}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {dayBills.map(b => (
+                                <div key={b.id} className={`rounded-lg px-2 py-1 text-xs font-semibold ${b.is_paid ? 'bg-green-100 text-green-700' : 'text-white'}`}
+                                  style={b.is_paid ? {} : { backgroundColor: '#9FA1FF' }}>
+                                  <span>{b.suppliers?.name ?? '-'}</span>
+                                  <span className="mx-1 opacity-60">·</span>
+                                  <span>Rp {fmt(b.installment)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="px-5 py-3 border-t border-gray-100 flex items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded" style={{ backgroundColor: '#9FA1FF' }}></span>
+                  <span className="text-xs text-gray-500">Belum Lunas</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-green-100"></span>
+                  <span className="text-xs text-gray-500">Lunas</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Pay modal */}
       {payingBill && (
