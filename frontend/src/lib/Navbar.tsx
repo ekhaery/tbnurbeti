@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck, faFileInvoiceDollar, faHandHoldingDollar, faMoneyCheckDollar, faReceipt, faUserGroup, faArrowTrendUp } from '@fortawesome/free-solid-svg-icons'
+import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck, faFileInvoiceDollar, faHandHoldingDollar, faMoneyCheckDollar, faReceipt, faUserGroup, faArrowTrendUp, faMoneyBillWave, faChartBar, faIdCard } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 
@@ -220,6 +220,38 @@ export default function Navbar() {
             </Link>
           </div>
 
+          {/* Operational */}
+          <div>
+            <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Operational</p>
+            <Link
+              href="/gaji-karyawan"
+              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                pathname.startsWith('/gaji-karyawan')
+                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+                <FontAwesomeIcon icon={faMoneyBillWave} className="w-4 h-4 text-gray-400" />
+              Gaji Karyawan
+            </Link>
+          </div>
+
+          {/* Laporan */}
+          <div>
+            <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Laporan</p>
+            <Link
+              href="/report-biaya-operasional"
+              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                pathname.startsWith('/report-biaya-operasional')
+                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FontAwesomeIcon icon={faChartBar} className="w-4 h-4 text-gray-400" />
+              Report Biaya Operasional
+            </Link>
+          </div>
+
           {/* Masterdata */}
           <div>
             <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Masterdata</p>
@@ -231,8 +263,19 @@ export default function Navbar() {
                   : 'text-gray-700 hover:bg-gray-50'
               }`}
             >
-              <FontAwesomeIcon icon={faUserGroup} className="w-4 h-4 text-gray-400" />
+                <FontAwesomeIcon icon={faUserGroup} className="w-4 h-4 text-gray-400" />
               Customer
+            </Link>
+            <Link
+              href="/karyawan"
+              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                pathname.startsWith('/karyawan')
+                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FontAwesomeIcon icon={faIdCard} className="w-4 h-4 text-gray-400" />
+              Karyawan
             </Link>
             <Link
               href="/settings/suppliers"
