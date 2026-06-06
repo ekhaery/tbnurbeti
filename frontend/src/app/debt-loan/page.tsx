@@ -123,7 +123,9 @@ export default function DebtLoanPage() {
     }).select('id').single()
 
     if (error || !newRecord) { setError(error?.message ?? 'Gagal menyimpan.'); setSaving(false); return }
-    await generateDetails(supabase, newRecord.id, form, period)
+    if (form.debt_type !== 'Rekening Koran') {
+      await generateDetails(supabase, newRecord.id, form, period)
+    }
     setSaving(false); setShowForm(false); setForm(emptyForm()); fetchData()
   }
 
@@ -156,9 +158,11 @@ export default function DebtLoanPage() {
 
     if (error) { setEditError(error.message); setEditSaving(false); return }
 
-    // Regenerate details
+    // Regenerate details (skip for Rekening Koran)
     await supabase.from('debt_loan_detail').delete().eq('debt_loan_id', editing!.id)
-    await generateDetails(supabase, editing!.id, editForm, editPeriod)
+    if (editForm.debt_type !== 'Rekening Koran') {
+      await generateDetails(supabase, editing!.id, editForm, editPeriod)
+    }
 
     setEditSaving(false); setEditing(null); fetchData()
   }
