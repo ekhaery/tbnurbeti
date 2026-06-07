@@ -116,7 +116,17 @@ export default function TagihanDebtLoanPage() {
         </div>
 
         {/* Summary */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-[#121358] rounded-xl shadow-sm p-3">
+              <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Sudah Lunas</p>
+              <p className="text-sm font-bold mt-0.5" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaid)}</p>
+            </div>
+            <div className="bg-[#121358] rounded-xl shadow-sm p-3">
+              <p className="text-xs font-semibold leading-tight" style={{ color: '#B5BAFF' }}>Bunga Rek. Koran (terbayar)</p>
+              <p className="text-sm font-bold mt-0.5" style={{ color: '#AEE2FF' }}>Rp {fmt(rekeningKoranTotal)}</p>
+            </div>
+          </div>
           <div className="bg-[#121358] rounded-xl shadow-sm p-3 space-y-2">
             <div>
               <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Belum Lunas</p>
@@ -125,21 +135,13 @@ export default function TagihanDebtLoanPage() {
             <div className="pt-2 border-t border-white/10 space-y-1.5">
               <div className="flex items-center justify-between">
                 <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Tagihan</p>
-                <p className="text-xs font-semibold" style={{ color: '#FCB7C7' }}>Rp {fmt(totalUnpaid)}</p>
+                <p className="text-xs font-semibold" style={{ color: '#FCB7C7' }}>{fmt(totalUnpaid)}</p>
               </div>
               <div className="flex items-center justify-between">
                 <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Rek. Koran</p>
-                <p className="text-xs font-semibold" style={{ color: '#FCB7C7' }}>Rp {fmt(rekeningKoranDebt)}</p>
+                <p className="text-xs font-semibold" style={{ color: '#FCB7C7' }}>{fmt(rekeningKoranDebt)}</p>
               </div>
             </div>
-          </div>
-          <div className="bg-[#121358] rounded-xl shadow-sm p-3">
-            <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Sudah Lunas</p>
-            <p className="text-sm font-bold mt-0.5" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaid)}</p>
-          </div>
-          <div className="bg-[#121358] rounded-xl shadow-sm p-3">
-            <p className="text-xs font-semibold leading-tight" style={{ color: '#B5BAFF' }}>Bunga Rek. Koran (terbayar)</p>
-            <p className="text-sm font-bold mt-0.5" style={{ color: '#AEE2FF' }}>Rp {fmt(rekeningKoranTotal)}</p>
           </div>
         </div>
 
