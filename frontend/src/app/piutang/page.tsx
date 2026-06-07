@@ -173,7 +173,7 @@ export default function PiutangPage() {
   const totalPiutang = list.reduce((s, r) => s + r.remaining_amount, 0)
   const totalLunas = list.filter(r => r.status === 'Lunas').reduce((s, r) => s + r.total, 0)
 
-  const FormBody = ({ f, setF, err }: { f: ReturnType<typeof emptyForm>; setF: (k: string, v: string | number) => void; err: string | null }) => (
+  const formFields = (f: ReturnType<typeof emptyForm>, setF: (k: string, v: string | number) => void, err: string | null) => (
     <div className="px-5 py-4 space-y-3 max-h-[65vh] overflow-y-auto">
       <div>
         <label className="block text-xs text-gray-500 mb-1">Customer <span className="text-red-500">*</span></label>
@@ -329,7 +329,7 @@ export default function PiutangPage() {
                 <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
               </button>
             </div>
-            <FormBody f={form} setF={set} err={error} />
+            {formFields(form, set, error)}
             <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
               <button onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Batal</button>
               <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
@@ -350,7 +350,7 @@ export default function PiutangPage() {
                 <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
               </button>
             </div>
-            <FormBody f={editForm} setF={setEdit} err={editError} />
+            {formFields(editForm, setEdit, editError)}
             <div className="px-5 py-4 border-t border-gray-100 space-y-2">
               <div className="flex gap-2">
                 <button onClick={() => setEditing(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Batal</button>
