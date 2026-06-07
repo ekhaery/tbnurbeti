@@ -50,6 +50,8 @@ export default function ProductListPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState<number | ''>('')
+  const [categoryQuery, setCategoryQuery] = useState('')
+  const [categoryDropdown, setCategoryDropdown] = useState(false)
   const [sort, setSort] = useState<SortOption>('updated_desc')
   const [sortOpen, setSortOpen] = useState(false)
   const [fetching, setFetching] = useState(true)
@@ -180,18 +182,34 @@ export default function ProductListPage() {
             placeholder="Cari nama atau kode..."
             className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
           />
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
-            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
-          >
-            <option value="">Semua</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <input
+              type="text"
+              value={categoryQuery}
+              onChange={e => { setCategoryQuery(e.target.value); setCategoryId(''); setCategoryDropdown(true) }}
+              onFocus={() => setCategoryDropdown(true)}
+              onBlur={() => setTimeout(() => setCategoryDropdown(false), 150)}
+              placeholder="Semua kategori..."
+              autoComplete="off"
+              className={`w-full border rounded-xl px-4 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${categoryId !== '' ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-300'}`}
+            />
+            {categoryDropdown && (
+              <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                <button onMouseDown={() => { setCategoryId(''); setCategoryQuery(''); setCategoryDropdown(false) }}
+                  className={`w-full text-left px-4 py-2.5 text-sm transition ${categoryId === '' ? 'bg-[#121358] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                  Semua
+                </button>
+                {categories
+                  .filter(c => c.name.toLowerCase().includes(categoryQuery.toLowerCase()))
+                  .map(cat => (
+                    <button key={cat.id} onMouseDown={() => { setCategoryId(cat.id); setCategoryQuery(cat.name); setCategoryDropdown(false) }}
+                      className={`w-full text-left px-4 py-2.5 text-sm transition ${categoryId === cat.id ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                      {cat.name}
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Product cards */}

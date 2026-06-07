@@ -57,6 +57,8 @@ export default function BulkInputPage() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [pendingPayload, setPendingPayload] = useState<Payload[]>([])
   const [openSuggestion, setOpenSuggestion] = useState<number | null>(null)
+  const [categoryQuery, setCategoryQuery] = useState('')
+  const [categoryDropdown, setCategoryDropdown] = useState(false)
 
   const isAdmin = appUser?.role === 'admin'
 
@@ -181,19 +183,31 @@ export default function BulkInputPage() {
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
               Kategori <span className="text-red-500">*</span>
             </label>
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(Number(e.target.value))}
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white text-gray-900"
-              required
-            >
-              <option value="">-- Pilih Kategori --</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                value={categoryQuery}
+                onChange={e => { setCategoryQuery(e.target.value); setCategoryId(''); setCategoryDropdown(true) }}
+                onFocus={() => setCategoryDropdown(true)}
+                onBlur={() => setTimeout(() => setCategoryDropdown(false), 150)}
+                placeholder="Cari atau pilih kategori..."
+                autoComplete="off"
+                className={`w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white ${categoryId !== '' ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-300'}`}
+              />
+              {categoryDropdown && (
+                <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                  {categories
+                    .filter(c => c.name.toLowerCase().includes(categoryQuery.toLowerCase()))
+                    .map(cat => (
+                      <button key={cat.id} type="button"
+                        onMouseDown={() => { setCategoryId(cat.id); setCategoryQuery(cat.name); setCategoryDropdown(false) }}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition ${categoryId === cat.id ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                        {cat.name}
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Product rows as cards */}
