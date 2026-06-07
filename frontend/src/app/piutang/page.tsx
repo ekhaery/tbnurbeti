@@ -56,8 +56,9 @@ export default function PiutangPage() {
   const [customerQuery, setCustomerQuery] = useState('')
   const [customerDropdown, setCustomerDropdown] = useState(false)
 
-  // Search filter
+  // Search & sort
   const [searchQuery, setSearchQuery] = useState('')
+  const [sortAsc, setSortAsc] = useState(false)
 
   // Add receivable
   const [showForm, setShowForm] = useState(false)
@@ -291,86 +292,118 @@ export default function PiutangPage() {
           </div>
         </div>
 
-        {/* Search */}
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Cari nama customer..."
-          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358] shadow-sm"
-        />
+        {/* Search + Sort */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Cari nama customer..."
+            className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358] shadow-sm"
+          />
+          <button
+            onClick={() => setSortAsc(v => !v)}
+            className="shrink-0 px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50 shadow-sm transition"
+            title="Sort by sisa piutang"
+          >
+            Sisa {sortAsc ? '↑' : '↓'}
+          </button>
+        </div>
 
-        {/* List */}
+        {/* List grouped by customer */}
         {fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
-        ) : list.filter(r => r.customers?.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
+        ) : list.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-10">Belum ada piutang.</div>
-        ) : (
+        ) : (() => {
+          // Group by customer_id
+          const grouped = list.reduce<Record<number, { name: string; rows: Receivable[]; totalRemaining: number }>>((acc, r) => {
+            const cid = r.customer_id
+            if (!acc[cid]) acc[cid] = { name: r.customers?.name ?? '-', rows: [], totalRemaining: 0 }
+            acc[cid].rows.push(r)
+            acc[cid].totalRemaining += r.remaining_amount
+            return acc
+          }, {})
+
+          const customers = Object.entries(grouped)
+            .filter(([, g]) => g.name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .sort(([, a], [, b]) => sortAsc ? a.totalRemaining - b.totalRemaining : b.totalRemaining - a.totalRemaining)
+
+          if (customers.length === 0) return <div className="text-center text-sm text-gray-400 py-10">Tidak ditemukan.</div>
+
+          return (
           <div className="space-y-2">
-            {list.filter(r => r.customers?.name.toLowerCase().includes(searchQuery.toLowerCase())).map(r => {
-              const statusCfg = receivablesStatusConfig(r.status)
-              const isOpen = expanded === r.id
+            {customers.map(([cid, group]) => {
+              const isOpen = expanded === Number(cid)
               return (
-                <div key={r.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
-                  <div className="relative p-4 pr-10">
-                    <button onClick={() => setExpanded(isOpen ? null : r.id)} className="w-full text-left">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-800">{r.customers?.name ?? '-'}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{fmtDate(r.date)}{r.due_date ? ` · JT: ${fmtDate(r.due_date)}` : ''}</p>
-                          <span className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${statusCfg.className}`}>
-                            {statusCfg.label}
-                          </span>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-bold text-[#121358]">Rp {fmt(r.total)}</p>
-                          {r.remaining_amount < r.total && (
-                            <p className="text-xs mt-0.5" style={{ color: '#9FA1FF' }}>Sisa: Rp {fmt(r.remaining_amount)}</p>
-                          )}
-                        </div>
+                <div key={cid} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  {/* Customer header */}
+                  <button onClick={() => setExpanded(isOpen ? null : Number(cid))} className="w-full px-4 py-3 flex items-center justify-between text-left">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{group.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{group.rows.length} tagihan</p>
+                    </div>
+                    <div className="text-right flex items-center gap-3">
+                      <div>
+                        <p className="text-xs text-gray-400">Sisa</p>
+                        <p className="text-sm font-bold" style={{ color: '#9FA1FF' }}>Rp {fmt(group.totalRemaining)}</p>
                       </div>
-                    </button>
+                      <FontAwesomeIcon icon={isOpen ? faChevronUp : faChevronDown} className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </button>
 
-                    {/* Edit icon */}
-                    <button onClick={() => openEdit(r)}
-                      className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-full text-[#121358]/50 hover:bg-[#121358]/10 hover:text-[#121358] transition">
-                      <FontAwesomeIcon icon={faPen} className="w-3 h-3" />
-                    </button>
-                  </div>
-
-                  {/* Expanded: detail payments */}
+                  {/* Expanded: individual receivables */}
                   {isOpen && (
-                    <div className="border-t border-gray-100">
-                      {r.customer_receivables_detail.length === 0 ? (
-                        <p className="px-4 py-3 text-xs text-gray-400">Belum ada pembayaran.</p>
-                      ) : (
-                        <div className="divide-y divide-gray-50">
-                          {r.customer_receivables_detail.map(d => (
-                            <div key={d.id} className="flex items-center justify-between px-4 py-2.5">
-                              <div>
-                                <p className="text-xs text-gray-700">{fmtDate(d.date)}</p>
-                                {d.notes && <p className="text-xs text-gray-400 italic">{d.notes}</p>}
+                    <div className="border-t border-gray-100 divide-y divide-gray-50">
+                      {group.rows.map(r => {
+                        const statusCfg = receivablesStatusConfig(r.status)
+                        return (
+                          <div key={r.id} className="px-4 py-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-gray-500">{fmtDate(r.date)}{r.due_date ? ` · JT: ${fmtDate(r.due_date)}` : ''}</p>
+                                <span className={`inline-block mt-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${statusCfg.className}`}>
+                                  {statusCfg.label}
+                                </span>
+                                {/* Payment history */}
+                                {r.customer_receivables_detail.length > 0 && (
+                                  <div className="mt-1.5 space-y-0.5">
+                                    {r.customer_receivables_detail.map(d => (
+                                      <p key={d.id} className="text-xs text-green-600">+ Rp {fmt(d.amount)} · {fmtDate(d.date)}{d.notes ? ` · ${d.notes}` : ''}</p>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
-                              <p className="text-sm font-semibold text-green-600">Rp {fmt(d.amount)}</p>
+                              <div className="text-right shrink-0">
+                                <p className="text-sm font-bold text-[#121358]">Rp {fmt(r.total)}</p>
+                                {r.remaining_amount < r.total && (
+                                  <p className="text-xs mt-0.5" style={{ color: '#9FA1FF' }}>Sisa: Rp {fmt(r.remaining_amount)}</p>
+                                )}
+                                <div className="flex items-center gap-1 justify-end mt-1">
+                                  <button onClick={() => openEdit(r)}
+                                    className="w-6 h-6 flex items-center justify-center rounded-full text-[#121358]/50 hover:bg-[#121358]/10 hover:text-[#121358] transition">
+                                    <FontAwesomeIcon icon={faPen} className="w-2.5 h-2.5" />
+                                  </button>
+                                  {r.status !== 'Lunas' && (
+                                    <button onClick={() => { setAddingDetail(r); setDetailForm(emptyDetail()); setDetailError(null) }}
+                                      className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
+                                      <FontAwesomeIcon icon={faPlus} className="w-2.5 h-2.5" /> Bayar
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                      {r.status !== 'Lunas' && (
-                        <div className="px-4 py-3 border-t border-gray-50">
-                          <button onClick={() => { setAddingDetail(r); setDetailForm(emptyDetail()); setDetailError(null) }}
-                            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
-                            <FontAwesomeIcon icon={faPlus} className="w-3 h-3" /> Catat Pembayaran
-                          </button>
-                        </div>
-                      )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
               )
             })}
           </div>
-        )}
+          )
+        })()}
       </div>
 
       {/* Add Modal */}
