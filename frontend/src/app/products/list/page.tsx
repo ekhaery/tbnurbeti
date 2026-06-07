@@ -53,6 +53,8 @@ export default function ProductListPage() {
   const [sort, setSort] = useState<SortOption>('updated_desc')
   const [sortOpen, setSortOpen] = useState(false)
   const [fetching, setFetching] = useState(true)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 25
   const sortRef = useRef<HTMLDivElement>(null)
 
   const isAdmin = appUser?.role === 'admin'
@@ -64,13 +66,25 @@ export default function ProductListPage() {
       .order('name')
       .then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
 
-    supabase
-      .from('products')
-      .select('id, code, name, base_price, price, stock, updated_at, categories(name)')
-      .then(({ data }: { data: Product[] | null }) => {
-        setProducts(data ?? [])
-        setFetching(false)
-      })
+    // Fetch all products in chunks to bypass the 1000-row PostgREST limit
+    const fetchAll = async () => {
+      const chunkSize = 1000
+      let from = 0
+      let all: Product[] = []
+      while (true) {
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, code, name, base_price, price, stock, updated_at, categories(name)')
+          .range(from, from + chunkSize - 1)
+        if (error || !data || data.length === 0) break
+        all = [...all, ...(data as Product[])]
+        if (data.length < chunkSize) break
+        from += chunkSize
+      }
+      setProducts(all)
+      setFetching(false)
+    }
+    fetchAll()
   }, [])
 
   // Close sort dropdown on outside click
@@ -94,6 +108,12 @@ export default function ProductListPage() {
     }),
     sort
   )
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  // Reset to page 1 when filters change
+  useEffect(() => { setPage(1) }, [search, categoryId, sort])
 
   if (loading) {
     return (
@@ -181,7 +201,7 @@ export default function ProductListPage() {
           <div className="text-center text-sm text-gray-400 py-10">Tidak ada produk.</div>
         ) : (
           <div className="space-y-2">
-            {filtered.map((p) => (
+            {paginated.map((p) => (
               <div key={p.id} className="bg-white rounded-xl shadow-sm p-4 flex items-start justify-between gap-3 relative">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800 truncate">{p.name}</p>
@@ -212,6 +232,42 @@ export default function ProductListPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-xs text-gray-400">
+              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} dari {filtered.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 disabled:opacity-30 transition"
+              >‹</button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                .reduce<(number | string)[]>((acc, p, i, arr) => {
+                  if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push('…')
+                  acc.push(p)
+                  return acc
+                }, [])
+                .map((p, i) => p === '…' ? (
+                  <span key={`ellipsis-${i}`} className="w-8 h-8 flex items-center justify-center text-xs text-gray-400">…</span>
+                ) : (
+                  <button key={p} onClick={() => setPage(p as number)}
+                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-semibold transition ${page === p ? 'bg-[#121358] text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                    {p}
+                  </button>
+                ))}
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 disabled:opacity-30 transition"
+              >›</button>
+            </div>
           </div>
         )}
       </div>
