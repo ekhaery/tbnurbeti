@@ -36,6 +36,7 @@ export default function TagihanDebtLoanPage() {
   const [paying, setPaying] = useState<DebtLoanDetail | null>(null)
   const [saving, setSaving] = useState(false)
   const [rekeningKoranTotal, setRekeningKoranTotal] = useState(0)
+  const [rekeningKoranDebt, setRekeningKoranDebt] = useState(0)
 
   const fetchData = async () => {
     const { data } = await supabase
@@ -45,7 +46,10 @@ export default function TagihanDebtLoanPage() {
     setList((data as DebtLoanDetail[]) ?? [])
     setFetching(false)
 
-    // Fetch Rekening Koran total (paid details sum or debt_amount)
+  }
+
+  const fetchRekeningKoran = async () => {
+    // Paid Rekening Koran details
     const { data: rkData } = await supabase
       .from('debt_loan_detail')
       .select('installment_amount, debt_loan!inner(debt_type)')
@@ -53,9 +57,18 @@ export default function TagihanDebtLoanPage() {
       .eq('is_paid', true)
     const total = (rkData ?? []).reduce((s: number, d: { installment_amount: number }) => s + d.installment_amount, 0)
     setRekeningKoranTotal(total)
+
+    // Total debt_amount for all Rekening Koran records
+    const { data: rkDebtData } = await supabase
+      .from('debt_loan')
+      .select('debt_amount')
+      .eq('debt_type', 'Rekening Koran')
+    const debtTotal = (rkDebtData ?? []).reduce((s: number, d: { debt_amount: number }) => s + d.debt_amount, 0)
+    setRekeningKoranDebt(debtTotal)
   }
 
   useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchRekeningKoran() }, [])
 
   const bankNames = Array.from(new Set(list.map(d => d.debt_loan?.bank_account ?? '').filter(Boolean))).sort()
   const years = Array.from(new Set(list.map(d => d.installment_due_date ? new Date(d.installment_due_date).getFullYear().toString() : '').filter(Boolean))).sort()
@@ -104,9 +117,21 @@ export default function TagihanDebtLoanPage() {
 
         {/* Summary */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="bg-[#121358] rounded-xl shadow-sm p-3">
-            <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Belum Lunas</p>
-            <p className="text-sm font-bold mt-0.5" style={{ color: '#FCB7C7' }}>Rp {fmt(totalUnpaid)}</p>
+          <div className="bg-[#121358] rounded-xl shadow-sm p-3 space-y-2">
+            <div>
+              <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Belum Lunas</p>
+              <p className="text-sm font-bold mt-0.5" style={{ color: '#FCB7C7' }}>Rp {fmt(totalUnpaid + rekeningKoranDebt)}</p>
+            </div>
+            <div className="pt-2 border-t border-white/10 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Tagihan</p>
+                <p className="text-xs font-semibold" style={{ color: '#FCB7C7' }}>Rp {fmt(totalUnpaid)}</p>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Rek. Koran</p>
+                <p className="text-xs font-semibold" style={{ color: '#FCB7C7' }}>Rp {fmt(rekeningKoranDebt)}</p>
+              </div>
+            </div>
           </div>
           <div className="bg-[#121358] rounded-xl shadow-sm p-3">
             <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Sudah Lunas</p>

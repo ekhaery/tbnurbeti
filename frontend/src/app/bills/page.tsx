@@ -16,7 +16,7 @@ type Bill = {
   paid_amount: number
   is_paid: boolean
   suppliers: { name: string } | null
-  purchasing: { code: string } | null
+  purchasing: { code: string; total: number } | null
 }
 
 type FilterStatus = 'all' | 'unpaid' | 'paid'
@@ -97,7 +97,7 @@ export default function BillsPage() {
   const fetchData = async () => {
     const { data } = await supabase
       .from('bills')
-      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, suppliers(name), purchasing(code)')
+      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, suppliers(name), purchasing(code, total)')
     setBills((data as Bill[]) ?? [])
     setFetching(false)
   }
@@ -679,12 +679,21 @@ export default function BillsPage() {
       {payingBill && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-gray-800">Bayar Tagihan</h3>
-                <p className="text-xs text-gray-500 mt-0.5">{payingBill.suppliers?.name} · {payingBill.month}</p>
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between" style={{ backgroundColor: '#B5BAFF' }}>
+              <div className="flex-1 text-center">
+                <h3 className="text-base font-bold text-[#121358]">
+                  Bayar Tagihan ke {payingBill.bill_no ? payingBill.bill_no.split('-').pop() : ''}
+                </h3>
+                <p className="text-xs text-[#121358]/70 mt-0.5">
+                  {payingBill.suppliers?.name} · Jatuh tempo: {payingBill.due_date.split('-').reverse().join('/')}
+                </p>
+                {payingBill.purchasing?.total != null && (
+                  <p className="text-xs text-[#121358]/70 mt-0.5">
+                    Total Purchasing: <span className="font-semibold text-[#121358]">Rp {fmt(payingBill.purchasing.total)}</span>
+                  </p>
+                )}
               </div>
-              <button onClick={() => setPayingBill(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition">
+              <button onClick={() => setPayingBill(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#121358]/10 hover:bg-[#121358]/20 text-[#121358] transition">
                 <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
               </button>
             </div>
