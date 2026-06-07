@@ -17,6 +17,14 @@ type DebtLoanDetail = {
   debt_loan: { bank_account: string; debt_type: string } | null
 }
 
+type RekeningKoran = {
+  id: number
+  bank_account: string
+  debt_amount: number
+  installment_amount: number
+  is_active: boolean
+}
+
 type FilterStatus = 'all' | 'unpaid' | 'paid'
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
@@ -25,6 +33,7 @@ const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'n
 export default function TagihanDebtLoanPage() {
   const supabase = createClient()
   const [list, setList] = useState<DebtLoanDetail[]>([])
+  const [rkList, setRkList] = useState<RekeningKoran[]>([])
   const [fetching, setFetching] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('unpaid')
   const [yearFilter, setYearFilter] = useState<string>(new Date().getFullYear().toString())
@@ -32,33 +41,51 @@ export default function TagihanDebtLoanPage() {
   const [bankQuery, setBankQuery] = useState('')
   const [bankDropdown, setBankDropdown] = useState(false)
 
-  // Pay modal
+  // Pay regular installment
   const [paying, setPaying] = useState<DebtLoanDetail | null>(null)
   const [saving, setSaving] = useState(false)
+
+  // Pay Rekening Koran
+  const [payingRk, setPayingRk] = useState<RekeningKoran | null>(null)
+  const [rkPayAmount, setRkPayAmount] = useState('')
+  const [rkSaving, setRkSaving] = useState(false)
+  const [rkError, setRkError] = useState<string | null>(null)
+
+  // Summary
   const [rekeningKoranTotal, setRekeningKoranTotal] = useState(0)
   const [rekeningKoranDebt, setRekeningKoranDebt] = useState(0)
 
   const fetchData = async () => {
+    // Fetch debt_loan_detail (exclude Rekening Koran)
     const { data } = await supabase
       .from('debt_loan_detail')
       .select('id, code, date, due_date, installment_amount, installment_due_date, is_paid, payment_date, debt_loan(bank_account, debt_type)')
       .order('installment_due_date', { ascending: true })
-    setList((data as DebtLoanDetail[]) ?? [])
+    // Filter out Rekening Koran client-side
+    const nonRk = (data ?? []).filter((d: DebtLoanDetail) => d.debt_loan?.debt_type !== 'Rekening Koran')
+    setList(nonRk)
     setFetching(false)
-
   }
 
   const fetchRekeningKoran = async () => {
-    // Paid Rekening Koran details
+    // Active Rekening Koran records
     const { data: rkData } = await supabase
+      .from('debt_loan')
+      .select('id, bank_account, debt_amount, installment_amount, is_active')
+      .eq('debt_type', 'Rekening Koran')
+      .eq('is_active', true)
+    setRkList((rkData as RekeningKoran[]) ?? [])
+
+    // Paid RK details (for summary)
+    const { data: rkPaidData } = await supabase
       .from('debt_loan_detail')
       .select('installment_amount, debt_loan!inner(debt_type)')
       .eq('debt_loan.debt_type', 'Rekening Koran')
       .eq('is_paid', true)
-    const total = (rkData ?? []).reduce((s: number, d: { installment_amount: number }) => s + d.installment_amount, 0)
-    setRekeningKoranTotal(total)
+    const paidTotal = (rkPaidData ?? []).reduce((s: number, d: { installment_amount: number }) => s + d.installment_amount, 0)
+    setRekeningKoranTotal(paidTotal)
 
-    // Total debt_amount for all Rekening Koran records
+    // Total debt_amount for Rekening Koran
     const { data: rkDebtData } = await supabase
       .from('debt_loan')
       .select('debt_amount')
@@ -81,7 +108,7 @@ export default function TagihanDebtLoanPage() {
     return true
   })
 
-  // Group by month label (e.g. "Juni 2026")
+  // Group by month
   const grouped = filtered.reduce<Record<string, DebtLoanDetail[]>>((acc, d) => {
     const key = d.installment_due_date
       ? new Date(d.installment_due_date).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
@@ -94,6 +121,7 @@ export default function TagihanDebtLoanPage() {
   const totalUnpaid = list.filter(d => !d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
   const totalPaid = list.filter(d => d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
 
+  // Pay regular installment
   const handlePay = async () => {
     if (!paying) return
     setSaving(true)
@@ -105,6 +133,32 @@ export default function TagihanDebtLoanPage() {
     setPaying(null)
     fetchData()
   }
+
+  // Pay Rekening Koran — creates new debt_loan_detail with is_paid=true
+  const handleRkPay = async () => {
+    if (!payingRk) return
+    const amount = parseFloat(rkPayAmount)
+    if (!amount || amount <= 0) { setRkError('Masukkan jumlah pembayaran.'); return }
+    setRkSaving(true); setRkError(null)
+    const today = new Date().toISOString().slice(0, 10)
+    const { error } = await supabase.from('debt_loan_detail').insert({
+      debt_loan_id: payingRk.id,
+      date: today,
+      due_date: today,
+      installment_amount: amount,
+      installment_due_date: today,
+      is_paid: true,
+      payment_date: today,
+    })
+    setRkSaving(false)
+    if (error) { setRkError(error.message); return }
+    setPayingRk(null)
+    setRkPayAmount('')
+    fetchRekeningKoran()
+  }
+
+  // All months to display (from grouped + current month always shown for RK)
+  const allMonths = Object.keys(grouped)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -147,10 +201,8 @@ export default function TagihanDebtLoanPage() {
 
         {/* Filter card */}
         <div className="rounded-2xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
-
           <p className="text-xs font-semibold text-[#121358]">Apply Filter:</p>
 
-          {/* Status tabs */}
           <div className="bg-gray-100 rounded-xl p-1 flex gap-1">
             {(['unpaid', 'paid', 'all'] as FilterStatus[]).map(f => (
               <button key={f} onClick={() => setFilter(f)}
@@ -160,7 +212,6 @@ export default function TagihanDebtLoanPage() {
             ))}
           </div>
 
-          {/* Year filter */}
           <div className="flex gap-2 overflow-x-auto pb-0.5">
             <button onClick={() => setYearFilter('')}
               className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition ${!yearFilter ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
@@ -174,7 +225,6 @@ export default function TagihanDebtLoanPage() {
             ))}
           </div>
 
-          {/* Bank filter autocomplete */}
           <div className="relative">
             <input type="text" value={bankQuery}
               onChange={e => { setBankQuery(e.target.value); setBankFilter(''); setBankDropdown(true) }}
@@ -207,81 +257,125 @@ export default function TagihanDebtLoanPage() {
           </div>
         </div>
 
-        {/* Yearly total */}
-        <div className="rounded-xl px-4 py-2.5 flex items-center justify-between bg-[#121358]">
-          <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Total hutang tahunan</p>
-          <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(filtered.reduce((s, d) => s + d.installment_amount, 0))}</p>
-        </div>
+        {/* Total hutang tahunan */}
+        {(() => {
+          const installmentTotal = filtered.filter(d => !d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
+          const rkYearlyTotal = rkList.reduce((s, rk) => s + rk.installment_amount * 12, 0)
+          return (
+            <div className="rounded-xl px-4 py-2.5 bg-[#121358] space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Total Hutang Tahunan</p>
+                <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(installmentTotal + rkYearlyTotal)}</p>
+              </div>
+              <div className="border-t border-white/10 pt-1.5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Cicilan</p>
+                  <p className="text-[10px]" style={{ color: '#FCB7C7' }}>Rp {fmt(installmentTotal)}</p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Rek. Koran (×12)</p>
+                  <p className="text-[10px]" style={{ color: '#FCB7C7' }}>Rp {fmt(rkYearlyTotal)}</p>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
-        {/* List grouped by month */}
+        {/* List grouped by month + RK per month */}
         {fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center text-sm text-gray-400 py-10">Tidak ada tagihan.</div>
         ) : (
-          Object.entries(grouped).map(([month, items]) => (
-            <div key={month} className="space-y-2">
-              <div className="flex items-center justify-between px-1">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{month}</p>
-                <p className="text-xs font-semibold text-gray-500">
-                  Rp {fmt(items.reduce((s, d) => s + d.installment_amount, 0))}
-                  <span className="text-gray-300 mx-1">·</span>
-                  <span className="text-green-600">{items.filter(d => d.is_paid).length} lunas</span>
-                  <span className="text-gray-300 mx-1">·</span>
-                  <span style={{ color: '#9FA1FF' }}>{items.filter(d => !d.is_paid).length} belum</span>
-                </p>
-              </div>
-              {items.map(d => (
-                <div key={d.id} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${d.is_paid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-gray-800">{d.debt_loan?.bank_account ?? '-'}</p>
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#9FA1FF]/20 text-[#121358]">
-                          {d.debt_loan?.debt_type ?? '-'}
-                        </span>
+          (() => {
+            // Build month list: from installments + always include current month for RK
+            const currentMonth = new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+            const monthSet = new Set([...allMonths, ...(filter !== 'paid' && rkList.length > 0 ? [currentMonth] : [])])
+            const months = Array.from(monthSet)
+
+            if (months.length === 0) return <div className="text-center text-sm text-gray-400 py-10">Tidak ada tagihan.</div>
+
+            return months.map(month => (
+              <div key={month} className="space-y-2">
+                {/* Month header */}
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{month}</p>
+                  {grouped[month] && (
+                    <p className="text-xs font-semibold text-gray-500">
+                      Rp {fmt(grouped[month].reduce((s, d) => s + d.installment_amount, 0))}
+                      <span className="text-gray-300 mx-1">·</span>
+                      <span className="text-green-600">{grouped[month].filter(d => d.is_paid).length} lunas</span>
+                      <span className="text-gray-300 mx-1">·</span>
+                      <span style={{ color: '#9FA1FF' }}>{grouped[month].filter(d => !d.is_paid).length} belum</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Installment cards */}
+                {(grouped[month] ?? []).map(d => (
+                  <div key={d.id} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${d.is_paid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-gray-800">{d.debt_loan?.bank_account ?? '-'}</p>
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#9FA1FF]/20 text-[#121358]">
+                            {d.debt_loan?.debt_type ?? '-'}
+                          </span>
+                        </div>
+                        {d.code && <p className="text-xs text-gray-400 font-mono mt-0.5">{d.code}</p>}
+                        {d.installment_due_date && <p className="text-xs text-gray-400 mt-0.5">Cicilan: {fmtDate(d.installment_due_date)}</p>}
+                        {d.due_date && <p className="text-xs text-gray-400 mt-0.5">Jatuh tempo: {fmtDate(d.due_date)}</p>}
+                        {d.is_paid && d.payment_date && <p className="text-xs text-green-600 mt-0.5">Dibayar: {fmtDate(d.payment_date)}</p>}
                       </div>
-                      {d.code && <p className="text-xs text-gray-400 font-mono mt-0.5">{d.code}</p>}
-                      {d.installment_due_date && (
-                        <p className="text-xs text-gray-500 mt-0.5">Cicilan: {fmtDate(d.installment_due_date)}</p>
-                      )}
-                      {d.due_date && (
-                        <p className="text-xs text-gray-500 mt-0.5">Jatuh tempo: {fmtDate(d.due_date)}</p>
-                      )}
-                      {d.is_paid && d.payment_date && (
-                        <p className="text-xs text-green-600 mt-0.5">Dibayar: {fmtDate(d.payment_date)}</p>
-                      )}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-[#121358]">Rp {fmt(d.installment_amount)}</p>
-                      {d.is_paid ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-600 mt-1">
-                          <FontAwesomeIcon icon={faCheck} className="w-2.5 h-2.5" /> Lunas
-                        </span>
-                      ) : (
-                        <button onClick={() => setPaying(d)}
-                          className="mt-1 flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
-                          <FontAwesomeIcon icon={faMoneyBillWave} className="w-3 h-3" />
-                          Bayar
-                        </button>
-                      )}
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold text-[#121358]">Rp {fmt(d.installment_amount)}</p>
+                        {d.is_paid ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-600 mt-1">
+                            <FontAwesomeIcon icon={faCheck} className="w-2.5 h-2.5" /> Lunas
+                          </span>
+                        ) : (
+                          <button onClick={() => setPaying(d)}
+                            className="mt-1 flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
+                            <FontAwesomeIcon icon={faMoneyBillWave} className="w-3 h-3" /> Bayar
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ))
+                ))}
+
+                {/* Rekening Koran — shown in every month */}
+                {filter !== 'paid' && rkList.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">Rekening Koran</p>
+                    {rkList.map(rk => (
+                      <div key={rk.id} className="bg-white rounded-xl shadow-sm p-4 border-l-4 border-amber-400">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-800">{rk.bank_account}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">Bunga per bulan: Rp {fmt(rk.installment_amount)}</p>
+                          </div>
+                          <button onClick={() => { setPayingRk(rk); setRkPayAmount(String(rk.installment_amount)); setRkError(null) }}
+                            className="mt-1 flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
+                            <FontAwesomeIcon icon={faMoneyBillWave} className="w-3 h-3" /> Bayar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          })()
         )}
       </div>
 
-      {/* Pay confirm modal */}
+      {/* Pay installment modal */}
       {paying && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-gray-800">Konfirmasi Pembayaran</h3>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs text-gray-400 mt-0.5">
                   {paying.debt_loan?.bank_account} · {paying.installment_due_date ? fmtDate(paying.installment_due_date) : '-'}
                 </p>
               </div>
@@ -294,13 +388,41 @@ export default function TagihanDebtLoanPage() {
               <span className="text-base font-bold text-[#121358]">Rp {fmt(paying.installment_amount)}</span>
             </div>
             <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
-              <button onClick={() => setPaying(null)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">
-                Batal
-              </button>
-              <button onClick={handlePay} disabled={saving}
-                className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
+              <button onClick={() => setPaying(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Batal</button>
+              <button onClick={handlePay} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
                 {saving ? 'Menyimpan...' : 'Konfirmasi'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pay Rekening Koran modal */}
+      {payingRk && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between" style={{ backgroundColor: '#B5BAFF' }}>
+              <div>
+                <h3 className="text-sm font-bold text-[#121358]">Bayar Rekening Koran</h3>
+                <p className="text-xs text-[#121358]/70 mt-0.5">{payingRk.bank_account}</p>
+              </div>
+              <button onClick={() => setPayingRk(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#121358]/10 hover:bg-[#121358]/20 text-[#121358] transition">
+                <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Jumlah Bayar</label>
+                <input type="number" value={rkPayAmount} onChange={e => setRkPayAmount(e.target.value)}
+                  placeholder="0" min="0"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+              </div>
+              {rkError && <p className="text-xs text-red-500">⚠️ {rkError}</p>}
+            </div>
+            <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
+              <button onClick={() => setPayingRk(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Batal</button>
+              <button onClick={handleRkPay} disabled={rkSaving} className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
+                {rkSaving ? 'Menyimpan...' : 'Konfirmasi'}
               </button>
             </div>
           </div>
