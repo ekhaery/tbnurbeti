@@ -35,6 +35,7 @@ export default function TagihanDebtLoanPage() {
   // Pay modal
   const [paying, setPaying] = useState<DebtLoanDetail | null>(null)
   const [saving, setSaving] = useState(false)
+  const [rekeningKoranTotal, setRekeningKoranTotal] = useState(0)
 
   const fetchData = async () => {
     const { data } = await supabase
@@ -43,6 +44,15 @@ export default function TagihanDebtLoanPage() {
       .order('installment_due_date', { ascending: true })
     setList((data as DebtLoanDetail[]) ?? [])
     setFetching(false)
+
+    // Fetch Rekening Koran total (paid details sum or debt_amount)
+    const { data: rkData } = await supabase
+      .from('debt_loan_detail')
+      .select('installment_amount, debt_loan!inner(debt_type)')
+      .eq('debt_loan.debt_type', 'Rekening Koran')
+      .eq('is_paid', true)
+    const total = (rkData ?? []).reduce((s: number, d: { installment_amount: number }) => s + d.installment_amount, 0)
+    setRekeningKoranTotal(total)
   }
 
   useEffect(() => { fetchData() }, [])
@@ -93,14 +103,18 @@ export default function TagihanDebtLoanPage() {
         </div>
 
         {/* Summary */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           <div className="bg-[#121358] rounded-xl shadow-sm p-3">
             <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Belum Lunas</p>
-            <p className="text-base font-bold mt-0.5" style={{ color: '#FCB7C7' }}>Rp {fmt(totalUnpaid)}</p>
+            <p className="text-sm font-bold mt-0.5" style={{ color: '#FCB7C7' }}>Rp {fmt(totalUnpaid)}</p>
           </div>
           <div className="bg-[#121358] rounded-xl shadow-sm p-3">
             <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Sudah Lunas</p>
-            <p className="text-base font-bold mt-0.5" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaid)}</p>
+            <p className="text-sm font-bold mt-0.5" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaid)}</p>
+          </div>
+          <div className="bg-[#121358] rounded-xl shadow-sm p-3">
+            <p className="text-xs font-semibold leading-tight" style={{ color: '#B5BAFF' }}>Bunga Rek. Koran (terbayar)</p>
+            <p className="text-sm font-bold mt-0.5" style={{ color: '#AEE2FF' }}>Rp {fmt(rekeningKoranTotal)}</p>
           </div>
         </div>
 
