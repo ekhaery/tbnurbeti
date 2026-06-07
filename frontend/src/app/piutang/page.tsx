@@ -52,6 +52,10 @@ export default function PiutangPage() {
   const [fetching, setFetching] = useState(true)
   const [expanded, setExpanded] = useState<number | null>(null)
 
+  // Customer autocomplete
+  const [customerQuery, setCustomerQuery] = useState('')
+  const [customerDropdown, setCustomerDropdown] = useState(false)
+
   // Add receivable
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm())
@@ -106,7 +110,7 @@ export default function PiutangPage() {
     })
     setSaving(false)
     if (error) { setError(error.message); return }
-    setShowForm(false); setForm(emptyForm()); fetchData()
+    setShowForm(false); setForm(emptyForm()); setCustomerQuery(''); fetchData()
   }
 
   const openEdit = (r: Receivable) => {
@@ -175,13 +179,51 @@ export default function PiutangPage() {
 
   const formFields = (f: ReturnType<typeof emptyForm>, setF: (k: string, v: string | number) => void, err: string | null) => (
     <div className="px-5 py-4 space-y-3 max-h-[65vh] overflow-y-auto">
-      <div>
+      <div className="relative">
         <label className="block text-xs text-gray-500 mb-1">Customer <span className="text-red-500">*</span></label>
-        <select value={f.customer_id} onChange={e => setF('customer_id', Number(e.target.value))}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]">
-          <option value="">-- Pilih Customer --</option>
-          {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <input
+          type="text"
+          value={customerQuery}
+          onChange={e => {
+            setCustomerQuery(e.target.value)
+            setF('customer_id', '')
+            setCustomerDropdown(true)
+          }}
+          onFocus={() => setCustomerDropdown(true)}
+          onBlur={() => setTimeout(() => setCustomerDropdown(false), 150)}
+          placeholder="Cari atau tambah customer..."
+          autoComplete="off"
+          className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${f.customer_id ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-300'}`}
+        />
+        {customerDropdown && (
+          <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+            {customers
+              .filter(c => c.name.toLowerCase().includes(customerQuery.toLowerCase()))
+              .map(c => (
+                <button key={c.id} type="button"
+                  onMouseDown={() => { setCustomerQuery(c.name); setF('customer_id', c.id); setCustomerDropdown(false) }}
+                  className={`w-full text-left px-4 py-2.5 text-sm transition ${f.customer_id === c.id ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                  {c.name}
+                </button>
+              ))}
+            {customerQuery.trim() && !customers.some(c => c.name.toLowerCase() === customerQuery.toLowerCase()) && (
+              <button type="button"
+                onMouseDown={async () => {
+                  const { data: newC } = await supabase.from('customers')
+                    .insert({ name: customerQuery.trim() }).select('id, name').single()
+                  if (newC) {
+                    setCustomers(prev => [...prev, newC].sort((a, b) => a.name.localeCompare(b.name)))
+                    setF('customer_id', newC.id)
+                    setCustomerQuery(newC.name)
+                  }
+                  setCustomerDropdown(false)
+                }}
+                className="w-full text-left px-4 py-2.5 text-sm text-[#121358] font-semibold hover:bg-[#121358]/5 transition border-t border-gray-100">
+                + New Customer: "{customerQuery.trim()}"
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>

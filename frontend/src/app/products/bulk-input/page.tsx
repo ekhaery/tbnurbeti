@@ -56,6 +56,7 @@ export default function BulkInputPage() {
   // confirmation modal
   const [showConfirm, setShowConfirm] = useState(false)
   const [pendingPayload, setPendingPayload] = useState<Payload[]>([])
+  const [openSuggestion, setOpenSuggestion] = useState<number | null>(null)
 
   const isAdmin = appUser?.role === 'admin'
 
@@ -212,27 +213,38 @@ export default function BulkInputPage() {
                   </button>
                 </div>
 
-                <div>
+                <div className="relative">
                   <label className="block text-xs text-gray-500 mb-1">
                     Nama Produk <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={row.name}
-                    onChange={(e) => updateRow(i, 'name', e.target.value)}
+                    onChange={(e) => { updateRow(i, 'name', e.target.value); setOpenSuggestion(i) }}
+                    onFocus={() => setOpenSuggestion(i)}
+                    onBlur={() => setTimeout(() => setOpenSuggestion(null), 150)}
                     placeholder="Ketik nama produk baru..."
-                    list={`products-list-${i}`}
+                    autoComplete="off"
                     className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 bg-gray-50 ${
                       row.name.trim() && existingNames.includes(toTitleCase(row.name.trim()).toLowerCase())
                         ? 'border-red-300 focus:ring-red-300'
                         : 'border-gray-200 focus:ring-[#121358]'
                     }`}
                   />
-                  <datalist id={`products-list-${i}`}>
-                    {existingNames.map((name) => (
-                      <option key={name} value={name} />
-                    ))}
-                  </datalist>
+                  {openSuggestion === i && row.name.trim() && (() => {
+                    const matches = existingNames.filter(n => n.toLowerCase().includes(row.name.toLowerCase()))
+                    return matches.length > 0 ? (
+                      <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
+                        {matches.map(name => (
+                          <button key={name} type="button"
+                            onMouseDown={() => { updateRow(i, 'name', name); setOpenSuggestion(null) }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null
+                  })()}
                   {row.name.trim() && existingNames.includes(toTitleCase(row.name.trim()).toLowerCase()) && (
                     <p className="text-xs text-red-500 mt-1">⚠ Produk ini sudah ada.</p>
                   )}
