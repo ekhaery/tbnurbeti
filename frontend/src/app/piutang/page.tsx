@@ -52,9 +52,12 @@ export default function PiutangPage() {
   const [fetching, setFetching] = useState(true)
   const [expanded, setExpanded] = useState<number | null>(null)
 
-  // Customer autocomplete
+  // Customer autocomplete (form)
   const [customerQuery, setCustomerQuery] = useState('')
   const [customerDropdown, setCustomerDropdown] = useState(false)
+
+  // Search filter
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Add receivable
   const [showForm, setShowForm] = useState(false)
@@ -288,14 +291,23 @@ export default function PiutangPage() {
           </div>
         </div>
 
+        {/* Search */}
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Cari nama customer..."
+          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358] shadow-sm"
+        />
+
         {/* List */}
         {fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
-        ) : list.length === 0 ? (
+        ) : list.filter(r => r.customers?.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-10">Belum ada piutang.</div>
         ) : (
           <div className="space-y-2">
-            {list.map(r => {
+            {list.filter(r => r.customers?.name.toLowerCase().includes(searchQuery.toLowerCase())).map(r => {
               const statusCfg = receivablesStatusConfig(r.status)
               const isOpen = expanded === r.id
               return (
