@@ -10,6 +10,7 @@ import { toTitleCase } from '@/lib/utils'
 import type { PurchasingStatus } from '@/lib/purchasingStatus'
 
 type Supplier = { id: number; name: string }
+type Category = { id: number; name: string }
 type Product = { id: number; name: string; categories: { name: string } | null }
 type ItemRow = { product_id: number | ''; query: string; qty: string; base_price: string }
 type AutocompleteState = { open: boolean; focused: number }
@@ -30,6 +31,13 @@ export default function BuatPurchasingPage() {
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  // New product inline
+  const [newProductIdx, setNewProductIdx] = useState<number | null>(null)
+  const [newProductName, setNewProductName] = useState('')
+  const [newProductCategoryId, setNewProductCategoryId] = useState<number | ''>('')
+  const [newProductPrice, setNewProductPrice] = useState('')
+  const [addingProduct, setAddingProduct] = useState(false)
   const [supplierId, setSupplierId] = useState<number | ''>('')
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [notes, setNotes] = useState('')
@@ -45,12 +53,17 @@ export default function BuatPurchasingPage() {
   const [newSupplierName, setNewSupplierName] = useState('')
   const [addingSupplier, setAddingSupplier] = useState(false)
   const [showNewSupplier, setShowNewSupplier] = useState(false)
+  // Supplier autocomplete
+  const [supplierQuery, setSupplierQuery] = useState('')
+  const [supplierDropdown, setSupplierDropdown] = useState(false)
 
   useEffect(() => {
     supabase.from('suppliers').select('id, name').order('name')
       .then(({ data }: { data: Supplier[] | null }) => setSuppliers(data ?? []))
     supabase.from('products').select('id, name, categories(name)').order('name')
       .then(({ data }: { data: Product[] | null }) => setProducts(data ?? []))
+    supabase.from('categories').select('id, name').order('name')
+      .then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
   }, [])
 
   const updateItem = (i: number, field: keyof ItemRow, value: string | number) => {
@@ -81,6 +94,28 @@ export default function BuatPurchasingPage() {
           p.name.toLowerCase().includes(query.toLowerCase()) ||
           (p.categories?.name ?? '').toLowerCase().includes(query.toLowerCase())
         )
+
+  const handleAddNewProduct = async (i: number) => {
+    const name = items[i]?.query?.trim()
+    if (!name) return
+    setAddingProduct(true)
+    const { data, error } = await supabase.from('products').insert({
+      name: toTitleCase(name),
+      category_id: newProductCategoryId || null,
+      base_price: 0,
+      price: parseFloat(newProductPrice) || 0,
+      stock: 0,
+    }).select('id, name, categories(name)').single()
+    setAddingProduct(false)
+    if (error || !data) return
+    const newProduct = data as Product
+    setProducts(prev => [...prev, newProduct].sort((a, b) => a.name.localeCompare(b.name)))
+    selectProduct(i, newProduct)
+    setNewProductIdx(null)
+    setNewProductName('')
+    setNewProductCategoryId('')
+    setNewProductPrice('')
+  }
 
   const handleAddSupplier = async () => {
     if (!newSupplierName.trim()) return
@@ -247,44 +282,48 @@ export default function BuatPurchasingPage() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Info Purchasing</p>
 
             {/* Supplier */}
-            <div>
+            <div className="relative">
               <label className="block text-xs text-gray-500 mb-1">Supplier <span className="text-red-500">*</span></label>
-              <div className="flex gap-2">
-                <select
-                  value={supplierId}
-                  onChange={e => setSupplierId(Number(e.target.value))}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
-                  required
-                >
-                  <option value="">-- Pilih Supplier --</option>
-                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setShowNewSupplier(v => !v)}
-                  className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm transition"
-                  title="Tambah supplier baru"
-                >
-                  <FontAwesomeIcon icon={faPlus} className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              {showNewSupplier && (
-                <div className="mt-2 flex gap-2">
-                  <input
-                    type="text"
-                    value={newSupplierName}
-                    onChange={e => setNewSupplierName(e.target.value)}
-                    placeholder="Nama supplier baru"
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddSupplier}
-                    disabled={addingSupplier || !newSupplierName.trim()}
-                    className="px-3 py-2 bg-[#121358] text-white rounded-lg text-sm disabled:opacity-50 transition"
-                  >
-                    {addingSupplier ? '...' : 'Simpan'}
-                  </button>
+              <input
+                type="text"
+                value={supplierQuery}
+                onChange={e => { setSupplierQuery(e.target.value); setSupplierId(''); setSupplierDropdown(true) }}
+                onFocus={() => setSupplierDropdown(true)}
+                onBlur={() => setTimeout(() => setSupplierDropdown(false), 150)}
+                placeholder="Cari supplier..."
+                autoComplete="off"
+                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${supplierId ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-300'}`}
+              />
+              {supplierDropdown && (
+                <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                  {suppliers
+                    .filter(s => s.name.toLowerCase().includes(supplierQuery.toLowerCase()))
+                    .map(s => (
+                      <button key={s.id} type="button"
+                        onMouseDown={() => { setSupplierId(s.id); setSupplierQuery(s.name); setSupplierDropdown(false) }}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition ${supplierId === s.id ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                        {s.name}
+                      </button>
+                    ))}
+                  {supplierQuery.trim() && !suppliers.some(s => s.name.toLowerCase() === supplierQuery.toLowerCase()) && (
+                    <button type="button"
+                      onMouseDown={async () => {
+                        setAddingSupplier(true)
+                        const { data } = await supabase.from('suppliers')
+                          .insert({ name: toTitleCase(supplierQuery.trim()) })
+                          .select('id, name').single()
+                        setAddingSupplier(false)
+                        if (data) {
+                          setSuppliers(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+                          setSupplierId(data.id)
+                          setSupplierQuery(data.name)
+                        }
+                        setSupplierDropdown(false)
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm font-semibold text-[#121358] hover:bg-[#121358]/5 transition border-t border-gray-100">
+                      {addingSupplier ? 'Menyimpan...' : `+ Supplier Baru: "${toTitleCase(supplierQuery.trim())}"`}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -383,7 +422,7 @@ export default function BuatPurchasingPage() {
                     autoComplete="off"
                     className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${row.product_id ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-300'}`}
                   />
-                  {autocomplete[i]?.open && filteredProducts(row.query).length > 0 && (
+                  {autocomplete[i]?.open && (
                     <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
                       {filteredProducts(row.query).map((p, optIdx) => (
                         <button
@@ -402,6 +441,48 @@ export default function BuatPurchasingPage() {
                           )}
                         </button>
                       ))}
+                      {row.query.trim() && !products.some(p => p.name.toLowerCase() === row.query.toLowerCase()) && (
+                        <button
+                          type="button"
+                          onMouseDown={() => { setNewProductIdx(i); setNewProductName(toTitleCase(row.query.trim())); setNewProductCategoryId(''); setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: false, focused: -1 } : s)) }}
+                          className="w-full text-left px-4 py-2.5 text-sm font-semibold text-[#121358] hover:bg-[#121358]/5 transition border-t border-gray-100"
+                        >
+                          + Produk Baru: "{toTitleCase(row.query.trim())}"
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Inline new product form */}
+                  {newProductIdx === i && (
+                    <div className="mt-2 p-3 rounded-xl space-y-2" style={{ backgroundColor: '#AEE2FF', border: '1.5px solid #9FA1FF' }}>
+                      <p className="text-xs font-bold text-[#121358]">+ Produk Baru: <span className="font-semibold">"{toTitleCase(row.query.trim())}"</span></p>
+                      <select
+                        value={newProductCategoryId}
+                        onChange={e => setNewProductCategoryId(e.target.value ? Number(e.target.value) : '')}
+                        className="w-full border border-[#9FA1FF] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white"
+                      >
+                        <option value="">-- Pilih Kategori --</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      <input
+                        type="number"
+                        value={newProductPrice}
+                        onChange={e => setNewProductPrice(e.target.value)}
+                        placeholder="Harga Jual"
+                        min="0"
+                        className="w-full border border-[#9FA1FF] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white"
+                      />
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => setNewProductIdx(null)}
+                          className="flex-1 py-1.5 rounded-lg border border-[#9FA1FF] text-xs text-[#121358] hover:bg-white/50 transition">
+                          Batal
+                        </button>
+                        <button type="button" onClick={() => handleAddNewProduct(i)} disabled={addingProduct}
+                          className="flex-1 py-1.5 rounded-lg bg-[#121358] text-white text-xs font-semibold disabled:opacity-40 transition">
+                          {addingProduct ? '...' : 'Simpan & Pilih'}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
