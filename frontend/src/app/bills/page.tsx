@@ -292,12 +292,12 @@ export default function BillsPage() {
           {/* Month filter */}
           <div className="flex flex-wrap gap-1.5">
             <button onClick={() => setMonthFilter('')}
-              className={`text-xs font-semibold px-2.5 py-1 rounded-full transition ${!monthFilter ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
+              className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition ${!monthFilter ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
               {now.getFullYear()}
             </button>
             {months.map(m => (
               <button key={m} onClick={() => setMonthFilter(m)}
-                className={`text-xs font-semibold px-2.5 py-1 rounded-full transition ${monthFilter === m ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition ${monthFilter === m ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
                 {monthLabel(m)}
               </button>
             ))}
@@ -394,10 +394,19 @@ export default function BillsPage() {
           {(['cicilan', 'jatuh_tempo'] as const).map(t => (
             <button key={t} onClick={() => setBillsTab(t)}
               className={`flex-1 text-center text-sm font-medium py-2 rounded-xl transition-colors ${billsTab === t ? 'bg-slate-800 text-white' : 'bg-slate-200 sm:bg-transparent text-slate-500 sm:hover:bg-slate-200'}`}>
-              {t === 'cicilan' ? 'Cicilan' : 'Jatuh Tempo'}
+              {t === 'cicilan' ? 'Cicilan' : 'Kumpulan Nota'}
             </button>
           ))}
         </div>
+
+        {/* Kumpulan Nota info */}
+        {billsTab === 'jatuh_tempo' && (
+          <p className="text-xs text-gray-500 px-1">
+            {monthFilter
+              ? `Berikut adalah kumpulan nota dengan jatuh tempo bulan : ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}`
+              : `Berikut adalah kumpulan nota dengan jatuh tempo di tahun : ${now.getFullYear()}`}
+          </p>
+        )}
 
         {/* Jatuh Tempo tab */}
         {billsTab === 'jatuh_tempo' && (

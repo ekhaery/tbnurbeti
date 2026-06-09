@@ -214,12 +214,12 @@ export default function TagihanDebtLoanPage() {
 
           <div className="flex gap-2 overflow-x-auto pb-0.5">
             <button onClick={() => setYearFilter('')}
-              className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition ${!yearFilter ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
+              className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition ${!yearFilter ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
               Semua Tahun
             </button>
             {years.map(y => (
               <button key={y} onClick={() => setYearFilter(y)}
-                className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition ${yearFilter === y ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition ${yearFilter === y ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
                 {y}
               </button>
             ))}
