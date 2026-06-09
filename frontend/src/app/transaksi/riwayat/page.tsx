@@ -117,7 +117,6 @@ export default function RiwayatTransaksiPage() {
                           </div>
                           <div className="text-right shrink-0">
                             <p className="text-sm font-semibold text-gray-800">Rp {fmt(item.price_sold)}</p>
-                            {isAdmin && <p className="text-xs text-gray-500 mt-0.5">COGS: Rp {fmt(item.cogs)}</p>}
                           </div>
                         </div>
                       ))}
