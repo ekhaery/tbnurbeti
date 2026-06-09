@@ -7,6 +7,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck, faFileInvoiceDollar, faHandHoldingDollar, faMoneyCheckDollar, faReceipt, faUserGroup, faArrowTrendUp, faMoneyBillWave, faChartBar, faIdCard } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase-browser'
+import { faBell } from '@fortawesome/free-solid-svg-icons'
 
 const settingsLinks = [
   { label: 'Category', href: '/settings/categories', icon: faGear },
@@ -19,7 +21,19 @@ export default function Navbar() {
   const { appUser, signOut } = useAuth()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
+  const [activityCount, setActivityCount] = useState(0)
   const isAdmin = appUser?.role === 'admin'
+  const supabase = createClient()
+
+  useEffect(() => {
+    if (!appUser) return
+    const today = new Date().toISOString().slice(0, 10)
+    supabase
+      .from('user_activities')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', today)
+      .then(({ count }) => setActivityCount(count ?? 0))
+  }, [appUser])
 
   // Detect desktop
   useEffect(() => {
@@ -90,6 +104,16 @@ export default function Navbar() {
             {/* Transaksi link */}
             <Link href="/transaksi" className={linkClass(pathname.startsWith('/transaksi'))}>
               Transaksi
+            </Link>
+
+            {/* Activity link */}
+            <Link href="/activity" className={`${linkClass(pathname.startsWith('/activity'))} relative`}>
+              <FontAwesomeIcon icon={faBell} className="w-4 h-4" />
+              {activityCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {activityCount > 99 ? '99+' : activityCount}
+                </span>
+              )}
             </Link>
 
             {/* Logout — non-admin only */}

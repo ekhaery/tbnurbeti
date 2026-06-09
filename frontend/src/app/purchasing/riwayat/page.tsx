@@ -6,6 +6,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faXmark, faBoxOpen, faCheck, faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
 import PurchasingTabs from '@/lib/PurchasingTabs'
 import { getArrivalStatus, ARRIVAL_STATUS } from '@/lib/arrivalStatus'
+import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
+import { useAuth } from '@/context/AuthContext'
 import { PURCHASING_STATUS } from '@/lib/purchasingStatus'
 
 type StockBatch = { id: number; is_available: boolean }
@@ -37,6 +39,7 @@ const fmt = (n: number) => n.toLocaleString('id-ID')
 
 export default function RiwayatPurchasingPage() {
   const supabase = createClient()
+  const { appUser } = useAuth()
   const [list, setList] = useState<Purchasing[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [fetching, setFetching] = useState(true)
@@ -187,6 +190,8 @@ export default function RiwayatPurchasingPage() {
     }
 
     setSaving(false)
+    await logActivity(supabase, appUser?.id,
+      USER_ACTIVITY.EDIT_PURCHASING(appUser?.name ?? 'User', editing!.code, newTotal))
     setEditing(null)
     showToast('Purchasing berhasil diupdate.')
     fetchData()

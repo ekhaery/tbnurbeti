@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { toTitleCase } from '@/lib/utils'
+import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
 import ProductTabs from '@/lib/ProductTabs'
 
 type Category = {
@@ -132,6 +133,11 @@ export default function BulkInputPage() {
       setError(insertError.message)
     } else {
       setSuccessCount(pendingPayload.length)
+      // Log activity for each product added
+      for (const p of pendingPayload) {
+        await logActivity(supabase, appUser?.id,
+          USER_ACTIVITY.ADD_NEW_PRODUCT(appUser?.name ?? 'User', p.name, p.price))
+      }
       setRows([emptyRow()])
       setCategoryId('')
       setPendingPayload([])

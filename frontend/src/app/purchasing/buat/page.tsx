@@ -8,6 +8,7 @@ import { faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import PurchasingTabs from '@/lib/PurchasingTabs'
 import { toTitleCase } from '@/lib/utils'
 import type { PurchasingStatus } from '@/lib/purchasingStatus'
+import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
 
 type Supplier = { id: number; name: string }
 type Category = { id: number; name: string }
@@ -271,6 +272,8 @@ export default function BuatPurchasingPage() {
 
     setSubmitting(false)
     setSuccess(`Purchasing ${code} berhasil disimpan.${periodVal > 0 ? ` ${periodVal} tagihan dibuat.` : ''} `)
+    await logActivity(supabase, appUser?.id,
+      USER_ACTIVITY.ADD_NEW_PURCHASING(appUser?.name ?? 'User', selectedSupplier!.name, totalValue))
     setSupplierId('')
     setNotes('')
     setJatuhTempo('')
