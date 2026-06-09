@@ -364,8 +364,8 @@ export default function BillsPage() {
                   <p className="text-xs font-semibold" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaidAll)}</p>
                 </div>
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px]" style={{ color: '#B5BAFF' }}>{monthFilter ? 'Total Tagihan Bulanan' : 'Total Tagihan Tahunan'} · {filtered.length} tagihan</p>
-                  <p className="text-xs font-semibold" style={{ color: '#FCB7C7' }}>Rp {fmt(filtered.reduce((s, b) => s + b.installment, 0))}</p>
+                  <p className="text-[10px]" style={{ color: '#B5BAFF' }}>{monthFilter ? 'Total Tagihan Bulanan' : 'Total Tagihan Tahunan'} · {filtered.filter(b => !b.is_paid).length} tagihan</p>
+                  <p className="text-xs font-semibold" style={{ color: '#FCB7C7' }}>Rp {fmt(filtered.filter(b => !b.is_paid).reduce((s, b) => s + (b.installment - b.paid_amount), 0))}</p>
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Sisa</p>
@@ -380,7 +380,7 @@ export default function BillsPage() {
                     <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>{monthFilter ? 'Total Tagihan Bulanan' : 'Total Tagihan Tahunan'}</p>
                     <p className="text-[10px] mt-0.5 text-white">{filtered.length} tagihan</p>
                   </div>
-                  <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(filtered.reduce((s, b) => s + b.installment, 0))}</p>
+                  <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(filtered.filter(b => !b.is_paid).reduce((s, b) => s + (b.installment - b.paid_amount), 0))}</p>
                 </div>
                 <div className="px-4 py-2.5 border-t border-white/10 grid grid-cols-3 gap-2">
                   <div>
