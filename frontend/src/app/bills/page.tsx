@@ -61,6 +61,12 @@ export default function BillsPage() {
   const [fetching, setFetching] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('unpaid')
   const [expandedBill, setExpandedBill] = useState<number | null>(null)
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set())
+  const toggleWeek = (week: string) => setExpandedWeeks(prev => {
+    const next = new Set(prev)
+    next.has(week) ? next.delete(week) : next.add(week)
+    return next
+  })
   const [purchasingItems, setPurchasingItems] = useState<Record<number, { id: number; qty: number; base_price: number; products: { name: string } | null }[]>>({})
   const [weeklyExpanded, setWeeklyExpanded] = useState(false)
   const [billsTab, setBillsTab] = useState<'cicilan' | 'jatuh_tempo'>('cicilan')
@@ -184,7 +190,16 @@ export default function BillsPage() {
 
   const remaining = (b: Bill) => b.installment - b.paid_amount
 
-  // Group by month (Cicilan tab) or due_date month (Jatuh Tempo tab)
+  // Helper: get Mon–Sun week label for a date string
+  const getWeekKey = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const day = d.getDay() === 0 ? 6 : d.getDay() - 1 // Mon=0
+    const mon = new Date(d); mon.setDate(d.getDate() - day)
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+    return `${mon.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} – ${sun.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`
+  }
+
+  // Group by week (Cicilan tab) or due_date month (Jatuh Tempo tab)
   const grouped = filtered.reduce<Record<string, Bill[]>>((acc, b) => {
     let key: string
     if (billsTab === 'jatuh_tempo') {
@@ -192,9 +207,7 @@ export default function BillsPage() {
         ? new Date(b.due_date).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
         : 'Tanpa Jatuh Tempo'
     } else {
-      key = b.installment_due_date
-        ? new Date(b.installment_due_date).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
-        : 'Tanpa Tanggal'
+      key = b.installment_due_date ? getWeekKey(b.installment_due_date) : 'Tanpa Tanggal'
     }
     if (!acc[key]) acc[key] = []
     acc[key].push(b)
@@ -394,6 +407,7 @@ export default function BillsPage() {
             const filteredPurchasing = purchasing.filter(p => {
               if (!p.due_date) return false
               if (monthFilter && p.due_date.slice(0, 7) !== monthFilter) return false
+              if (supplierFilter && p.suppliers?.name !== supplierFilter) return false
               return true
             })
             const groupedPurchasing = filteredPurchasing.reduce<Record<string, PurchasingRow[]>>((acc, p) => {
@@ -437,8 +451,8 @@ export default function BillsPage() {
           <div className="text-center text-sm text-gray-400 py-10">Tidak ada tagihan.</div>
         ) : (
           Object.entries(grouped).map(([month, monthBills]) => {
-            // Get Monday of the first bill's week in this group
             const firstDate = monthBills[0]?.installment_due_date
+            const isWeekOpen = expandedWeeks.has(month)
             const getMonday = (dateStr: string) => {
               const d = new Date(dateStr)
               const day = d.getDay() === 0 ? 6 : d.getDay() - 1
@@ -447,19 +461,31 @@ export default function BillsPage() {
               return d
             }
             return (
-            <div key={month} className="space-y-2">
-              <div className="flex items-center justify-between px-1">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{month}</p>
-                {firstDate && (
+            <div key={month} className="space-y-1">
+              {/* Week header — clickable */}
+              <div onClick={() => toggleWeek(month)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-white rounded-xl shadow-sm hover:bg-gray-50 transition cursor-pointer">
+                <div className="flex items-center gap-2">
+                  <FontAwesomeIcon icon={isWeekOpen ? faChevronUp : faChevronDown} className="w-3 h-3 text-gray-400" />
+                  <p className="text-xs font-semibold text-gray-600">{month}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-gray-400">{monthBills.length} tagihan · Rp {fmt(monthBills.reduce((s, b) => s + b.installment, 0))}</p>
+                  {firstDate && (
                   <button
-                    onClick={() => { setMonthCalendarDate(new Date(firstDate)); setShowMonthCalendar(true) }}
+                    type="button"
+                    onClick={e => { e.stopPropagation(); setCalendarWeekStart(getMonday(firstDate)); setShowCalendar(true) }}
                     className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition" style={{ backgroundColor: '#AEE2FF', color: '#121358' }}
                   >
                     <FontAwesomeIcon icon={faEye} className="w-2.5 h-2.5" />
                     Kalender
                   </button>
-                )}
+                  )}
+                </div>
               </div>
+
+              {/* Bills — shown when week is expanded */}
+              {isWeekOpen && <div className="space-y-1 pl-1">
               {monthBills.map(b => {
                 const isOpen = expandedBill === b.id
                 const items = purchasingItems[b.purchasing_id]
@@ -533,6 +559,7 @@ export default function BillsPage() {
                 </div>
                 )
               })}
+              </div>}
             </div>
             )
           })
@@ -666,7 +693,7 @@ export default function BillsPage() {
                 {days.map((day, idx) => {
                   const dateStr = day.toISOString().slice(0, 10)
                   const isToday = dateStr === todayStr
-                  const dayBills = bills.filter(b => b.installment_due_date === dateStr)
+                  const dayBills = filtered.filter(b => b.installment_due_date === dateStr)
 
                   return (
                     <div key={dateStr} className={`flex items-start gap-3 px-4 py-3 ${isToday ? 'bg-[#121358]/5' : ''}`}>

@@ -60,6 +60,9 @@ export default function RiwayatPurchasingPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const [toast, setToast] = useState<string | null>(null)
+  const [supplierSearch, setSupplierSearch] = useState('')
+  const [supplierSearchDropdown, setSupplierSearchDropdown] = useState(false)
+  const [supplierFilter, setSupplierFilter] = useState('')
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -212,13 +215,48 @@ export default function RiwayatPurchasingPage() {
           <p className="text-xs text-gray-500 mt-0.5">{fetching ? '...' : `${list.length} purchasing`}</p>
         </div>
 
+        {/* Supplier search */}
+        <div className="relative">
+          <input
+            type="text"
+            value={supplierSearch}
+            onChange={e => { setSupplierSearch(e.target.value); setSupplierFilter(''); setSupplierSearchDropdown(true) }}
+            onFocus={() => setSupplierSearchDropdown(true)}
+            onBlur={() => setTimeout(() => setSupplierSearchDropdown(false), 150)}
+            placeholder="Cari supplier..."
+            autoComplete="off"
+            className={`w-full bg-white border rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358] shadow-sm ${supplierFilter ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-200'}`}
+          />
+          {supplierSearch && (
+            <button onClick={() => { setSupplierSearch(''); setSupplierFilter('') }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+          )}
+          {supplierSearchDropdown && (
+            <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+              <button onMouseDown={() => { setSupplierFilter(''); setSupplierSearch(''); setSupplierSearchDropdown(false) }}
+                className={`w-full text-left px-4 py-2.5 text-sm transition ${!supplierFilter ? 'bg-[#121358] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                Semua Supplier
+              </button>
+              {Array.from(new Set(list.map(p => p.suppliers?.name ?? '').filter(Boolean)))
+                .sort()
+                .filter(n => n.toLowerCase().includes(supplierSearch.toLowerCase()))
+                .map(name => (
+                  <button key={name} onMouseDown={() => { setSupplierFilter(name); setSupplierSearch(name); setSupplierSearchDropdown(false) }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition ${supplierFilter === name ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                    {name}
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
+
         {fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
         ) : list.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-10">Belum ada purchasing.</div>
         ) : (
           <div className="space-y-2">
-            {list.map(p => {
+            {list.filter(p => !supplierFilter || p.suppliers?.name === supplierFilter).map(p => {
               const isInit = p.status === 'init'
               const canEdit = p.status !== 'completed'
               const isCreated = p.status === 'created'
