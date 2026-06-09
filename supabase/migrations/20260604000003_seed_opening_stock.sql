@@ -3,9 +3,8 @@
 -- stock_batches from existing products.stock + products.base_price.
 --
 -- Rules:
--- * base_price = 0        → skip entirely
--- * stock > 0             → use actual stock value
--- * stock IS NULL or = 0  → use 200 as placeholder
+-- * base_price = 0  → skip entirely
+-- * all others      → use 200 as placeholder (products.stock was dropped)
 
 do $$ begin
   -- 1. Create dummy supplier if not exists
@@ -27,7 +26,7 @@ do $$ begin
   select
     pur.id,
     p.id,
-    case when coalesce(p.stock, 0) > 0 then p.stock else 200 end,
+    200,
     p.base_price
   from products p
   join purchasing pur on pur.code = 'OPENING-BALANCE'
