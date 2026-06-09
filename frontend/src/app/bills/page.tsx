@@ -391,24 +391,42 @@ export default function BillsPage() {
             ) : Object.entries(groupedPurchasing).map(([month, items]) => (
               <div key={month} className="space-y-2">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-1">{month}</p>
-                {items.map(p => (
-                  <div key={p.id} className="bg-white rounded-xl shadow-sm p-4 border-l-4 border-[#9FA1FF]">
+                {items.map(p => {
+                  const pBills = bills.filter(b => b.purchasing_id === p.id)
+                  const unpaidBills = pBills.filter(b => !b.is_paid)
+                  const allPaid = pBills.length > 0 && unpaidBills.length === 0
+                  return (
+                  <div key={p.id} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${allPaid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-800">{p.suppliers?.name ?? '-'}</p>
                         <p className="text-xs text-gray-400 font-mono mt-0.5">{p.code}</p>
                         <p className="text-xs text-gray-500 mt-0.5">Tanggal: {fmtDate(p.date)}</p>
                         {p.due_date && <p className="text-xs text-gray-500 mt-0.5">Jatuh tempo: {fmtDate(p.due_date)}</p>}
-                        <span className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                          p.status === 'completed' ? 'bg-green-100 text-green-600' :
-                          p.status === 'created' ? 'bg-blue-100 text-blue-600' :
-                          'bg-orange-100 text-orange-500'
-                        }`}>{p.status}</span>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                            p.status === 'completed' ? 'bg-green-100 text-green-600' :
+                            p.status === 'created' ? 'bg-blue-100 text-blue-600' :
+                            'bg-orange-100 text-orange-500'
+                          }`}>{p.status}</span>
+                          {pBills.length > 0 && (
+                            allPaid ? (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-600">
+                                Lunas
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">
+                                Belum Lunas · {unpaidBills.length} tagihan
+                              </span>
+                            )
+                          )}
+                        </div>
                       </div>
                       <p className="text-sm font-bold text-[#121358] shrink-0">Rp {fmt(p.total)}</p>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             ))
           })()

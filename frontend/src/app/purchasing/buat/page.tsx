@@ -49,6 +49,13 @@ export default function BuatPurchasingPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  // Duplicate detection
+  const [dupModal, setDupModal] = useState<{
+    purchasing: { id: number; code: string; date: string; total: number; due_date: string | null; suppliers: { name: string } | null }
+    items: { id: number; qty: number; base_price: number; products: { name: string } | null }[]
+  } | null>(null)
+  const [skipDupCheck, setSkipDupCheck] = useState(false)
+
   // New supplier inline
   const [newSupplierName, setNewSupplierName] = useState('')
   const [addingSupplier, setAddingSupplier] = useState(false)
@@ -56,6 +63,14 @@ export default function BuatPurchasingPage() {
   // Supplier autocomplete
   const [supplierQuery, setSupplierQuery] = useState('')
   const [supplierDropdown, setSupplierDropdown] = useState(false)
+
+  useEffect(() => {
+    if (skipDupCheck) {
+      const syntheticEvent = { preventDefault: () => {} } as React.FormEvent
+      handleSubmit(syntheticEvent)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skipDupCheck])
 
   useEffect(() => {
     supabase.from('suppliers').select('id, name').order('name')
@@ -158,12 +173,39 @@ export default function BuatPurchasingPage() {
     if (!supplierId) { setError('Pilih supplier terlebih dahulu.'); return }
     if (validItems.length === 0) { setError('Isi minimal satu produk.'); return }
 
+    const totalValue = validItems.reduce((sum, r) => sum + (parseFloat(r.base_price) || 0) * (parseInt(r.qty) || 0), 0)
+
+    // Check for duplicate (skip if user confirmed)
+    if (!skipDupCheck) {
+      let dupQuery = supabase
+        .from('purchasing')
+        .select('id, code, date, total, due_date, suppliers(name)')
+        .eq('supplier_id', Number(supplierId))
+        .eq('date', date)
+        .eq('total', totalValue)
+      if (jatuhTempo) dupQuery = dupQuery.eq('due_date', jatuhTempo)
+      else dupQuery = dupQuery.is('due_date', null)
+
+      const { data: dupData } = await dupQuery.limit(1).single()
+      if (dupData) {
+        const { data: dupItems } = await supabase
+          .from('purchasing_items')
+          .select('id, qty, base_price, products(name)')
+          .eq('purchasing_id', (dupData as { id: number }).id)
+        setDupModal({
+          purchasing: dupData as { id: number; code: string; date: string; total: number; due_date: string | null; suppliers: { name: string } | null },
+          items: (dupItems ?? []) as { id: number; qty: number; base_price: number; products: { name: string } | null }[]
+        })
+        return
+      }
+    }
+
+    setSkipDupCheck(false)
     setSubmitting(true)
 
     const code = generateCode(selectedSupplier!.name, date)
 
     // 1. Insert purchasing header
-    const totalValue = validItems.reduce((sum, r) => sum + (parseFloat(r.base_price) || 0) * (parseInt(r.qty) || 0), 0)
 
     const status: PurchasingStatus = transformationPhase ? 'init' : 'created'
 
@@ -545,6 +587,57 @@ export default function BuatPurchasingPage() {
           </button>
         </form>
       </div>
+
+      {/* Duplicate modal */}
+      {dupModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 bg-amber-50">
+              <p className="text-sm font-bold text-amber-700">⚠ Data Serupa Ditemukan</p>
+              <p className="text-xs text-amber-600 mt-0.5">Purchasing dengan data berikut sudah ada.</p>
+            </div>
+            <div className="px-5 py-4 space-y-2 max-h-60 overflow-y-auto">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Kode</span>
+                <span className="font-mono font-semibold text-gray-700">{dupModal.purchasing.code}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Supplier</span>
+                <span className="font-semibold text-gray-700">{dupModal.purchasing.suppliers?.name ?? '-'}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Tanggal</span>
+                <span className="text-gray-700">{dupModal.purchasing.date}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Total</span>
+                <span className="font-semibold text-gray-700">Rp {fmt(dupModal.purchasing.total)}</span>
+              </div>
+              {dupModal.items.length > 0 && (
+                <div className="pt-2 border-t border-gray-100">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">Items</p>
+                  {dupModal.items.map(item => (
+                    <div key={item.id} className="flex justify-between text-xs py-0.5">
+                      <span className="text-gray-600">{item.products?.name ?? '-'}</span>
+                      <span className="text-gray-500">×{item.qty} @ Rp {fmt(item.base_price)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
+              <button onClick={() => setDupModal(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">
+                Batal
+              </button>
+              <button onClick={() => { setDupModal(null); setSkipDupCheck(true) }}
+                className="flex-1 py-2.5 rounded-xl bg-[#121358] text-white text-sm font-semibold hover:bg-[#1a1c6e] transition">
+                Tetap Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
