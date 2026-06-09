@@ -78,7 +78,7 @@ export default function ProductListPage() {
       while (true) {
         const { data, error } = await supabase
           .from('products')
-          .select('id, code, name, base_price, price, stock, updated_at, categories(name)')
+          .select('id, code, name, base_price, price, updated_at, categories(name)')
           .range(from, from + chunkSize - 1)
         if (error || !data || data.length === 0) break
         allProducts = [...allProducts, ...(data as Product[])]

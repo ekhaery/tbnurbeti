@@ -104,7 +104,6 @@ export default function BuatPurchasingPage() {
       category_id: newProductCategoryId || null,
       base_price: 0,
       price: parseFloat(newProductPrice) || 0,
-      stock: 0,
     }).select('id, name, categories(name)').single()
     setAddingProduct(false)
     if (error || !data) return

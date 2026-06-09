@@ -25,7 +25,6 @@ export default function EditProductPage() {
     category_id: '',
     base_price: '',
     price: '',
-    stock: '',
     is_discontinued: false,
   })
   const [fetching, setFetching] = useState(true)
@@ -38,10 +37,10 @@ export default function EditProductPage() {
 
     supabase
       .from('products')
-      .select('id, code, name, category_id, base_price, price, stock, is_discontinued')
+      .select('id, code, name, category_id, base_price, price, is_discontinued')
       .eq('id', id)
       .single()
-      .then(({ data }: { data: { code: string | null; name: string; category_id: number; base_price: number; price: number; stock: number; is_discontinued: boolean } | null }) => {
+      .then(({ data }: { data: { code: string | null; name: string; category_id: number; base_price: number; price: number; is_discontinued: boolean } | null }) => {
         if (data) {
           setForm({
             code: data.code ?? '',
@@ -49,7 +48,6 @@ export default function EditProductPage() {
             category_id: String(data.category_id ?? ''),
             base_price: String(data.base_price ?? ''),
             price: String(data.price ?? ''),
-            stock: String(data.stock ?? ''),
             is_discontinued: data.is_discontinued ?? false,
           })
         }
@@ -71,7 +69,6 @@ export default function EditProductPage() {
         category_id: Number(form.category_id),
         base_price: parseFloat(form.base_price) || 0,
         price: parseFloat(form.price) || 0,
-        stock: parseInt(form.stock) || 0,
         is_discontinued: form.is_discontinued,
         updated_at: new Date().toISOString(),
       })
@@ -182,15 +179,6 @@ export default function EditProductPage() {
                 onChange={(e) => setForm({ ...form, price: e.target.value })}
                 required
                 min="0"
-                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#121358]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Stok</label>
-              <input
-                type="number"
-                value={form.stock}
-                onChange={(e) => setForm({ ...form, stock: e.target.value })}
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#121358]"
               />
             </div>

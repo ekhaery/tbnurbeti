@@ -11,7 +11,7 @@ type Product = {
   id: number
   name: string
   price: number
-  stock: number
+  stock: number // derived from stock_batches
   categories: { name: string } | null
 }
 
@@ -60,10 +60,19 @@ export default function BuatTransaksiPage() {
   const fetchProducts = async () => {
     const { data } = await supabase
       .from('products')
-      .select('id, name, price, stock, categories(name)')
+      .select('id, name, price, categories(name)')
       .eq('is_discontinued', false)
       .order('name')
-    setProducts((data as Product[]) ?? [])
+    // Get available stock from stock_batches
+    const { data: batches } = await supabase
+      .from('stock_batches')
+      .select('product_id, qty_remaining')
+      .eq('is_available', true)
+    const stockMap: Record<number, number> = {}
+    for (const b of (batches ?? []) as { product_id: number; qty_remaining: number }[]) {
+      stockMap[b.product_id] = (stockMap[b.product_id] ?? 0) + b.qty_remaining
+    }
+    setProducts(((data ?? []) as Omit<Product, 'stock'>[]).map(p => ({ ...p, stock: stockMap[p.id] ?? 0 })))
   }
 
   useEffect(() => { fetchProducts() }, [])
@@ -199,12 +208,7 @@ export default function BuatTransaksiPage() {
         if (batchUpdateErr) { setError(batchUpdateErr.message); setSubmitting(false); return }
       }
 
-      // Update product stock
-      const product = products.find(p => p.id === productId)!
-      await supabase
-        .from('products')
-        .update({ stock: product.stock - qtyNeeded, updated_at: new Date().toISOString() })
-        .eq('id', productId)
+      // stock is now tracked via stock_batches.qty_remaining only
     }
 
     setSubmitting(false)

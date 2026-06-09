@@ -17,7 +17,6 @@ type ProductRow = {
   name: string
   base_price: string
   price: string
-  stock: string
   is_discontinued: boolean
 }
 
@@ -26,7 +25,6 @@ type Payload = {
   category_id: number | ''
   base_price: number
   price: number
-  stock: number
   is_discontinued: boolean
 }
 
@@ -34,7 +32,6 @@ const emptyRow = (): ProductRow => ({
   name: '',
   base_price: '',
   price: '',
-  stock: '0',
   is_discontinued: false,
 })
 
@@ -117,7 +114,6 @@ export default function BulkInputPage() {
       category_id: categoryId,
       base_price: parseFloat(r.base_price) || 0,
       price: isPriceRequired ? parseFloat(r.price) : (parseFloat(r.price) || 0),
-      stock: parseInt(r.stock) || 0,
       is_discontinued: r.is_discontinued,
     }))
 
@@ -308,16 +304,6 @@ export default function BulkInputPage() {
                       className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white text-gray-900"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Stok</label>
-                    <input
-                      type="number"
-                      value={row.stock}
-                      onChange={(e) => updateRow(i, 'stock', e.target.value)}
-                      placeholder="0"
-                      className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white text-gray-900"
-                    />
-                  </div>
                 </div>
               </div>
             ))}
@@ -361,7 +347,6 @@ export default function BulkInputPage() {
                 <div key={i} className="flex items-center justify-between px-5 py-3">
                   <div>
                     <p className="text-sm font-medium text-gray-800">{p.name}</p>
-                    <p className="text-xs text-gray-400">Stok: {p.stock}</p>
                   </div>
                   <div className="text-right">
                     {isAdmin && (
