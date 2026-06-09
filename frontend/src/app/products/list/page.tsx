@@ -68,22 +68,43 @@ export default function ProductListPage() {
       .order('name')
       .then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
 
-    // Fetch all products in chunks to bypass the 1000-row PostgREST limit
+    // Fetch all products + stock_batches in chunks
     const fetchAll = async () => {
       const chunkSize = 1000
+
+      // Fetch products
       let from = 0
-      let all: Product[] = []
+      let allProducts: Product[] = []
       while (true) {
         const { data, error } = await supabase
           .from('products')
           .select('id, code, name, base_price, price, stock, updated_at, categories(name)')
           .range(from, from + chunkSize - 1)
         if (error || !data || data.length === 0) break
-        all = [...all, ...(data as Product[])]
+        allProducts = [...allProducts, ...(data as Product[])]
         if (data.length < chunkSize) break
         from += chunkSize
       }
-      setProducts(all)
+
+      // Fetch stock_batches and sum qty_remaining per product
+      from = 0
+      const stockMap: Record<number, number> = {}
+      while (true) {
+        const { data, error } = await supabase
+          .from('stock_batches')
+          .select('product_id, qty_remaining')
+          .eq('is_available', true)
+          .range(from, from + chunkSize - 1)
+        if (error || !data || data.length === 0) break
+        for (const row of data as { product_id: number; qty_remaining: number }[]) {
+          stockMap[row.product_id] = (stockMap[row.product_id] ?? 0) + row.qty_remaining
+        }
+        if (data.length < chunkSize) break
+        from += chunkSize
+      }
+
+      // Override stock with sum from stock_batches
+      setProducts(allProducts.map(p => ({ ...p, stock: stockMap[p.id] ?? 0 })))
       setFetching(false)
     }
     fetchAll()
