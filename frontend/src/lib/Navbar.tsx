@@ -144,6 +144,22 @@ export default function Navbar() {
         {/* Drawer body */}
         <div className="flex-1 overflow-y-auto py-4 space-y-4">
 
+          {/* Laporan */}
+          <div>
+            <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Laporan</p>
+            <Link
+              href="/laporan-penjualan"
+              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                pathname.startsWith('/laporan-penjualan')
+                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FontAwesomeIcon icon={faChartBar} className="w-4 h-4 text-gray-400" />
+              Laporan
+            </Link>
+          </div>
+
           {/* Purchasing */}
           <div>
             <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Purchasing</p>
@@ -233,22 +249,6 @@ export default function Navbar() {
             >
                 <FontAwesomeIcon icon={faMoneyBillWave} className="w-4 h-4 text-gray-400" />
               Gaji Karyawan
-            </Link>
-          </div>
-
-          {/* Laporan */}
-          <div>
-            <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Laporan</p>
-            <Link
-              href="/report-biaya-operasional"
-              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
-                pathname.startsWith('/report-biaya-operasional')
-                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
-                  : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <FontAwesomeIcon icon={faChartBar} className="w-4 h-4 text-gray-400" />
-              Report Biaya Operasional
             </Link>
           </div>
 
