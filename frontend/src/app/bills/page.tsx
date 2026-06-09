@@ -16,7 +16,7 @@ type Bill = {
   paid_amount: number
   is_paid: boolean
   suppliers: { name: string } | null
-  purchasing: { code: string; total: number } | null
+  purchasing: { code: string; total: number; date: string } | null
 }
 
 type FilterStatus = 'all' | 'unpaid' | 'paid'
@@ -60,6 +60,8 @@ export default function BillsPage() {
   const [bills, setBills] = useState<Bill[]>([])
   const [fetching, setFetching] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('unpaid')
+  const [expandedBill, setExpandedBill] = useState<number | null>(null)
+  const [purchasingItems, setPurchasingItems] = useState<Record<number, { id: number; qty: number; base_price: number; products: { name: string } | null }[]>>({})
   const [weeklyExpanded, setWeeklyExpanded] = useState(false)
   const [billsTab, setBillsTab] = useState<'cicilan' | 'jatuh_tempo'>('cicilan')
   const [purchasing, setPurchasing] = useState<PurchasingRow[]>([])
@@ -97,13 +99,25 @@ export default function BillsPage() {
   const fetchData = async () => {
     const { data } = await supabase
       .from('bills')
-      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, suppliers(name), purchasing(code, total)')
+      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, suppliers(name), purchasing(code, total, date)')
     setBills((data as Bill[]) ?? [])
     setFetching(false)
   }
 
   useEffect(() => { fetchData() }, [])
   useEffect(() => { if (payingBill) setTimeout(() => inputRef.current?.focus(), 100) }, [payingBill])
+
+  const toggleBill = async (bill: Bill) => {
+    if (expandedBill === bill.id) { setExpandedBill(null); return }
+    setExpandedBill(bill.id)
+    if (!purchasingItems[bill.purchasing_id]) {
+      const { data } = await supabase
+        .from('purchasing_items')
+        .select('id, qty, base_price, products(name)')
+        .eq('purchasing_id', bill.purchasing_id)
+      setPurchasingItems(prev => ({ ...prev, [bill.purchasing_id]: (data ?? []) as { id: number; qty: number; base_price: number; products: { name: string } | null }[] }))
+    }
+  }
 
   useEffect(() => {
     if (billsTab !== 'jatuh_tempo') return
@@ -446,9 +460,13 @@ export default function BillsPage() {
                   </button>
                 )}
               </div>
-              {monthBills.map(b => (
-                <div key={b.id} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${b.is_paid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
-                  <div className="flex items-start justify-between gap-3">
+              {monthBills.map(b => {
+                const isOpen = expandedBill === b.id
+                const items = purchasingItems[b.purchasing_id]
+                return (
+                <div key={b.id} className={`bg-white rounded-xl shadow-sm overflow-hidden border-l-4 ${b.is_paid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
+                  {/* Bill header */}
+                  <div className="p-4 flex items-start justify-between gap-3 cursor-pointer hover:bg-gray-50 transition" onClick={() => toggleBill(b)}>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-800">{b.suppliers?.name ?? '-'}</p>
                       <p className="text-xs text-gray-400 font-mono mt-0.5">{b.bill_no ?? b.purchasing?.code}</p>
@@ -461,34 +479,60 @@ export default function BillsPage() {
                         </p>
                       )}
                     </div>
-                    <div className="text-right shrink-0">
-                      {!(b.paid_amount > 0 && !b.is_paid) && (
-                        <p className="text-sm font-bold text-[#121358]">Rp {fmt(b.installment)}</p>
-                      )}
-                      {b.is_paid ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-600 mt-1">
-                          <FontAwesomeIcon icon={faCheck} className="w-2.5 h-2.5" /> Lunas
-                        </span>
-                      ) : (
-                        <>
-                          {b.paid_amount > 0 && (
-                            <p className="text-sm font-bold mt-0.5" style={{ color: '#9FA1FF' }}>
-                              Rp {fmt(remaining(b))}
-                            </p>
-                          )}
-                          <button
-                            onClick={() => openPay(b)}
-                            className="mt-1 flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition"
-                          >
-                            <FontAwesomeIcon icon={faMoneyBillWave} className="w-3 h-3" />
-                            Bayar
-                          </button>
-                        </>
-                      )}
+                    <div className="text-right shrink-0 flex items-start gap-2">
+                      <div>
+                        {!(b.paid_amount > 0 && !b.is_paid) && (
+                          <p className="text-sm font-bold text-[#121358]">Rp {fmt(b.installment)}</p>
+                        )}
+                        {b.is_paid ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-600 mt-1">
+                            <FontAwesomeIcon icon={faCheck} className="w-2.5 h-2.5" /> Lunas
+                          </span>
+                        ) : (
+                          <>
+                            {b.paid_amount > 0 && (
+                              <p className="text-sm font-bold mt-0.5" style={{ color: '#9FA1FF' }}>
+                                Rp {fmt(remaining(b))}
+                              </p>
+                            )}
+                            <button
+                              onClick={e => { e.stopPropagation(); openPay(b) }}
+                              className="mt-1 flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition"
+                            >
+                              <FontAwesomeIcon icon={faMoneyBillWave} className="w-3 h-3" />
+                              Bayar
+                            </button>
+                          </>
+                        )}
+                      </div>
+                      <FontAwesomeIcon icon={isOpen ? faChevronUp : faChevronDown} className="w-3 h-3 text-gray-400 mt-1 shrink-0" />
                     </div>
                   </div>
+
+                  {/* Expanded: purchasing items */}
+                  {isOpen && (
+                    <div className="border-t border-gray-100 bg-gray-50 divide-y divide-gray-100">
+                      {!items ? (
+                        <p className="px-4 py-2 text-xs text-gray-400">Memuat...</p>
+                      ) : items.length === 0 ? (
+                        <p className="px-4 py-2 text-xs text-gray-400">Tidak ada item.</p>
+                      ) : items.map(item => (
+                        <div key={item.id} className="flex items-center justify-between px-4 py-2">
+                          <div>
+                            <p className="text-xs font-medium text-gray-700">{item.products?.name ?? '-'}</p>
+                            <p className="text-xs text-gray-400">Qty: {item.qty}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-400">@ Rp {fmt(item.base_price)}</p>
+                            <p className="text-xs font-semibold text-gray-700">Rp {fmt(item.qty * item.base_price)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
+                )
+              })}
             </div>
             )
           })
@@ -687,6 +731,11 @@ export default function BillsPage() {
                 <p className="text-xs text-[#121358]/70 mt-0.5">
                   {payingBill.suppliers?.name} · Jatuh tempo: {payingBill.due_date.split('-').reverse().join('/')}
                 </p>
+                {payingBill.purchasing?.date && (
+                  <p className="text-xs text-[#121358]/70 mt-0.5">
+                    Tanggal Nota: <span className="font-semibold text-[#121358]">{payingBill.purchasing.date.split('-').reverse().join('/')}</span>
+                  </p>
+                )}
                 {payingBill.purchasing?.total != null && (
                   <p className="text-xs text-[#121358]/70 mt-0.5">
                     Total Purchasing: <span className="font-semibold text-[#121358]">Rp {fmt(payingBill.purchasing.total)}</span>

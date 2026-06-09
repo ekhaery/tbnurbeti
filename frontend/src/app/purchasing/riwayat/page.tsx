@@ -70,7 +70,7 @@ export default function RiwayatPurchasingPage() {
     const { data } = await supabase
       .from('purchasing')
       .select('id, code, date, due_date, notes, total, status, supplier_id, suppliers(name), purchasing_items(id, qty, base_price, products(name), stock_batches(id, is_available))')
-      .order('date', { ascending: false })
+      .order('id', { ascending: false })
     setList((data as Purchasing[]) ?? [])
     setFetching(false)
   }
