@@ -297,14 +297,16 @@ export default function RiwayatPurchasingPage() {
           {/* Date range */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[10px] font-semibold text-[#121358] mb-1">Dari Tanggal</label>
+              <label className="block text-[10px] font-semibold text-[#121358] mb-1">Dari</label>
               <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                style={{ fontSize: '11px' }}
+                className="w-full bg-white border border-gray-200 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-[#121358] mb-1">Sampai Tanggal</label>
+              <label className="block text-[10px] font-semibold text-[#121358] mb-1">Sampai</label>
               <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                style={{ fontSize: '11px' }}
+                className="w-full bg-white border border-gray-200 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
             </div>
           </div>
 
