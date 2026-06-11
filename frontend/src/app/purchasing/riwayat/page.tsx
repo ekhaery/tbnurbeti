@@ -249,16 +249,18 @@ export default function RiwayatPurchasingPage() {
     if (piData && piData.length > 0) {
       const items = piData as { id: number; product_id: number; qty: number; base_price: number }[]
 
-      // Create/update stock_batches
-      const batches = items.map(pi => ({
-        purchasing_item_id: pi.id,
-        product_id: pi.product_id,
-        qty_remaining: pi.qty,
-        base_price: pi.base_price,
-        received_at: p.date,
-        is_available: true,
-      }))
-      await supabase.from('stock_batches').upsert(batches, { onConflict: 'purchasing_item_id' })
+      // Create stock_batches if not exist, then set is_available = true
+      await supabase.from('stock_batches').upsert(
+        items.map(pi => ({
+          purchasing_item_id: pi.id,
+          product_id: pi.product_id,
+          qty_remaining: pi.qty,
+          base_price: pi.base_price,
+          received_at: p.date,
+          is_available: true,
+        })),
+        { onConflict: 'purchasing_item_id' }
+      )
 
       // Update products.base_price with latest purchase price (only if > 0)
       for (const pi of items) {
@@ -269,9 +271,10 @@ export default function RiwayatPurchasingPage() {
         }
       }
 
+      // Mark purchasing as completed
       await supabase.from('purchasing').update({ status: 'completed' }).eq('id', p.id)
     }
-    showToast('Barang ditandai tiba. Stok & harga modal diupdate.')
+    showToast('Barang ditandai tiba. Stok diupdate.')
     fetchData()
   }
 
