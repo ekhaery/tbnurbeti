@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faXmark, faBoxOpen, faCheck, faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faXmark, faBoxOpen, faCheck, faPen, faTrash, faPlus } from '@fortawesome/free-solid-svg-icons'
+import Link from 'next/link'
 import PurchasingTabs from '@/lib/PurchasingTabs'
 import { getArrivalStatus, ARRIVAL_STATUS } from '@/lib/arrivalStatus'
 import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
@@ -213,11 +214,15 @@ export default function RiwayatPurchasingPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
-        <PurchasingTabs />
-
-        <div>
-          <h2 className="text-lg font-bold text-gray-800">Riwayat Purchasing</h2>
-          <p className="text-xs text-gray-500 mt-0.5">{fetching ? '...' : `${list.length} purchasing`}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">Riwayat Purchasing</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{fetching ? '...' : `${list.length} purchasing`}</p>
+          </div>
+          <Link href="/purchasing/buat"
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
+            <FontAwesomeIcon icon={faPlus} className="w-3 h-3" /> Purchasing
+          </Link>
         </div>
 
         {/* Supplier search */}

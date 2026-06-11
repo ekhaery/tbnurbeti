@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
-import PurchasingTabs from '@/lib/PurchasingTabs'
+import { useRouter } from 'next/navigation'
 import { toTitleCase } from '@/lib/utils'
 import type { PurchasingStatus } from '@/lib/purchasingStatus'
 import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
@@ -29,6 +29,7 @@ function generateCode(supplierName: string, date: string) {
 export default function BuatPurchasingPage() {
   const supabase = createClient()
   const { appUser } = useAuth()
+  const router = useRouter()
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -284,7 +285,9 @@ export default function BuatPurchasingPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
-        <PurchasingTabs />
+        <button onClick={() => router.back()} className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-[#121358] transition">
+          ‹ Kembali ke Riwayat Purchasing
+        </button>
 
         <div>
           <h2 className="text-lg font-bold text-gray-800">Buat Purchasing</h2>

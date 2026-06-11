@@ -188,7 +188,7 @@ export default function Navbar() {
           <div>
             <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Purchasing</p>
             <Link
-              href="/purchasing"
+              href="/purchasing/riwayat"
               className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
                 pathname.startsWith('/purchasing')
                   ? 'text-[#121358] bg-[#121358]/8 font-semibold'
