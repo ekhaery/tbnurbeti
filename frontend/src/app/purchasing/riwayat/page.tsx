@@ -346,13 +346,21 @@ export default function RiwayatPurchasingPage() {
         </div>
 
         {/* Status tabs */}
-        <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1">
-          {(['all', 'init', 'created', 'completed'] as const).map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              className={`flex-1 text-center text-xs font-medium py-2 rounded-xl transition-colors ${statusFilter === s ? 'bg-slate-800 text-white' : 'bg-slate-200 sm:bg-transparent text-slate-500 sm:hover:bg-slate-200'}`}>
-              {s === 'all' ? 'Semua' : s === 'init' ? 'Catatan Awal' : s === 'created' ? 'Barang Dipesan' : 'Barang Tiba'}
+        <div className="space-y-1.5">
+          <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1">
+            {(['all', 'created', 'completed'] as const).map(s => (
+              <button key={s} onClick={() => setStatusFilter(s)}
+                className={`flex-1 text-center text-xs font-medium py-2 rounded-xl transition-colors ${statusFilter === s ? 'bg-slate-800 text-white' : 'bg-slate-200 sm:bg-transparent text-slate-500 sm:hover:bg-slate-200'}`}>
+                {s === 'all' ? 'Semua' : s === 'created' ? 'Barang Dipesan' : 'Barang Tiba'}
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-start pl-1">
+            <button onClick={() => setStatusFilter(statusFilter === 'init' ? 'all' : 'init')}
+              className={`text-[10px] font-semibold transition ${statusFilter === 'init' ? 'text-[#121358]' : 'text-gray-400 hover:text-gray-600'}`}>
+              [Lihat pencatatan awal ({list.filter(p => p.status === 'init').length})]
             </button>
-          ))}
+          </div>
         </div>
 
         {fetching ? (
