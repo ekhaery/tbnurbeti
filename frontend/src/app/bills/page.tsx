@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faMoneyBillWave, faCheck, faXmark, faCalendarDays, faChevronDown, faChevronUp, faEye } from '@fortawesome/free-solid-svg-icons'
+import { faMoneyBillWave, faCheck, faXmark, faCalendarDays, faChevronDown, faChevronUp, faEye, faReceipt } from '@fortawesome/free-solid-svg-icons'
 
 type Bill = {
   id: number
@@ -15,6 +15,8 @@ type Bill = {
   installment: number
   paid_amount: number
   is_paid: boolean
+  payment_date: string | null
+  updated_at: string
   suppliers: { name: string } | null
   purchasing: { code: string; total: number; date: string } | null
 }
@@ -69,6 +71,9 @@ export default function BillsPage() {
   })
   const [purchasingItems, setPurchasingItems] = useState<Record<number, { id: number; qty: number; base_price: number; products: { name: string } | null }[]>>({})
   const [billsTab, setBillsTab] = useState<'cicilan' | 'jatuh_tempo'>('cicilan')
+  const [showPaidModal, setShowPaidModal] = useState(false)
+  const [paidPage, setPaidPage] = useState(1)
+  const PAID_PAGE_SIZE = 50
   const [purchasing, setPurchasing] = useState<PurchasingRow[]>([])
   const [fetchingPurchasing, setFetchingPurchasing] = useState(false)
   const now = new Date()
@@ -104,7 +109,7 @@ export default function BillsPage() {
   const fetchData = async () => {
     const { data } = await supabase
       .from('bills')
-      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, suppliers(name), purchasing(code, total, date)')
+      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date)')
     setBills((data as Bill[]) ?? [])
     setFetching(false)
   }
@@ -225,6 +230,10 @@ export default function BillsPage() {
             <h2 className="text-lg font-bold text-gray-800">Tagihan Dagang</h2>
             <p className="text-xs text-gray-500 mt-0.5">Tagihan dari pengadaan berjangka.</p>
           </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => { setShowPaidModal(true); setPaidPage(1) }} className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#121358] text-white hover:bg-[#1a1c6e] transition shadow-sm">
+              <FontAwesomeIcon icon={faReceipt} className="w-4 h-4 text-white" />
+            </button>
           <div className="relative">
             <button onClick={() => setShowCalendarMenu(v => !v)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#121358] text-white hover:bg-[#1a1c6e] transition shadow-sm">
               <FontAwesomeIcon icon={faCalendarDays} className="w-4 h-4 text-white" />
@@ -248,6 +257,7 @@ export default function BillsPage() {
                 </div>
               </>
             )}
+          </div>
           </div>
         </div>
 
@@ -604,6 +614,89 @@ export default function BillsPage() {
           })
         ))}
       </div>
+
+      {/* Paid Bills Modal */}
+      {showPaidModal && (() => {
+        const paidBills = [...bills]
+          .filter(b => b.paid_amount > 0)
+          .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+
+        const totalPages = Math.ceil(paidBills.length / PAID_PAGE_SIZE)
+        const paginated = paidBills.slice((paidPage - 1) * PAID_PAGE_SIZE, paidPage * PAID_PAGE_SIZE)
+
+        // Group by day
+        const grouped = paginated.reduce<Record<string, typeof paginated>>((acc, b) => {
+          const day = b.updated_at.slice(0, 10)
+          const label = (() => {
+            const today = new Date().toISOString().slice(0, 10)
+            const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+            if (day === today) return 'Hari Ini'
+            if (day === yesterday) return 'Kemarin'
+            return new Date(day).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+          })()
+          if (!acc[label]) acc[label] = []
+          acc[label].push(b)
+          return acc
+        }, {})
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
+            <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
+              {/* Header */}
+              <div className="px-5 py-4 flex items-center justify-between bg-[#121358] shrink-0">
+                <div>
+                  <p className="text-sm font-bold text-white">Riwayat Pembayaran</p>
+                  <p className="text-xs text-white/60 mt-0.5">{paidBills.length} tagihan dibayar</p>
+                </div>
+                <button onClick={() => setShowPaidModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                  <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* List */}
+              <div className="overflow-y-auto flex-1 px-4 py-3 space-y-4">
+                {Object.entries(grouped).map(([day, dayBills]) => (
+                  <div key={day} className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{day}</p>
+                      <p className="text-xs font-semibold text-gray-500">Rp {fmt(dayBills.reduce((s, b) => s + b.paid_amount, 0))}</p>
+                    </div>
+                    {dayBills.map(b => (
+                      <div key={b.id} className={`bg-white border rounded-xl p-3 flex items-start justify-between gap-3 ${b.is_paid ? 'border-green-200' : 'border-amber-200'}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800 truncate">{b.suppliers?.name ?? '-'}</p>
+                          <p className="text-xs text-gray-400 font-mono mt-0.5">{b.bill_no ?? '-'}</p>
+                          {b.payment_date && <p className="text-xs text-gray-400 mt-0.5">Dibayar: {fmtDate(b.payment_date)}</p>}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-bold text-[#121358]">Rp {fmt(b.paid_amount)}</p>
+                          <span className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${b.is_paid ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
+                            {b.is_paid ? 'Lunas' : 'Sebagian'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 shrink-0">
+                  <p className="text-xs text-gray-400">{(paidPage - 1) * PAID_PAGE_SIZE + 1}–{Math.min(paidPage * PAID_PAGE_SIZE, paidBills.length)} dari {paidBills.length}</p>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setPaidPage(p => Math.max(1, p - 1))} disabled={paidPage === 1}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-sm text-gray-500 disabled:opacity-30">‹</button>
+                    <span className="text-xs text-gray-500 px-2">{paidPage}/{totalPages}</span>
+                    <button onClick={() => setPaidPage(p => Math.min(totalPages, p + 1))} disabled={paidPage === totalPages}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-sm text-gray-500 disabled:opacity-30">›</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Monthly Calendar Modal */}
       {showMonthCalendar && (() => {
