@@ -403,6 +403,10 @@ export default function RiwayatPurchasingPage() {
                           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PURCHASING_STATUS[p.status as 'init' | 'created'].className}`}>
                             {PURCHASING_STATUS[p.status as 'init' | 'created'].label}
                           </span>
+                        ) : p.status === 'completed' ? (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-600">
+                            ✓ Sudah Tiba
+                          </span>
                         ) : (
                           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ARRIVAL_STATUS[status!].className}`}>
                             {ARRIVAL_STATUS[status!].label}
