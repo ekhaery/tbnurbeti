@@ -242,13 +242,15 @@ export default function RiwayatPurchasingPage() {
 
   // Tandai Tiba for 'created' status
   const handleTandaiTiba = async (p: Purchasing) => {
-    // Create stock_batches if not exists, mark is_available = true
     const { data: piData } = await supabase
       .from('purchasing_items')
       .select('id, product_id, qty, base_price')
       .eq('purchasing_id', p.id)
     if (piData && piData.length > 0) {
-      const batches = (piData as { id: number; product_id: number; qty: number; base_price: number }[]).map(pi => ({
+      const items = piData as { id: number; product_id: number; qty: number; base_price: number }[]
+
+      // Create/update stock_batches
+      const batches = items.map(pi => ({
         purchasing_item_id: pi.id,
         product_id: pi.product_id,
         qty_remaining: pi.qty,
@@ -257,9 +259,19 @@ export default function RiwayatPurchasingPage() {
         is_available: true,
       }))
       await supabase.from('stock_batches').upsert(batches, { onConflict: 'purchasing_item_id' })
+
+      // Update products.base_price with latest purchase price (only if > 0)
+      for (const pi of items) {
+        if (pi.base_price > 0) {
+          await supabase.from('products')
+            .update({ base_price: pi.base_price, updated_at: new Date().toISOString() })
+            .eq('id', pi.product_id)
+        }
+      }
+
       await supabase.from('purchasing').update({ status: 'completed' }).eq('id', p.id)
     }
-    showToast('Barang ditandai tiba. Stok diupdate.')
+    showToast('Barang ditandai tiba. Stok & harga modal diupdate.')
     fetchData()
   }
 

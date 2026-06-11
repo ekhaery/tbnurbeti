@@ -244,6 +244,15 @@ export default function BuatPurchasingPage() {
 
       const { error: batchErr } = await supabase.from('stock_batches').insert(batches)
       if (batchErr) { setError(batchErr.message); setSubmitting(false); return }
+
+      // Update products.base_price with latest purchase price
+      for (const item of insertedItems as { id: number; product_id: number; qty: number; base_price: number }[]) {
+        if (item.base_price > 0) {
+          await supabase.from('products')
+            .update({ base_price: item.base_price, updated_at: new Date().toISOString() })
+            .eq('id', item.product_id)
+        }
+      }
     }
 
     // 4. Generate bills if period > 0 (period = weeks)
