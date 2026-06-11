@@ -32,7 +32,7 @@ export default function Navbar() {
       .from('user_activities')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', today)
-      .then(({ count }) => setActivityCount(count ?? 0))
+      .then(({ count }: { count: number | null }) => setActivityCount(count ?? 0))
   }, [appUser])
 
   // Detect desktop
