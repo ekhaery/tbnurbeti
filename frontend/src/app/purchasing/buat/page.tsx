@@ -46,6 +46,7 @@ export default function BuatPurchasingPage() {
   const [items, setItems] = useState<ItemRow[]>([emptyItem()])
   const [autocomplete, setAutocomplete] = useState<AutocompleteState[]>([{ open: false, focused: -1 }])
   const [transformationPhase, setTransformationPhase] = useState(true)
+  const [barangReady, setBarangReady] = useState<boolean | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -208,7 +209,7 @@ export default function BuatPurchasingPage() {
 
     // 1. Insert purchasing header
 
-    const status: PurchasingStatus = transformationPhase ? 'init' : 'created'
+    const status: PurchasingStatus = transformationPhase ? 'init' : barangReady ? 'completed' : 'created'
 
     const { data: pur, error: purErr } = await supabase.from('purchasing')
       .insert({ code, supplier_id: supplierId, date, notes: notes.trim() || null, total: totalValue, created_by: appUser?.id, status, due_date: jatuhTempo || null })
@@ -229,8 +230,8 @@ export default function BuatPurchasingPage() {
 
     if (itemsErr || !insertedItems) { setError(itemsErr?.message ?? 'Gagal menyimpan items.'); setSubmitting(false); return }
 
-    // 3. Insert stock_batches (only when transformation phase is OFF)
-    if (!transformationPhase) {
+    // 3. Insert stock_batches only when toggle OFF and barang ready = Yes
+    if (!transformationPhase && barangReady) {
       const batches = insertedItems.map((item: { id: number; product_id: number; qty: number; base_price: number }) => ({
         purchasing_item_id: item.id,
         product_id: item.product_id,
@@ -298,25 +299,43 @@ export default function BuatPurchasingPage() {
         )}
 
         {/* Transformation Phase Toggle */}
-        <div className="rounded-xl p-3 flex items-center justify-between gap-3 border-2" style={{ backgroundColor: '#B5BAFF', borderColor: '#9FA1FF' }}>
-          <div>
-            <p className={`text-xs font-semibold ${transformationPhase ? 'text-[#121358]' : 'text-gray-500'}`}>
-              Transformation Phase
-            </p>
-            <p className={`text-xs mt-0.5 ${transformationPhase ? 'text-[#121358]/70' : 'text-gray-400'}`}>
-              {transformationPhase
-                ? 'ON — hanya mencatat tagihan, stok tidak diupdate.'
-                : 'OFF — stok akan diupdate saat barang tiba.'}
-            </p>
+        <div className="rounded-xl border-2 overflow-hidden" style={{ backgroundColor: '#B5BAFF', borderColor: '#9FA1FF' }}>
+          <div className="p-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-[#121358]">
+                Transformation Phase
+              </p>
+              <p className="text-xs mt-0.5 text-[#121358]/70">
+                {transformationPhase
+                  ? 'ON — hanya mencatat tagihan, stok tidak diupdate.'
+                  : 'OFF — stok akan diupdate saat barang tiba.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setTransformationPhase(v => !v); setBarangReady(null) }}
+              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${transformationPhase ? '' : 'bg-gray-300'}`}
+              style={transformationPhase ? { backgroundColor: '#AEE2FF' } : {}}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${transformationPhase ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setTransformationPhase(v => !v)}
-            className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${transformationPhase ? '' : 'bg-gray-300'}`}
-            style={transformationPhase ? { backgroundColor: '#AEE2FF' } : {}}
-          >
-            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${transformationPhase ? 'translate-x-5' : 'translate-x-0'}`} />
-          </button>
+
+          {!transformationPhase && (
+            <div className="px-3 pb-3 pt-2 border-t border-[#9FA1FF]/30">
+              <p className="text-xs font-semibold text-[#121358] mb-2">Apakah barang sudah ready di toko?</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setBarangReady(true)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${barangReady === true ? 'bg-[#121358] text-white' : 'bg-white/60 text-[#121358] hover:bg-white/80'}`}>
+                  Ya, sudah
+                </button>
+                <button type="button" onClick={() => setBarangReady(false)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${barangReady === false ? 'bg-[#121358] text-white' : 'bg-white/60 text-[#121358] hover:bg-white/80'}`}>
+                  Belum
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
