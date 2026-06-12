@@ -116,6 +116,11 @@ export default function LaporanTagihanHutangPage() {
 
   const dayCount = Math.max(1, Math.round((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / 86400000) + 1)
   const avgPerDay = bills.reduce((s, b) => s + b.installment, 0) / dayCount
+  const billsTotalInstallment = bills.reduce((s, b) => s + b.installment, 0)
+  const billsTotalPaid = bills.reduce((s, b) => s + b.paid_amount, 0)
+  const billsPaidPct = billsTotalInstallment > 0 ? (billsTotalPaid / billsTotalInstallment * 100).toFixed(1) : '0.0'
+  const billsUnpaid = billsTotalInstallment - billsTotalPaid
+  const billsUnpaidPct = billsTotalInstallment > 0 ? (billsUnpaid / billsTotalInstallment * 100).toFixed(1) : '0.0'
 
   const allCalEvents = [
     ...bills.map(b => ({ date: b.installment_due_date ?? '', label: b.suppliers?.name ?? '-', amount: b.installment, type: 'bills' })),
@@ -242,6 +247,14 @@ export default function LaporanTagihanHutangPage() {
                       <div>
                         <p className="text-[10px] text-white/60">Rata-rata tagihan dagang /hari</p>
                         <p className="text-xs font-semibold text-white mt-0.5">Rp {fmt(Math.round(avgPerDay))}</p>
+                      </div>
+                      <div className="border-t border-white/10 pt-2">
+                        <p className="text-[10px] text-white/60">Sudah terbayar</p>
+                        <p className="text-xs font-semibold text-white mt-0.5">Rp {fmt(billsTotalPaid)} <span className="text-white/60">({billsPaidPct}%)</span></p>
+                      </div>
+                      <div className="border-t border-white/10 pt-2">
+                        <p className="text-[10px] text-white/60">Belum terbayar</p>
+                        <p className="text-xs font-semibold text-white mt-0.5">Rp {fmt(billsUnpaid)} <span className="text-white/60">({billsUnpaidPct}%)</span></p>
                       </div>
                     </div>
                   </div>
