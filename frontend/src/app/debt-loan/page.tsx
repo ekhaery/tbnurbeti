@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus, faXmark, faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faPlus, faXmark, faPen, faTrash, faChevronLeft } from '@fortawesome/free-solid-svg-icons'
+import { useRouter } from 'next/navigation'
 import {
   BANK_ACCOUNT_OPTIONS,
   DEBT_TYPE_OPTIONS,
@@ -75,6 +76,7 @@ async function generateDetails(supabase: ReturnType<typeof createClient>, debtLo
 
 export default function DebtLoanPage() {
   const supabase = createClient()
+  const router = useRouter()
   const [list, setList] = useState<DebtLoan[]>([])
   const [fetching, setFetching] = useState(true)
 
@@ -242,15 +244,15 @@ export default function DebtLoanPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
 
+        <button onClick={() => router.back()} className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-[#121358] transition">
+          <FontAwesomeIcon icon={faChevronLeft} className="w-3 h-3" /> Kembali ke halaman Debt & Loan
+        </button>
+
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-gray-800">Debt & Loan</h2>
+            <h2 className="text-lg font-bold text-gray-800">Daftar Debt & Loan</h2>
             <p className="text-xs text-gray-500 mt-0.5">Daftar hutang dan pinjaman.</p>
           </div>
-          <button onClick={() => { setShowForm(true); setError(null) }}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
-            <FontAwesomeIcon icon={faPlus} className="w-3 h-3" /> Tambah
-          </button>
         </div>
 
         {fetching ? (

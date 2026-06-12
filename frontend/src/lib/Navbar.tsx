@@ -206,7 +206,7 @@ export default function Navbar() {
                   : 'text-gray-700 hover:bg-gray-50'
               }`}
             >
-              <FontAwesomeIcon icon={faFileInvoiceDollar} className="w-4 h-4 text-gray-400" />
+              <FontAwesomeIcon icon={faHandHoldingDollar} className="w-4 h-4 text-gray-400" />
               Tagihan Dagang
             </Link>
           </div>
@@ -234,7 +234,7 @@ export default function Navbar() {
               }`}
             >
               <FontAwesomeIcon icon={faReceipt} className="w-4 h-4 text-gray-400" />
-              Tagihan Debt & Loan
+              Debt & Loan
             </Link>
             <Link
               href="/piutang"
