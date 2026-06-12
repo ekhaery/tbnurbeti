@@ -97,7 +97,7 @@ export default function DebtLoanPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const fetchData = async () => {
-    const { data } = await supabase.from('debt_loan').select('*').order('date', { ascending: false })
+    const { data } = await supabase.from('debt_loan').select('*').neq('debt_type', 'Giro').order('date', { ascending: false })
     setList((data as DebtLoan[]) ?? [])
     setFetching(false)
   }
