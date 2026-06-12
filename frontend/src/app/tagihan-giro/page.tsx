@@ -145,7 +145,17 @@ export default function TagihanGiroPage() {
     setConfirmingDelete(false); setDeleting(null); fetchData()
   }
 
-  const formFields = (f: ReturnType<typeof emptyForm>, setF: (k: string, v: string) => void, p: DebtLoanPeriod | null, err: string | null) => (
+  const calcAutoInstallment = (f: ReturnType<typeof emptyForm>, p: DebtLoanPeriod | null): string => {
+    const amount = parseFloat(f.debt_amount)
+    if (!p || !amount || amount <= 0) return ''
+    const n = f.installment_type === 'daily' ? p.days : f.installment_type === 'weekly' ? p.weeks : p.month
+    if (!n || n <= 0) return ''
+    return String(Math.round((amount / n) * 100) / 100)
+  }
+
+  const formFields = (f: ReturnType<typeof emptyForm>, setF: (k: string, v: string) => void, p: DebtLoanPeriod | null, err: string | null) => {
+    const autoInstallment = calcAutoInstallment(f, p)
+    return (
     <div className="px-5 py-4 space-y-3 max-h-[65vh] overflow-y-auto">
       <div>
         <label className="block text-xs text-gray-500 mb-1">Bank Account</label>
@@ -155,40 +165,42 @@ export default function TagihanGiroPage() {
         </select>
       </div>
       <div>
-        <label className="block text-xs text-gray-500 mb-1">Tanggal</label>
+        <label className="block text-xs text-gray-500 mb-1">Tanggal Dibuat</label>
         <input type="date" value={f.date} onChange={e => setF('date', e.target.value)}
           className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
       </div>
       <div>
+        <label className="block text-xs text-gray-500 mb-1">Jatuh Tempo</label>
+        <input type="date" value={f.due_date} min={f.date} onChange={e => { setF('due_date', e.target.value); setF('installment_amount', calcAutoInstallment({ ...f, due_date: e.target.value }, calcPeriodFn(f.date, e.target.value))) }}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+        {p && <p className="text-xs text-gray-400 mt-1">{p.days} hari · {p.weeks} minggu · {p.month} bulan</p>}
+      </div>
+      <div>
         <label className="block text-xs text-gray-500 mb-1">Jumlah Tagihan <span className="text-red-500">*</span></label>
-        <input type="number" value={f.debt_amount} onChange={e => setF('debt_amount', e.target.value)}
+        <input type="number" value={f.debt_amount} onChange={e => { setF('debt_amount', e.target.value); setF('installment_amount', calcAutoInstallment({ ...f, debt_amount: e.target.value }, p)) }}
           placeholder="0" min="0"
           className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">Tipe Cicilan</label>
-          <select value={f.installment_type} onChange={e => setF('installment_type', e.target.value)}
+          <select value={f.installment_type} onChange={e => { setF('installment_type', e.target.value); setF('installment_amount', calcAutoInstallment({ ...f, installment_type: e.target.value }, p)) }}
             className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]">
             {INSTALLMENT_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Jumlah Cicilan</label>
-          <input type="number" value={f.installment_amount} onChange={e => setF('installment_amount', e.target.value)}
-            placeholder="0" min="0"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+          <input type="number" value={autoInstallment || f.installment_amount} disabled
+            placeholder="Auto"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 text-gray-500 cursor-not-allowed" />
+          {autoInstallment && <p className="text-[10px] text-gray-400 mt-0.5">= Rp {fmt(parseFloat(autoInstallment))}/cicilan</p>}
         </div>
-      </div>
-      <div>
-        <label className="block text-xs text-gray-500 mb-1">Tanggal Lunas</label>
-        <input type="date" value={f.due_date} min={f.date} onChange={e => setF('due_date', e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
-        {p && <p className="text-xs text-gray-400 mt-1">{p.days} hari · {p.weeks} minggu · {p.month} bulan</p>}
       </div>
       {err && <p className="text-xs text-red-500">⚠️ {err}</p>}
     </div>
-  )
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -221,7 +233,7 @@ export default function TagihanGiroPage() {
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">{fmtDate(d.date)}</p>
                     <p className="text-xs text-gray-500 mt-0.5">Cicilan: {installmentLabel(d.installment_type)} · Rp {fmt(d.installment_amount)}</p>
-                    {d.due_date && <p className="text-xs text-gray-500 mt-0.5">Lunas: {fmtDate(d.due_date)}</p>}
+                    {d.due_date && <p className="text-xs text-gray-500 mt-0.5">Jatuh Tempo: {fmtDate(d.due_date)}</p>}
                     {d.period && <p className="text-xs text-gray-500 mt-0.5">{d.period.days} hari · {d.period.weeks} minggu · {d.period.month} bulan</p>}
                   </div>
                   <div className="text-right shrink-0">
