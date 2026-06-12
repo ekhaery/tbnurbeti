@@ -24,6 +24,7 @@ export default function LaporanTagihanHutangPage() {
   const [bills, setBills] = useState<BillRow[]>([])
   const [loanDetails, setLoanDetails] = useState<DetailRow[]>([])
   const [giroDetails, setGiroDetails] = useState<DetailRow[]>([])
+  const [rkList, setRkList] = useState<{ id: number; installment_amount: number }[]>([])
   const [overdueBills, setOverdueBills] = useState<BillRow[]>([])
   const [overdueDetails, setOverdueDetails] = useState<DetailRow[]>([])
   const [fetching, setFetching] = useState(true)
@@ -57,6 +58,12 @@ export default function LaporanTagihanHutangPage() {
       .select('id, installment_amount, is_paid, installment_due_date, due_date, debt_loan(bank_account, debt_type, suppliers(name))')
       .lt('due_date', todayStr).eq('is_paid', false)
     setOverdueDetails((odDetails ?? []) as DetailRow[])
+
+    // Rekening Koran (active, recurring monthly)
+    const { data: rkData } = await supabase.from('debt_loan')
+      .select('id, installment_amount').eq('debt_type', 'Rekening Koran').eq('is_active', true)
+    setRkList((rkData ?? []) as { id: number; installment_amount: number }[])
+
     setFetching(false)
   }
 
@@ -65,7 +72,8 @@ export default function LaporanTagihanHutangPage() {
   const debtLoanBank = loanDetails.filter(d => !d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
   const debtBills = bills.filter(b => !b.is_paid).reduce((s, b) => s + (b.installment - b.paid_amount), 0)
   const debtGiro = giroDetails.filter(d => !d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
-  const totalDebt = debtLoanBank + debtBills + debtGiro
+  const debtRK = rkList.reduce((s, r) => s + r.installment_amount, 0)
+  const totalDebt = debtLoanBank + debtBills + debtGiro + debtRK
   const paidLoanBank = loanDetails.filter(d => d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
   const paidBills = bills.filter(b => b.is_paid).reduce((s, b) => s + b.installment, 0)
   const paidGiro = giroDetails.filter(d => d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
@@ -129,7 +137,7 @@ export default function LaporanTagihanHutangPage() {
 
         {/* Legend */}
         <div className="flex items-center gap-4 px-1">
-          {[['Tagihan Dagang','#9FA1FF'],['Giro','#121358'],['Loan & Bank','#FCB7C7']].map(([l,c]) => (
+          {[['Tagihan Dagang','#9FA1FF'],['Giro','#121358'],['Loan & Bank','#FCB7C7'],['Rekening Koran','#F5A623']].map(([l,c]) => (
             <div key={l} className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ backgroundColor: c }}></span><span className="text-[10px] text-gray-500">{l}</span></div>
           ))}
         </div>
@@ -146,6 +154,7 @@ export default function LaporanTagihanHutangPage() {
                 <SR label="Loan & Bank" value={debtLoanBank} color="#FCB7C7" />
                 <SR label="Tagihan Dagang" value={debtBills} color="#FCB7C7" />
                 <SR label="Giro" value={debtGiro} color="#FCB7C7" />
+                <SR label="Rekening Koran (per bulan)" value={debtRK} color="#F5A623" />
                 <div className="flex items-center justify-between pt-2 mt-1 border-t border-white/20">
                   <p className="text-sm font-bold text-white">Total Terbayar</p>
                   <p className="text-sm font-black" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaid)}</p>
