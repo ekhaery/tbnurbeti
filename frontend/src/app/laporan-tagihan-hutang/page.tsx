@@ -114,6 +114,9 @@ export default function LaporanTagihanHutangPage() {
   const totalPaid = paidLoanBank + paidBills + paidGiro + rkPaid
   const top5Giro = [...giroDetails].sort((a, b) => b.installment_amount - a.installment_amount).slice(0, 10)
 
+  const dayCount = Math.max(1, Math.round((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / 86400000) + 1)
+  const avgPerDay = bills.reduce((s, b) => s + b.installment, 0) / dayCount
+
   const allCalEvents = [
     ...bills.map(b => ({ date: b.installment_due_date ?? '', label: b.suppliers?.name ?? '-', amount: b.installment, type: 'bills' })),
     ...giroDetails.map(d => ({ date: d.installment_due_date ?? '', label: (d.debt_loan as { bank_account: string } | null)?.bank_account ?? '-', amount: d.installment_amount, type: 'giro' })),
@@ -205,29 +208,42 @@ export default function LaporanTagihanHutangPage() {
               </div>
 
               {top5Purchasing.length > 0 && (
-                <div className="rounded-xl overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-[#121358]">
-                    <p className="text-xs font-semibold text-white">Top 10 Tagihan Dagang</p>
-                    <button onClick={() => setSortByDueDate(v => !v)}
-                      className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded transition ${sortByDueDate ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white'}`}>
-                      <FontAwesomeIcon icon={faArrowUpAZ} className="w-3 h-3" />
-                      JT ↑
-                    </button>
-                  </div>
-                  <div className="p-4 space-y-0 max-h-64 overflow-y-auto" style={{ backgroundColor: '#3f50e8' }}>
-                  {[...top5Purchasing].sort((a, b) => sortByDueDate
-                    ? (a.due_date ?? '').localeCompare(b.due_date ?? '')
-                    : b.total - a.total
-                  ).map((p, i) => (
-                    <div key={p.id} className="flex items-start justify-between py-1.5 gap-2 border-b border-white/10 last:border-0 rounded-lg px-1"
-                      style={{ backgroundColor: i < 5 ? 'transparent' : 'rgba(255,255,255,0.06)' }}>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-white">{p.suppliers?.name ?? '-'}</p>
-                        <p className="text-[10px] mt-0.5" style={{ color: '#B5BAFF' }}>{fmtDate(p.date)} | JT: {p.due_date ? fmtDate(p.due_date) : '-'}</p>
-                      </div>
-                      <p className="text-xs font-semibold shrink-0" style={{ color: '#FCB7C7' }}>Rp {fmt(p.total)}</p>
+                <div className="flex gap-3 items-start">
+                  <div className="flex-[2] min-w-0 rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-[#121358]">
+                      <p className="text-xs font-semibold text-white">Top 10 Tagihan Dagang</p>
+                      <button onClick={() => setSortByDueDate(v => !v)}
+                        className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded transition ${sortByDueDate ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white'}`}>
+                        <FontAwesomeIcon icon={faArrowUpAZ} className="w-3 h-3" />
+                        JT ↑
+                      </button>
                     </div>
-                  ))}
+                    <div className="p-4 space-y-0 max-h-64 overflow-y-auto" style={{ backgroundColor: '#3f50e8' }}>
+                    {[...top5Purchasing].sort((a, b) => sortByDueDate
+                      ? (a.due_date ?? '').localeCompare(b.due_date ?? '')
+                      : b.total - a.total
+                    ).map((p, i) => (
+                      <div key={p.id} className="flex items-start justify-between py-1.5 gap-2 border-b border-white/10 last:border-0 rounded-lg px-1"
+                        style={{ backgroundColor: i < 5 ? 'transparent' : 'rgba(255,255,255,0.06)' }}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-white">{p.suppliers?.name ?? '-'}</p>
+                          <p className="text-[10px] mt-0.5" style={{ color: '#B5BAFF' }}>{fmtDate(p.date)} | JT: {p.due_date ? fmtDate(p.due_date) : '-'}</p>
+                        </div>
+                        <p className="text-xs font-semibold shrink-0" style={{ color: '#FCB7C7' }}>Rp {fmt(p.total)}</p>
+                      </div>
+                    ))}
+                    </div>
+                  </div>
+                  <div className="flex-[1] min-w-0 rounded-xl overflow-hidden">
+                    <div className="px-3 py-2.5 bg-[#121358]">
+                      <p className="text-xs font-semibold text-white">Kesimpulan</p>
+                    </div>
+                    <div className="p-3 space-y-2" style={{ backgroundColor: '#3f50e8' }}>
+                      <div>
+                        <p className="text-[10px] text-white/60">Rata-rata tagihan dagang /hari</p>
+                        <p className="text-xs font-semibold text-white mt-0.5">Rp {fmt(Math.round(avgPerDay))}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
