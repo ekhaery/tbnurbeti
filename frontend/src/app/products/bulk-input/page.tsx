@@ -67,10 +67,21 @@ export default function BulkInputPage() {
       .order('name')
       .then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
 
-    supabase
-      .from('products')
-      .select('name')
-      .then(({ data }: { data: { name: string }[] | null }) => setExistingNames([...new Set((data ?? []).map((p) => p.name.toLowerCase()))]))
+    // Fetch all product names in chunks to bypass 1000-row limit
+    const fetchAllNames = async () => {
+      const chunkSize = 1000
+      let from = 0
+      const allNames: string[] = []
+      while (true) {
+        const { data, error } = await supabase.from('products').select('name').range(from, from + chunkSize - 1)
+        if (error || !data || data.length === 0) break
+        allNames.push(...(data as { name: string }[]).map(p => p.name))
+        if (data.length < chunkSize) break
+        from += chunkSize
+      }
+      setExistingNames([...new Set(allNames)])
+    }
+    fetchAllNames()
   }, [])
 
   const updateRow = (index: number, field: keyof ProductRow, value: string | boolean) => {
@@ -242,13 +253,13 @@ export default function BulkInputPage() {
                     placeholder="Ketik nama produk baru..."
                     autoComplete="off"
                     className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 bg-gray-50 ${
-                      row.name.trim() && existingNames.includes(toTitleCase(row.name.trim()).toLowerCase())
+                      row.name.trim() && existingNames.some(n => n.toLowerCase() === row.name.trim().toLowerCase())
                         ? 'border-red-300 focus:ring-red-300'
                         : 'border-gray-200 focus:ring-[#121358]'
                     }`}
                   />
                   {openSuggestion === i && row.name.trim() && (() => {
-                    const matches = existingNames.filter(n => n.toLowerCase().includes(row.name.toLowerCase()))
+                    const matches = existingNames.filter(n => n.toLowerCase().includes(row.name.toLowerCase())).slice(0, 30)
                     return matches.length > 0 ? (
                       <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
                         {matches.map(name => (
@@ -261,7 +272,7 @@ export default function BulkInputPage() {
                       </div>
                     ) : null
                   })()}
-                  {row.name.trim() && existingNames.includes(toTitleCase(row.name.trim()).toLowerCase()) && (
+                  {row.name.trim() && existingNames.some(n => n.toLowerCase() === row.name.trim().toLowerCase()) && (
                     <p className="text-xs text-red-500 mt-1">⚠ Produk ini sudah ada.</p>
                   )}
                 </div>
