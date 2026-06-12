@@ -25,6 +25,7 @@ export default function LaporanTagihanHutangPage() {
   const [loanDetails, setLoanDetails] = useState<DetailRow[]>([])
   const [giroDetails, setGiroDetails] = useState<DetailRow[]>([])
   const [rkList, setRkList] = useState<{ id: number; installment_amount: number }[]>([])
+  const [rkPaid, setRkPaid] = useState(0)
   const [overdueBills, setOverdueBills] = useState<BillRow[]>([])
   const [overdueDetails, setOverdueDetails] = useState<DetailRow[]>([])
   const [fetching, setFetching] = useState(true)
@@ -64,6 +65,16 @@ export default function LaporanTagihanHutangPage() {
       .select('id, installment_amount').eq('debt_type', 'Rekening Koran').eq('is_active', true)
     setRkList((rkData ?? []) as { id: number; installment_amount: number }[])
 
+    // Rekening Koran paid details in range
+    const { data: rkPaidData } = await supabase.from('debt_loan_detail')
+      .select('installment_amount, debt_loan!inner(debt_type)')
+      .eq('debt_loan.debt_type', 'Rekening Koran')
+      .eq('is_paid', true)
+      .gte('installment_due_date', dateFrom)
+      .lte('installment_due_date', dateTo)
+    const rkPaidTotal = (rkPaidData ?? []).reduce((s: number, d: { installment_amount: number }) => s + d.installment_amount, 0)
+    setRkPaid(rkPaidTotal)
+
     setFetching(false)
   }
 
@@ -77,7 +88,7 @@ export default function LaporanTagihanHutangPage() {
   const paidLoanBank = loanDetails.filter(d => d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
   const paidBills = bills.filter(b => b.is_paid).reduce((s, b) => s + b.installment, 0)
   const paidGiro = giroDetails.filter(d => d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
-  const totalPaid = paidLoanBank + paidBills + paidGiro
+  const totalPaid = paidLoanBank + paidBills + paidGiro + rkPaid
   const top5Bills = [...bills].sort((a, b) => b.installment - a.installment).slice(0, 5)
   const top5Giro = [...giroDetails].sort((a, b) => b.installment_amount - a.installment_amount).slice(0, 5)
 
@@ -144,24 +155,28 @@ export default function LaporanTagihanHutangPage() {
 
         {fetching ? <div className="text-center text-sm text-gray-400 py-10">Memuat...</div> : (
           <>
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-1">Summary I</p>
-              <div className="bg-[#121358] rounded-xl p-4 space-y-1">
-                <div className="flex items-center justify-between pb-2 mb-1 border-b border-white/20">
-                  <p className="text-sm font-bold text-white">Total Hutang</p>
-                  <p className="text-sm font-black" style={{ color: '#FCB7C7' }}>Rp {fmt(totalDebt)}</p>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Total Hutang card */}
+              <div className="bg-[#121358] rounded-xl p-3 space-y-1">
+                <div className="pb-1.5 mb-1 border-b border-white/20">
+                  <p className="text-xs font-bold text-white">Total Hutang</p>
+                  <p className="text-sm font-black mt-0.5" style={{ color: '#FCB7C7' }}>Rp {fmt(totalDebt)}</p>
                 </div>
                 <SR label="Loan & Bank" value={debtLoanBank} color="#FCB7C7" />
-                <SR label="Tagihan Dagang" value={debtBills} color="#FCB7C7" />
+                <SR label="Tagihan" value={debtBills} color="#FCB7C7" />
                 <SR label="Giro" value={debtGiro} color="#FCB7C7" />
-                <SR label="Rekening Koran (per bulan)" value={debtRK} color="#F5A623" />
-                <div className="flex items-center justify-between pt-2 mt-1 border-t border-white/20">
-                  <p className="text-sm font-bold text-white">Total Terbayar</p>
-                  <p className="text-sm font-black" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaid)}</p>
+                <SR label="Rek. Koran" value={debtRK} color="#F5A623" />
+              </div>
+              {/* Total Terbayar card */}
+              <div className="bg-[#121358] rounded-xl p-3 space-y-1">
+                <div className="pb-1.5 mb-1 border-b border-white/20">
+                  <p className="text-xs font-bold text-white">Total Terbayar</p>
+                  <p className="text-sm font-black mt-0.5" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaid)}</p>
                 </div>
-                <SR label="Paid Loan & Bank" value={paidLoanBank} color="#D9F9DF" />
-                <SR label="Paid Tagihan Dagang" value={paidBills} color="#D9F9DF" />
-                <SR label="Paid Giro" value={paidGiro} color="#D9F9DF" />
+                <SR label="Loan & Bank" value={paidLoanBank} color="#D9F9DF" />
+                <SR label="Tagihan" value={paidBills} color="#D9F9DF" />
+                <SR label="Giro" value={paidGiro} color="#D9F9DF" />
+                <SR label="Rek. Koran" value={rkPaid} color="#F5A623" />
               </div>
             </div>
 
