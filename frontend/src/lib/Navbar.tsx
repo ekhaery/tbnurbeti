@@ -215,17 +215,6 @@ export default function Navbar() {
           <div>
             <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Finance</p>
             <Link
-              href="/debt-loan"
-              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
-                pathname.startsWith('/debt-loan')
-                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
-                  : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <FontAwesomeIcon icon={faHandHoldingDollar} className="w-4 h-4 text-gray-400" />
-              Debt & Loan
-            </Link>
-            <Link
               href="/tagihan-giro"
               className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
                 pathname.startsWith('/tagihan-giro')
