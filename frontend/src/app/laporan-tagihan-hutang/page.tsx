@@ -25,7 +25,7 @@ export default function LaporanTagihanHutangPage() {
   const [bills, setBills] = useState<BillRow[]>([])
   const [loanDetails, setLoanDetails] = useState<DetailRow[]>([])
   const [giroDetails, setGiroDetails] = useState<DetailRow[]>([])
-  const [rkList, setRkList] = useState<{ id: number; installment_amount: number }[]>([])
+  const [rkList, setRkList] = useState<{ id: number; installment_amount: number; bank_account: string; due_date: string | null }[]>([])
   const [top5Purchasing, setTop5Purchasing] = useState<PurchasingRow[]>([])
   const [topGiroDebt, setTopGiroDebt] = useState<{ id: number; bank_account: string; debt_amount: number; date: string; due_date: string | null; suppliers: { name: string } | null }[]>([])
   const [sortByDueDate, setSortByDueDate] = useState(false)
@@ -69,8 +69,8 @@ export default function LaporanTagihanHutangPage() {
 
     // Rekening Koran (active, recurring monthly)
     const { data: rkData } = await supabase.from('debt_loan')
-      .select('id, installment_amount').eq('debt_type', 'Rekening Koran').eq('is_active', true)
-    setRkList((rkData ?? []) as { id: number; installment_amount: number }[])
+      .select('id, installment_amount, bank_account, due_date').eq('debt_type', 'Rekening Koran').eq('is_active', true)
+    setRkList((rkData ?? []) as typeof rkList)
 
     // Rekening Koran paid details in range (filter client-side)
     const { data: rkPaidData } = await supabase.from('debt_loan_detail')
@@ -118,9 +118,10 @@ export default function LaporanTagihanHutangPage() {
     ...bills.map(b => ({ date: b.installment_due_date ?? '', label: b.suppliers?.name ?? '-', amount: b.installment, type: 'bills' })),
     ...giroDetails.map(d => ({ date: d.installment_due_date ?? '', label: (d.debt_loan as { bank_account: string } | null)?.bank_account ?? '-', amount: d.installment_amount, type: 'giro' })),
     ...loanDetails.map(d => ({ date: d.installment_due_date ?? '', label: (d.debt_loan as { bank_account: string } | null)?.bank_account ?? '-', amount: d.installment_amount, type: 'loan' })),
+    ...rkList.filter(r => r.due_date).map(r => ({ date: r.due_date!, label: r.bank_account, amount: r.installment_amount, type: 'rk' })),
   ].filter(e => e.date)
 
-  const typeColor = (type: string) => type === 'bills' ? '#121358' : type === 'giro' ? '#9FA1FF' : '#FCB7C7'
+  const typeColor = (type: string) => type === 'bills' ? '#121358' : type === 'giro' ? '#9FA1FF' : type === 'rk' ? '#F5A623' : '#FCB7C7'
 
   const SR = ({ label, value, color }: { label: string; value: number; color: string }) => (
     <div className="flex items-center justify-between py-1.5 border-b border-white/10 last:border-0">
@@ -186,7 +187,6 @@ export default function LaporanTagihanHutangPage() {
             </div>
 
             <div className="space-y-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-1">Summary II</p>
               {/* Calendar button */}
               <div className="relative flex justify-end">
                 <button onClick={() => setShowCalMenu(v => !v)}
@@ -258,26 +258,36 @@ export default function LaporanTagihanHutangPage() {
                   </div>
                 </div>
               )}
-              <div className="bg-white rounded-xl shadow-sm p-4">
-                <p className="text-xs font-semibold text-red-600 mb-2">Overdue ({overdueBills.length + overdueDetails.length})</p>
-                {overdueBills.length === 0 && overdueDetails.length === 0 ? (
-                  <p className="text-xs text-gray-400">Tidak ada tagihan overdue.</p>
-                ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {overdueBills.map(b => (
-                      <div key={`b-${b.id}`} className="flex items-center justify-between">
-                        <div><p className="text-xs text-gray-700">{b.suppliers?.name ?? '-'}</p><p className="text-[10px] text-red-400">Due: {fmtDate(b.due_date)}</p></div>
-                        <p className="text-xs font-semibold text-red-500">Rp {fmt(b.installment - b.paid_amount)}</p>
-                      </div>
-                    ))}
-                    {overdueDetails.map(d => (
-                      <div key={`d-${d.id}`} className="flex items-center justify-between">
-                        <div><p className="text-xs text-gray-700">{(d.debt_loan as { bank_account: string } | null)?.bank_account ?? '-'} <span className="text-[10px] text-gray-400">({(d.debt_loan as { debt_type: string } | null)?.debt_type})</span></p><p className="text-[10px] text-red-400">Due: {d.due_date ? fmtDate(d.due_date) : '-'}</p></div>
-                        <p className="text-xs font-semibold text-red-500">Rp {fmt(d.installment_amount)}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="rounded-xl overflow-hidden">
+                <div className="flex items-center px-4 py-2.5" style={{ backgroundColor: '#991B1B' }}>
+                  <p className="text-xs font-semibold text-white">Lewat Jatuh Tempo ({overdueBills.length + overdueDetails.length}) | Rp {fmt(overdueBills.reduce((s,b) => s + (b.installment - b.paid_amount), 0) + overdueDetails.reduce((s,d) => s + d.installment_amount, 0))}</p>
+                </div>
+                <div className="p-4 bg-gray-200">
+                  {overdueBills.length === 0 && overdueDetails.length === 0 ? (
+                    <p className="text-xs text-gray-400">Tidak ada tagihan overdue.</p>
+                  ) : (
+                    <div className="space-y-0 max-h-64 overflow-y-auto">
+                      {overdueBills.map(b => (
+                        <div key={`b-${b.id}`} className="flex items-start justify-between py-1.5 gap-2 border-b border-gray-200 last:border-0 px-1">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-[#121358]">{b.suppliers?.name ?? '-'}</p>
+                            <p className="text-[10px] mt-0.5 text-gray-500">JT: {fmtDate(b.due_date)}</p>
+                          </div>
+                          <p className="text-xs font-semibold shrink-0 text-red-700">Rp {fmt(b.installment - b.paid_amount)}</p>
+                        </div>
+                      ))}
+                      {overdueDetails.map(d => (
+                        <div key={`d-${d.id}`} className="flex items-start justify-between py-1.5 gap-2 border-b border-gray-200 last:border-0 px-1">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-[#121358]">{(d.debt_loan as { bank_account: string } | null)?.bank_account ?? '-'} <span className="text-[10px] text-gray-400">({(d.debt_loan as { debt_type: string } | null)?.debt_type})</span></p>
+                            <p className="text-[10px] mt-0.5 text-gray-500">JT: {d.due_date ? fmtDate(d.due_date) : '-'}</p>
+                          </div>
+                          <p className="text-xs font-semibold shrink-0 text-red-700">Rp {fmt(d.installment_amount)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
