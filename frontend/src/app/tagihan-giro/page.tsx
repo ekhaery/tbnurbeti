@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus, faXmark, faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faPlus, faXmark, faPen, faTrash, faCalendarDays, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons'
 import {
   BANK_ACCOUNT_OPTIONS,
   INSTALLMENT_TYPE_OPTIONS,
@@ -76,12 +76,43 @@ async function generateDetails(supabase: ReturnType<typeof createClient>, debtLo
   await supabase.from('debt_loan_detail').insert(details)
 }
 
+type CalDetail = { id: number; installment_due_date: string | null; due_date: string | null; installment_amount: number; debt_loan: { bank_account: string; debt_amount: number; suppliers: { name: string } | null } | null }
+
+function CalChip({ d, fmt }: { d: CalDetail; fmt: (n: number) => string }) {
+  const dl = d.debt_loan
+  const name = dl?.suppliers?.name ?? dl?.bank_account ?? '-'
+  const isJatuhTempo = d.due_date && d.installment_due_date && d.due_date === d.installment_due_date
+  return (
+    <div className="rounded-lg px-2 py-1 text-xs font-semibold text-white w-full"
+      style={{ backgroundColor: isJatuhTempo ? '#D92243' : '#9FA1FF' }}>
+      <span>{name} · Rp {fmt(d.installment_amount)}</span>
+      {isJatuhTempo && dl?.debt_amount != null && (
+        <span className="ml-1">| <span className="font-black">Rp {fmt(dl.debt_amount)}</span></span>
+      )}
+    </div>
+  )
+}
+
 export default function TagihanGiroPage() {
   const supabase = createClient()
   const [list, setList] = useState<DebtLoan[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [supplierDropdown, setSupplierDropdown] = useState(false)
   const [fetching, setFetching] = useState(true)
+
+  // Filters
+  const [filterDateFrom, setFilterDateFrom] = useState('')
+  const [filterDateTo, setFilterDateTo] = useState('')
+  const [filterSupplierFilter, setFilterSupplierFilter] = useState('')
+  const [filterSupplierQuery, setFilterSupplierQuery] = useState('')
+  const [filterSupplierDropdown, setFilterSupplierDropdown] = useState(false)
+
+  // Calendar
+  const [showCalendar, setShowCalendar] = useState(false)
+  const [calWeekStart, setCalWeekStart] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1)); d.setHours(0,0,0,0); return d
+  })
+  const [calDetails, setCalDetails] = useState<CalDetail[]>([])
 
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm())
@@ -102,8 +133,18 @@ export default function TagihanGiroPage() {
     setFetching(false)
   }
 
+  const fetchCalDetails = async () => {
+    const { data } = await supabase
+      .from('debt_loan_detail')
+      .select('id, installment_due_date, due_date, installment_amount, debt_loan!inner(bank_account, debt_type, debt_amount, suppliers(name))')
+      .eq('debt_loan.debt_type', 'Giro')
+      .eq('is_paid', false)
+    setCalDetails((data ?? []) as typeof calDetails)
+  }
+
   useEffect(() => {
     fetchData()
+    fetchCalDetails()
     supabase.from('suppliers').select('id, name').order('name')
       .then(({ data }: { data: Supplier[] | null }) => setSuppliers(data ?? []))
   }, [])
@@ -246,16 +287,96 @@ export default function TagihanGiroPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
 
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-gray-800">Giro</h2>
             <p className="text-xs text-gray-500 mt-0.5">Tagihan berbasis giro.</p>
           </div>
-          <button onClick={() => { setShowForm(true); setError(null) }}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
-            <FontAwesomeIcon icon={faPlus} className="w-3 h-3" /> Tambah
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowCalendar(true)}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-white border border-gray-200 text-[#121358] hover:bg-gray-50 shadow-sm transition">
+              <FontAwesomeIcon icon={faCalendarDays} className="w-3 h-3" />
+              Lihat Kalender
+            </button>
+            <button onClick={() => { setShowForm(true); setError(null) }}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
+              <FontAwesomeIcon icon={faPlus} className="w-3 h-3" /> Tambah
+            </button>
+          </div>
         </div>
+
+        {/* Filter card */}
+        <div className="rounded-2xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-[#121358]">Filter:</p>
+            <button
+              onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterSupplierFilter(''); setFilterSupplierQuery('') }}
+              className="text-2xl font-bold text-[#121358]/60 hover:text-[#121358] transition leading-none"
+            >
+              ↺
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-semibold text-[#121358] mb-1">Dari</label>
+              <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)}
+                style={{ fontSize: '11px' }}
+                className="w-full bg-white border border-gray-200 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#121358] mb-1">Sampai</label>
+              <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)}
+                style={{ fontSize: '11px' }}
+                className="w-full bg-white border border-gray-200 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+            </div>
+          </div>
+          <div className="relative">
+            <input type="text" value={filterSupplierQuery}
+              onChange={e => { setFilterSupplierQuery(e.target.value); setFilterSupplierFilter(''); setFilterSupplierDropdown(true) }}
+              onFocus={() => setFilterSupplierDropdown(true)}
+              onBlur={() => setTimeout(() => setFilterSupplierDropdown(false), 150)}
+              placeholder="Filter supplier..."
+              autoComplete="off"
+              className={`w-full bg-white border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${filterSupplierFilter ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-200'}`}
+            />
+            {filterSupplierDropdown && (
+              <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
+                <button onMouseDown={() => { setFilterSupplierFilter(''); setFilterSupplierQuery(''); setFilterSupplierDropdown(false) }}
+                  className={`w-full text-left px-4 py-2.5 text-sm transition ${!filterSupplierFilter ? 'bg-[#121358] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                  Semua Supplier
+                </button>
+                {suppliers.filter(s => s.name.toLowerCase().includes(filterSupplierQuery.toLowerCase())).map(s => (
+                  <button key={s.id} onMouseDown={() => { setFilterSupplierFilter(s.name); setFilterSupplierQuery(s.name); setFilterSupplierDropdown(false) }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition ${filterSupplierFilter === s.name ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Summary */}
+        {(() => {
+          const filteredList = list.filter(d => {
+            if (filterDateFrom && (d.due_date ?? '') < filterDateFrom) return false
+            if (filterDateTo && (d.due_date ?? '') > filterDateTo) return false
+            if (filterSupplierFilter && d.suppliers?.name !== filterSupplierFilter) return false
+            return true
+          })
+          const totalDebt = filteredList.reduce((s, d) => s + d.debt_amount, 0)
+          return filteredList.length > 0 ? (
+            <div className="bg-[#121358] rounded-xl px-4 py-3 space-y-1">
+              {filterSupplierFilter && <p className="text-xs font-bold text-white">{filterSupplierFilter}</p>}
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Total Hutang Giro</p>
+                <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(totalDebt)}</p>
+              </div>
+              <p className="text-[10px] text-white/50">{filteredList.length} giro</p>
+            </div>
+          ) : null
+        })()}
 
         {fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
@@ -263,7 +384,12 @@ export default function TagihanGiroPage() {
           <div className="text-center text-sm text-gray-400 py-10">Belum ada data.</div>
         ) : (
           <div className="space-y-3">
-            {list.map(d => (
+            {list.filter(d => {
+              if (filterDateFrom && (d.due_date ?? '') < filterDateFrom) return false
+              if (filterDateTo && (d.due_date ?? '') > filterDateTo) return false
+              if (filterSupplierFilter && d.suppliers?.name !== filterSupplierFilter) return false
+              return true
+            }).map(d => (
               <div key={d.id} className="relative bg-white rounded-xl shadow-sm p-4 border-l-4 border-[#9FA1FF]">
                 <div className="flex items-start justify-between gap-3 pr-8">
                   <div className="flex-1 min-w-0">
@@ -290,6 +416,70 @@ export default function TagihanGiroPage() {
           </div>
         )}
       </div>
+
+      {/* Weekly Calendar Modal */}
+      {showCalendar && (() => {
+        const days = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(calWeekStart); d.setDate(d.getDate() + i); return d
+        })
+        const todayStr = new Date().toISOString().slice(0, 10)
+        const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
+        const prevWeek = () => setCalWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })
+        const nextWeek = () => setCalWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })
+        const weekEnd = days[6]
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
+            <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden">
+              <div className="px-5 py-4 flex items-center justify-between bg-[#121358]">
+                <button onClick={prevWeek} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                  <FontAwesomeIcon icon={faChevronLeft} className="w-3 h-3" />
+                </button>
+                <p className="text-sm font-semibold text-white">
+                  {calWeekStart.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} – {weekEnd.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button onClick={nextWeek} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                    <FontAwesomeIcon icon={faChevronRight} className="w-3 h-3" />
+                  </button>
+                  <button onClick={() => setShowCalendar(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                    <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+              <div className="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto">
+                {days.map((day, idx) => {
+                  const dateStr = day.toISOString().slice(0, 10)
+                  const isToday = dateStr === todayStr
+                  const dayDetails = calDetails.filter(d => d.installment_due_date === dateStr)
+                  const dayTotal = dayDetails.reduce((s, d) => s + d.installment_amount, 0)
+                  return (
+                    <div key={dateStr} className={`flex items-start gap-3 px-4 py-3 ${isToday ? 'bg-[#121358]/5' : ''}`}>
+                      <div className={`shrink-0 w-12 text-center rounded-lg py-1.5 ${isToday ? 'bg-[#121358]' : 'bg-gray-100'}`}>
+                        <p className={`text-[10px] font-semibold ${isToday ? 'text-white/70' : 'text-gray-400'}`}>{dayNames[idx]}</p>
+                        <p className={`text-sm font-bold ${isToday ? 'text-white' : 'text-gray-700'}`}>{day.getDate()}</p>
+                      </div>
+                      <div className="flex-1 min-h-[2.5rem]">
+                        {dayDetails.length === 0 ? (
+                          <p className="text-xs text-gray-300 mt-1">—</p>
+                        ) : (
+                          <>
+                            <p className="text-xs font-bold text-[#121358] mb-1">Rp {fmt(dayTotal)}</p>
+                            <div className="flex flex-wrap gap-1">
+                              {dayDetails.map(d => (
+                                <CalChip key={d.id} d={d} fmt={fmt} />
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Add Modal */}
       {showForm && (
