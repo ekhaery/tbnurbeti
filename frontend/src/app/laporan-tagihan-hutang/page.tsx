@@ -27,7 +27,9 @@ export default function LaporanTagihanHutangPage() {
   const [giroDetails, setGiroDetails] = useState<DetailRow[]>([])
   const [rkList, setRkList] = useState<{ id: number; installment_amount: number }[]>([])
   const [top5Purchasing, setTop5Purchasing] = useState<PurchasingRow[]>([])
+  const [topGiroDebt, setTopGiroDebt] = useState<{ id: number; bank_account: string; debt_amount: number; date: string; due_date: string | null; suppliers: { name: string } | null }[]>([])
   const [sortByDueDate, setSortByDueDate] = useState(false)
+  const [sortGiroByDueDate, setSortGiroByDueDate] = useState(false)
   const [rkPaid, setRkPaid] = useState(0)
   const [overdueBills, setOverdueBills] = useState<BillRow[]>([])
   const [overdueDetails, setOverdueDetails] = useState<DetailRow[]>([])
@@ -87,6 +89,14 @@ export default function LaporanTagihanHutangPage() {
       .gte('due_date', dateFrom).lte('due_date', dateTo)
       .order('total', { ascending: false }).limit(10)
     setTop5Purchasing((purData ?? []) as PurchasingRow[])
+
+    // Top 10 Giro from debt_loan (debt_amount)
+    const { data: giroDebtData } = await supabase.from('debt_loan')
+      .select('id, bank_account, debt_amount, date, due_date, suppliers(name)')
+      .eq('debt_type', 'Giro')
+      .gte('due_date', dateFrom).lte('due_date', dateTo)
+      .order('debt_amount', { ascending: false }).limit(10)
+    setTopGiroDebt((giroDebtData ?? []) as typeof topGiroDebt)
     } catch (e) { console.error('fetchAll error:', e) }
     setFetching(false)
   }
@@ -102,7 +112,7 @@ export default function LaporanTagihanHutangPage() {
   const paidBills = bills.filter(b => b.is_paid).reduce((s, b) => s + b.installment, 0)
   const paidGiro = giroDetails.filter(d => d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
   const totalPaid = paidLoanBank + paidBills + paidGiro + rkPaid
-  const top5Giro = [...giroDetails].sort((a, b) => b.installment_amount - a.installment_amount).slice(0, 5)
+  const top5Giro = [...giroDetails].sort((a, b) => b.installment_amount - a.installment_amount).slice(0, 10)
 
   const allCalEvents = [
     ...bills.map(b => ({ date: b.installment_due_date ?? '', label: b.suppliers?.name ?? '-', amount: b.installment, type: 'bills' })),
@@ -110,7 +120,7 @@ export default function LaporanTagihanHutangPage() {
     ...loanDetails.map(d => ({ date: d.installment_due_date ?? '', label: (d.debt_loan as { bank_account: string } | null)?.bank_account ?? '-', amount: d.installment_amount, type: 'loan' })),
   ].filter(e => e.date)
 
-  const typeColor = (type: string) => type === 'bills' ? '#9FA1FF' : type === 'giro' ? '#121358' : '#FCB7C7'
+  const typeColor = (type: string) => type === 'bills' ? '#121358' : type === 'giro' ? '#9FA1FF' : '#FCB7C7'
 
   const SR = ({ label, value, color }: { label: string; value: number; color: string }) => (
     <div className="flex items-center justify-between py-1.5 border-b border-white/10 last:border-0">
@@ -122,26 +132,9 @@ export default function LaporanTagihanHutangPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-gray-800">Laporan Tagihan Hutang</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Ringkasan semua kewajiban hutang.</p>
-          </div>
-          <div className="relative">
-            <button onClick={() => setShowCalMenu(v => !v)}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
-              <FontAwesomeIcon icon={faCalendarDays} className="w-3 h-3" /> Kalender
-            </button>
-            {showCalMenu && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setShowCalMenu(false)} />
-                <div className="absolute right-0 top-9 z-40 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden w-36">
-                  <button onMouseDown={() => { setCalMode('weekly'); setShowCalMenu(false); setShowCalendar(true) }} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">Mingguan</button>
-                  <button onMouseDown={() => { setCalMode('monthly'); setShowCalMenu(false); setShowCalendar(true) }} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100">Bulanan</button>
-                </div>
-              </>
-            )}
-          </div>
+        <div>
+          <h2 className="text-lg font-bold text-gray-800">Laporan Tagihan Hutang</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Ringkasan semua kewajiban hutang.</p>
         </div>
 
         <div className="rounded-2xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
@@ -160,7 +153,7 @@ export default function LaporanTagihanHutangPage() {
 
         {/* Legend */}
         <div className="flex items-center gap-4 px-1">
-          {[['Tagihan Dagang','#9FA1FF'],['Giro','#121358'],['Loan & Bank','#FCB7C7'],['Rekening Koran','#F5A623']].map(([l,c]) => (
+          {[['Tagihan Dagang','#121358'],['Giro','#9FA1FF'],['Loan & Bank','#FCB7C7'],['Rekening Koran','#F5A623']].map(([l,c]) => (
             <div key={l} className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ backgroundColor: c }}></span><span className="text-[10px] text-gray-500">{l}</span></div>
           ))}
         </div>
@@ -194,17 +187,34 @@ export default function LaporanTagihanHutangPage() {
 
             <div className="space-y-3">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-1">Summary II</p>
+              {/* Calendar button */}
+              <div className="relative flex justify-end">
+                <button onClick={() => setShowCalMenu(v => !v)}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
+                  <FontAwesomeIcon icon={faCalendarDays} className="w-3 h-3" /> Kalender
+                </button>
+                {showCalMenu && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setShowCalMenu(false)} />
+                    <div className="absolute right-0 top-9 z-40 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden w-36">
+                      <button onMouseDown={() => { setCalMode('weekly'); setShowCalMenu(false); setShowCalendar(true) }} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">Mingguan</button>
+                      <button onMouseDown={() => { setCalMode('monthly'); setShowCalMenu(false); setShowCalendar(true) }} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100">Bulanan</button>
+                    </div>
+                  </>
+                )}
+              </div>
+
               {top5Purchasing.length > 0 && (
-                <div className="bg-[#121358] rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Top 10 Tagihan Dagang</p>
+                <div className="rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-[#121358]">
+                    <p className="text-xs font-semibold text-white">Top 10 Tagihan Dagang</p>
                     <button onClick={() => setSortByDueDate(v => !v)}
                       className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded transition ${sortByDueDate ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white'}`}>
                       <FontAwesomeIcon icon={faArrowUpAZ} className="w-3 h-3" />
                       JT ↑
                     </button>
                   </div>
-                  <div className="space-y-0 max-h-64 overflow-y-auto">
+                  <div className="p-4 space-y-0 max-h-64 overflow-y-auto" style={{ backgroundColor: '#3f50e8' }}>
                   {[...top5Purchasing].sort((a, b) => sortByDueDate
                     ? (a.due_date ?? '').localeCompare(b.due_date ?? '')
                     : b.total - a.total
@@ -221,15 +231,31 @@ export default function LaporanTagihanHutangPage() {
                   </div>
                 </div>
               )}
-              {top5Giro.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm p-4">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">Top 5 Giro</p>
-                  {top5Giro.map((d, i) => (
-                    <div key={d.id} className="flex items-center justify-between py-1">
-                      <p className="text-xs text-gray-600"><span className="font-bold text-gray-400 mr-1">{i+1}.</span>{(d.debt_loan as { bank_account: string } | null)?.bank_account ?? '-'}</p>
-                      <p className="text-xs font-semibold text-[#121358]">Rp {fmt(d.installment_amount)}</p>
-                    </div>
-                  ))}
+              {topGiroDebt.length > 0 && (
+                <div className="rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-[#121358]">
+                    <p className="text-xs font-semibold text-white">Top 10 Giro</p>
+                    <button onClick={() => setSortGiroByDueDate(v => !v)}
+                      className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded transition ${sortGiroByDueDate ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white'}`}>
+                      <FontAwesomeIcon icon={faArrowUpAZ} className="w-3 h-3" />
+                      JT ↑
+                    </button>
+                  </div>
+                  <div className="p-4 space-y-0 max-h-64 overflow-y-auto" style={{ backgroundColor: '#6B6FFF' }}>
+                    {[...topGiroDebt].sort((a, b) => sortGiroByDueDate
+                      ? (a.due_date ?? '').localeCompare(b.due_date ?? '')
+                      : b.debt_amount - a.debt_amount
+                    ).map((d, i) => (
+                      <div key={d.id} className="flex items-start justify-between py-1.5 gap-2 border-b border-white/10 last:border-0 rounded-lg px-1"
+                        style={{ backgroundColor: i < 5 ? 'transparent' : 'rgba(255,255,255,0.06)' }}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-white">{d.suppliers?.name ?? d.bank_account ?? '-'}</p>
+                          <p className="text-[10px] mt-0.5 text-white/60">{fmtDate(d.date)}{d.due_date ? ` | JT: ${fmtDate(d.due_date)}` : ''}</p>
+                        </div>
+                        <p className="text-xs font-semibold shrink-0 text-white">Rp {fmt(d.debt_amount)}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               <div className="bg-white rounded-xl shadow-sm p-4">
