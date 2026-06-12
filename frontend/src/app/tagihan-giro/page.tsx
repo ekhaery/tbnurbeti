@@ -145,7 +145,7 @@ export default function TagihanGiroPage() {
     setConfirmingDelete(false); setDeleting(null); fetchData()
   }
 
-  const FormBody = ({ f, setF, p, err }: { f: ReturnType<typeof emptyForm>; setF: (k: string, v: string) => void; p: DebtLoanPeriod | null; err: string | null }) => (
+  const formFields = (f: ReturnType<typeof emptyForm>, setF: (k: string, v: string) => void, p: DebtLoanPeriod | null, err: string | null) => (
     <div className="px-5 py-4 space-y-3 max-h-[65vh] overflow-y-auto">
       <div>
         <label className="block text-xs text-gray-500 mb-1">Bank Account</label>
@@ -248,7 +248,7 @@ export default function TagihanGiroPage() {
                 <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
               </button>
             </div>
-            <FormBody f={form} setF={set} p={period} err={error} />
+            {formFields(form, set, period, error)}
             <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
               <button onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Batal</button>
               <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
@@ -269,7 +269,7 @@ export default function TagihanGiroPage() {
                 <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
               </button>
             </div>
-            <FormBody f={editForm} setF={setEdit} p={editPeriod} err={editError} />
+            {formFields(editForm, setEdit, editPeriod, editError)}
             {editPeriod && <p className="px-5 text-xs text-amber-600 pb-2">⚠️ Detail cicilan lama akan dihapus dan dibuat ulang.</p>}
             <div className="px-5 py-4 border-t border-gray-100 space-y-2">
               <div className="flex gap-2">
