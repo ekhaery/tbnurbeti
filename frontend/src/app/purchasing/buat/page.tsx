@@ -149,7 +149,9 @@ export default function BuatPurchasingPage() {
   }
 
   const selectedSupplier = suppliers.find(s => s.id === supplierId)
-  const previewCode = selectedSupplier ? generateCode(selectedSupplier.name, date) : 'PUR-...'
+  const previewCode = selectedSupplier
+    ? `PUR-${selectedSupplier.name.toUpperCase().replace(/\s+/g, '').slice(0, 8)}-N-${date.replace(/-/g, '')}`
+    : 'PUR-...'
 
   // Calculate period from date → jatuhTempo
   const calcPeriod = (): { weeks: number; months: number } | null => {
@@ -206,7 +208,18 @@ export default function BuatPurchasingPage() {
     setSkipDupCheck(false)
     setSubmitting(true)
 
-    const code = generateCode(selectedSupplier!.name, date)
+    // Generate unique code with increment: PUR-SUPPLIER-1-DATE, 2, 3...
+    const d = date.replace(/-/g, '')
+    const s = selectedSupplier!.name.toUpperCase().replace(/\s+/g, '').slice(0, 8)
+    let code = ''
+    let increment = 1
+    while (true) {
+      code = `PUR-${s}-${increment}-${d}`
+      const { data: existing } = await supabase
+        .from('purchasing').select('id').eq('code', code).limit(1).single()
+      if (!existing) break
+      increment++
+    }
 
     // 1. Insert purchasing header
 
