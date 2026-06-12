@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCalendarDays, faXmark, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons'
+import { faCalendarDays, faXmark, faChevronLeft, faChevronRight, faArrowUpAZ } from '@fortawesome/free-solid-svg-icons'
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -27,6 +27,7 @@ export default function LaporanTagihanHutangPage() {
   const [giroDetails, setGiroDetails] = useState<DetailRow[]>([])
   const [rkList, setRkList] = useState<{ id: number; installment_amount: number }[]>([])
   const [top5Purchasing, setTop5Purchasing] = useState<PurchasingRow[]>([])
+  const [sortByDueDate, setSortByDueDate] = useState(false)
   const [rkPaid, setRkPaid] = useState(0)
   const [overdueBills, setOverdueBills] = useState<BillRow[]>([])
   const [overdueDetails, setOverdueDetails] = useState<DetailRow[]>([])
@@ -195,9 +196,19 @@ export default function LaporanTagihanHutangPage() {
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-1">Summary II</p>
               {top5Purchasing.length > 0 && (
                 <div className="bg-[#121358] rounded-xl p-4">
-                  <p className="text-xs font-semibold mb-2" style={{ color: '#B5BAFF' }}>Top 10 Tagihan Dagang</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Top 10 Tagihan Dagang</p>
+                    <button onClick={() => setSortByDueDate(v => !v)}
+                      className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded transition ${sortByDueDate ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white'}`}>
+                      <FontAwesomeIcon icon={faArrowUpAZ} className="w-3 h-3" />
+                      JT ↑
+                    </button>
+                  </div>
                   <div className="space-y-0 max-h-64 overflow-y-auto">
-                  {top5Purchasing.map((p, i) => (
+                  {[...top5Purchasing].sort((a, b) => sortByDueDate
+                    ? (a.due_date ?? '').localeCompare(b.due_date ?? '')
+                    : b.total - a.total
+                  ).map((p, i) => (
                     <div key={p.id} className="flex items-start justify-between py-1.5 gap-2 border-b border-white/10 last:border-0 rounded-lg px-1"
                       style={{ backgroundColor: i < 5 ? 'transparent' : 'rgba(255,255,255,0.06)' }}>
                       <div className="flex-1 min-w-0">
