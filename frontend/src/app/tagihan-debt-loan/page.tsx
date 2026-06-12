@@ -208,7 +208,7 @@ export default function TagihanDebtLoanPage() {
             <Link href="/debt-loan"
               className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 shadow-sm transition">
               <FontAwesomeIcon icon={faList} className="w-3 h-3" />
-              Daftar Hutang
+              Lihat Daftar Hutang
             </Link>
             <button onClick={() => { setShowAddDebt(true); setAddError(null) }}
               className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] shadow-sm transition">

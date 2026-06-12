@@ -230,13 +230,15 @@ export default function BillsPage() {
             <h2 className="text-lg font-bold text-gray-800">Tagihan Dagang</h2>
             <p className="text-xs text-gray-500 mt-0.5">Tagihan dari pengadaan berjangka.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => { setShowPaidModal(true); setPaidPage(1) }} className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#121358] text-white hover:bg-[#1a1c6e] transition shadow-sm">
-              <FontAwesomeIcon icon={faReceipt} className="w-4 h-4 text-white" />
+          <div className="flex flex-col items-end gap-1.5">
+            <button onClick={() => { setShowPaidModal(true); setPaidPage(1) }} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#121358] text-white hover:bg-[#1a1c6e] transition shadow-sm text-xs font-semibold">
+              <FontAwesomeIcon icon={faReceipt} className="w-3.5 h-3.5 text-white" />
+              Lihat Riwayat Pembayaran
             </button>
           <div className="relative">
-            <button onClick={() => setShowCalendarMenu(v => !v)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#121358] text-white hover:bg-[#1a1c6e] transition shadow-sm">
-              <FontAwesomeIcon icon={faCalendarDays} className="w-4 h-4 text-white" />
+            <button onClick={() => setShowCalendarMenu(v => !v)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#121358] text-white hover:bg-[#1a1c6e] transition shadow-sm text-xs font-semibold">
+              <FontAwesomeIcon icon={faCalendarDays} className="w-3.5 h-3.5 text-white" />
+              Lihat Jadwal Bayar
             </button>
             {showCalendarMenu && (
               <>
@@ -845,14 +847,20 @@ export default function BillsPage() {
                               Total: Rp {fmt(dayBills.reduce((s, b) => s + b.installment, 0))}
                             </p>
                             <div className="flex flex-wrap gap-1.5">
-                              {dayBills.map(b => (
+                              {dayBills.map(b => {
+                                const isJatuhTempo = b.due_date && b.installment_due_date && b.due_date === b.installment_due_date
+                                return (
                                 <div key={b.id} className={`rounded-lg px-2 py-1 text-xs font-semibold ${b.is_paid ? 'bg-green-100 text-green-700' : 'text-white'}`}
-                                  style={b.is_paid ? {} : { backgroundColor: '#9FA1FF' }}>
+                                  style={b.is_paid ? {} : { backgroundColor: isJatuhTempo ? '#D92243' : '#9FA1FF' }}>
                                   <span>{b.suppliers?.name ?? '-'}</span>
                                   <span className="mx-1 opacity-60">·</span>
                                   <span>Rp {fmt(b.installment)}</span>
+                                  {isJatuhTempo && b.purchasing?.total != null && (
+                                    <span className="ml-1">| <span className="font-black">Rp {fmt(b.purchasing.total)}</span></span>
+                                  )}
                                 </div>
-                              ))}
+                                )
+                              })}
                             </div>
                           </>
                         )}
