@@ -3,7 +3,13 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCheck, faMoneyBillWave, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faCheck, faMoneyBillWave, faXmark, faPlus, faList } from '@fortawesome/free-solid-svg-icons'
+import Link from 'next/link'
+import {
+  BANK_ACCOUNT_OPTIONS,
+  DEBT_TYPE_OPTIONS,
+  INSTALLMENT_TYPE_OPTIONS,
+} from '@/lib/debtLoanOptions'
 
 type DebtLoanDetail = {
   id: number
@@ -43,6 +49,28 @@ export default function TagihanDebtLoanPage() {
   const [bankFilter, setBankFilter] = useState('')
   const [bankQuery, setBankQuery] = useState('')
   const [bankDropdown, setBankDropdown] = useState(false)
+
+  // Add debt modal
+  const [showAddDebt, setShowAddDebt] = useState(false)
+  const [addForm, setAddForm] = useState({ bank_account: BANK_ACCOUNT_OPTIONS[0] as string, debt_type: DEBT_TYPE_OPTIONS[0] as string, date: new Date().toISOString().slice(0, 10), debt_amount: '', installment_type: 'monthly' as string, installment_amount: '', due_date: '' })
+  const [addSaving, setAddSaving] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
+
+  const handleAddDebt = async () => {
+    if (!addForm.debt_amount) { setAddError('Masukkan jumlah hutang.'); return }
+    setAddSaving(true); setAddError(null)
+    const { error } = await supabase.from('debt_loan').insert({
+      bank_account: addForm.bank_account, debt_type: addForm.debt_type, date: addForm.date,
+      debt_amount: parseFloat(addForm.debt_amount), installment_type: addForm.installment_type,
+      installment_amount: parseFloat(addForm.installment_amount) || 0,
+      due_date: addForm.due_date || null,
+    })
+    setAddSaving(false)
+    if (error) { setAddError(error.message); return }
+    setShowAddDebt(false)
+    setAddForm({ bank_account: BANK_ACCOUNT_OPTIONS[0] as string, debt_type: DEBT_TYPE_OPTIONS[0] as string, date: new Date().toISOString().slice(0, 10), debt_amount: '', installment_type: 'monthly' as string, installment_amount: '', due_date: '' })
+    fetchData(); fetchRekeningKoran()
+  }
 
   // Pay regular installment
   const [paying, setPaying] = useState<DebtLoanDetail | null>(null)
@@ -171,9 +199,23 @@ export default function TagihanDebtLoanPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
 
-        <div>
-          <h2 className="text-lg font-bold text-gray-800">Tagihan Debt & Loan</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Detail tagihan cicilan hutang.</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">Tagihan Debt & Loan</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Detail tagihan cicilan hutang.</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link href="/debt-loan"
+              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 shadow-sm transition">
+              <FontAwesomeIcon icon={faList} className="w-3 h-3" />
+              Daftar Hutang
+            </Link>
+            <button onClick={() => { setShowAddDebt(true); setAddError(null) }}
+              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] shadow-sm transition">
+              <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
+              Tambah
+            </button>
+          </div>
         </div>
 
         {/* Summary */}
@@ -471,6 +513,73 @@ export default function TagihanDebtLoanPage() {
               <button onClick={() => setPayingRk(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Batal</button>
               <button onClick={handleRkPay} disabled={rkSaving} className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
                 {rkSaving ? 'Menyimpan...' : 'Konfirmasi'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Add Debt Modal */}
+      {showAddDebt && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-800">Tambah Debt & Loan</h3>
+              <button onClick={() => setShowAddDebt(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition">
+                <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3 max-h-[65vh] overflow-y-auto">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Bank Account</label>
+                <select value={addForm.bank_account} onChange={e => setAddForm(f => ({ ...f, bank_account: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]">
+                  {BANK_ACCOUNT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Tipe Hutang</label>
+                <select value={addForm.debt_type} onChange={e => setAddForm(f => ({ ...f, debt_type: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]">
+                  {DEBT_TYPE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Tanggal</label>
+                <input type="date" value={addForm.date} onChange={e => setAddForm(f => ({ ...f, date: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Jumlah Hutang <span className="text-red-500">*</span></label>
+                <input type="number" value={addForm.debt_amount} onChange={e => setAddForm(f => ({ ...f, debt_amount: e.target.value }))}
+                  placeholder="0" min="0"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Tipe Cicilan</label>
+                  <select value={addForm.installment_type} onChange={e => setAddForm(f => ({ ...f, installment_type: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]">
+                    {INSTALLMENT_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Jumlah Cicilan</label>
+                  <input type="number" value={addForm.installment_amount} onChange={e => setAddForm(f => ({ ...f, installment_amount: e.target.value }))}
+                    placeholder="0" min="0"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Tanggal Lunas</label>
+                <input type="date" value={addForm.due_date} onChange={e => setAddForm(f => ({ ...f, due_date: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+              </div>
+              {addError && <p className="text-xs text-red-500">⚠️ {addError}</p>}
+            </div>
+            <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
+              <button onClick={() => setShowAddDebt(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Batal</button>
+              <button onClick={handleAddDebt} disabled={addSaving} className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
+                {addSaving ? 'Menyimpan...' : 'Simpan'}
               </button>
             </div>
           </div>
