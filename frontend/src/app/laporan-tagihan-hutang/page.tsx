@@ -122,6 +122,9 @@ export default function LaporanTagihanHutangPage() {
   const billsUnpaid = billsTotalInstallment - billsTotalPaid
   const billsUnpaidPct = billsTotalInstallment > 0 ? (billsUnpaid / billsTotalInstallment * 100).toFixed(1) : '0.0'
   const giroAvgPerDay = giroDetails.reduce((s, d) => s + d.installment_amount, 0) / dayCount
+  const overdueTotal = overdueBills.reduce((s, b) => s + (b.installment - b.paid_amount), 0) + overdueDetails.reduce((s, d) => s + d.installment_amount, 0)
+  const overdueAvg12 = overdueTotal / (12 * 30)
+  const overdueAvg18 = overdueTotal / (18 * 30)
 
   const allCalEvents = [
     ...bills.map(b => ({ date: b.installment_due_date ?? '', label: b.suppliers?.name ?? '-', amount: b.installment, type: 'bills' })),
@@ -213,6 +216,15 @@ export default function LaporanTagihanHutangPage() {
                 )}
               </div>
 
+              <div className="rounded-xl overflow-hidden">
+                <div className="px-4 py-2.5 bg-[#121358]">
+                  <p className="text-xs font-semibold text-white">Total Tagihan /hari</p>
+                </div>
+                <div className="px-4 py-3" style={{ backgroundColor: '#3f50e8' }}>
+                  <p className="text-sm font-black text-white">Rp {fmt(Math.round(avgPerDay + giroAvgPerDay + overdueAvg12))}</p>
+                </div>
+              </div>
+
               {top5Purchasing.length > 0 && (
                 <div className="flex gap-3 items-start">
                   <div className="flex-[2] min-w-0 rounded-xl overflow-hidden">
@@ -301,35 +313,52 @@ export default function LaporanTagihanHutangPage() {
                   </div>
                 </div>
               )}
-              <div className="rounded-xl overflow-hidden">
-                <div className="flex items-center px-4 py-2.5" style={{ backgroundColor: '#991B1B' }}>
-                  <p className="text-xs font-semibold text-white">Lewat Jatuh Tempo ({overdueBills.length + overdueDetails.length}) | Rp {fmt(overdueBills.reduce((s,b) => s + (b.installment - b.paid_amount), 0) + overdueDetails.reduce((s,d) => s + d.installment_amount, 0))}</p>
+              <div className="flex gap-3 items-start">
+                <div className="flex-[2] min-w-0 rounded-xl overflow-hidden">
+                  <div className="flex items-center px-4 py-2.5" style={{ backgroundColor: '#991B1B' }}>
+                    <p className="text-xs font-semibold text-white">Lewat Jatuh Tempo ({overdueBills.length + overdueDetails.length}) | Rp {fmt(overdueTotal)}</p>
+                  </div>
+                  <div className="p-4 bg-gray-200">
+                    {overdueBills.length === 0 && overdueDetails.length === 0 ? (
+                      <p className="text-xs text-gray-400">Tidak ada tagihan overdue.</p>
+                    ) : (
+                      <div className="space-y-0 max-h-64 overflow-y-auto">
+                        {overdueBills.map(b => (
+                          <div key={`b-${b.id}`} className="flex items-start justify-between py-1.5 gap-2 border-b border-gray-200 last:border-0 px-1">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-[#121358]">{b.suppliers?.name ?? '-'}</p>
+                              <p className="text-[10px] mt-0.5 text-gray-500">JT: {fmtDate(b.due_date)}</p>
+                            </div>
+                            <p className="text-xs font-semibold shrink-0 text-red-700">Rp {fmt(b.installment - b.paid_amount)}</p>
+                          </div>
+                        ))}
+                        {overdueDetails.map(d => (
+                          <div key={`d-${d.id}`} className="flex items-start justify-between py-1.5 gap-2 border-b border-gray-200 last:border-0 px-1">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-[#121358]">{(d.debt_loan as { bank_account: string } | null)?.bank_account ?? '-'} <span className="text-[10px] text-gray-400">({(d.debt_loan as { debt_type: string } | null)?.debt_type})</span></p>
+                              <p className="text-[10px] mt-0.5 text-gray-500">JT: {d.due_date ? fmtDate(d.due_date) : '-'}</p>
+                            </div>
+                            <p className="text-xs font-semibold shrink-0 text-red-700">Rp {fmt(d.installment_amount)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="p-4 bg-gray-200">
-                  {overdueBills.length === 0 && overdueDetails.length === 0 ? (
-                    <p className="text-xs text-gray-400">Tidak ada tagihan overdue.</p>
-                  ) : (
-                    <div className="space-y-0 max-h-64 overflow-y-auto">
-                      {overdueBills.map(b => (
-                        <div key={`b-${b.id}`} className="flex items-start justify-between py-1.5 gap-2 border-b border-gray-200 last:border-0 px-1">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-[#121358]">{b.suppliers?.name ?? '-'}</p>
-                            <p className="text-[10px] mt-0.5 text-gray-500">JT: {fmtDate(b.due_date)}</p>
-                          </div>
-                          <p className="text-xs font-semibold shrink-0 text-red-700">Rp {fmt(b.installment - b.paid_amount)}</p>
-                        </div>
-                      ))}
-                      {overdueDetails.map(d => (
-                        <div key={`d-${d.id}`} className="flex items-start justify-between py-1.5 gap-2 border-b border-gray-200 last:border-0 px-1">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-[#121358]">{(d.debt_loan as { bank_account: string } | null)?.bank_account ?? '-'} <span className="text-[10px] text-gray-400">({(d.debt_loan as { debt_type: string } | null)?.debt_type})</span></p>
-                            <p className="text-[10px] mt-0.5 text-gray-500">JT: {d.due_date ? fmtDate(d.due_date) : '-'}</p>
-                          </div>
-                          <p className="text-xs font-semibold shrink-0 text-red-700">Rp {fmt(d.installment_amount)}</p>
-                        </div>
-                      ))}
+                <div className="flex-[1] min-w-0 rounded-xl overflow-hidden">
+                  <div className="px-3 py-2.5" style={{ backgroundColor: '#991B1B' }}>
+                    <p className="text-xs font-semibold text-white">Kesimpulan</p>
+                  </div>
+                  <div className="p-3 space-y-2 bg-gray-200">
+                    <div>
+                      <p className="text-[10px] text-gray-500">Rata-rata /hari (12 bln)</p>
+                      <p className="text-xs font-semibold text-[#121358] mt-0.5">Rp {fmt(Math.round(overdueAvg12))}</p>
                     </div>
-                  )}
+                    <div className="border-t border-gray-300 pt-2">
+                      <p className="text-[10px] text-gray-500">Rata-rata /hari (18 bln)</p>
+                      <p className="text-xs font-semibold text-[#121358] mt-0.5">Rp {fmt(Math.round(overdueAvg18))}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
