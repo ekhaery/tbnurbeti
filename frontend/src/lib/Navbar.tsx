@@ -182,6 +182,17 @@ export default function Navbar() {
               <FontAwesomeIcon icon={faChartBar} className="w-4 h-4 text-gray-400" />
               Laporan
             </Link>
+            <Link
+              href="/laporan-tagihan-hutang"
+              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                pathname.startsWith('/laporan-tagihan-hutang')
+                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FontAwesomeIcon icon={faChartBar} className="w-4 h-4 text-gray-400" />
+              Laporan Tagihan Hutang
+            </Link>
           </div>
 
           {/* Purchasing */}
