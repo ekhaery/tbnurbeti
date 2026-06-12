@@ -15,6 +15,7 @@ const defaultTo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2,
 const todayStr = now.toISOString().slice(0, 10)
 
 type BillRow = { id: number; installment: number; paid_amount: number; is_paid: boolean; installment_due_date: string | null; due_date: string; suppliers: { name: string } | null }
+type PurchasingRow = { id: number; total: number; date: string; due_date: string | null; suppliers: { name: string } | null }
 type DetailRow = { id: number; installment_amount: number; is_paid: boolean; installment_due_date: string | null; due_date: string | null; debt_loan: { bank_account: string; debt_type: string; suppliers?: { name: string } | null } | null }
 
 export default function LaporanTagihanHutangPage() {
@@ -25,6 +26,7 @@ export default function LaporanTagihanHutangPage() {
   const [loanDetails, setLoanDetails] = useState<DetailRow[]>([])
   const [giroDetails, setGiroDetails] = useState<DetailRow[]>([])
   const [rkList, setRkList] = useState<{ id: number; installment_amount: number }[]>([])
+  const [top5Purchasing, setTop5Purchasing] = useState<PurchasingRow[]>([])
   const [rkPaid, setRkPaid] = useState(0)
   const [overdueBills, setOverdueBills] = useState<BillRow[]>([])
   const [overdueDetails, setOverdueDetails] = useState<DetailRow[]>([])
@@ -39,16 +41,18 @@ export default function LaporanTagihanHutangPage() {
 
   const fetchAll = async () => {
     setFetching(true)
+    try {
     const { data: billsData } = await supabase.from('bills')
       .select('id, installment, paid_amount, is_paid, installment_due_date, due_date, suppliers(name)')
       .gte('installment_due_date', dateFrom).lte('installment_due_date', dateTo)
     setBills((billsData ?? []) as BillRow[])
 
     const { data: loanData } = await supabase.from('debt_loan_detail')
-      .select('id, installment_amount, is_paid, installment_due_date, due_date, debt_loan!inner(bank_account, debt_type)')
+      .select('id, installment_amount, is_paid, installment_due_date, due_date, debt_loan(bank_account, debt_type)')
       .gte('installment_due_date', dateFrom).lte('installment_due_date', dateTo)
-    setLoanDetails(((loanData ?? []) as DetailRow[]).filter(d => d.debt_loan?.debt_type !== 'Giro'))
-    setGiroDetails(((loanData ?? []) as DetailRow[]).filter(d => d.debt_loan?.debt_type === 'Giro'))
+    const allDetails = (loanData ?? []) as DetailRow[]
+    setLoanDetails(allDetails.filter(d => d.debt_loan?.debt_type !== 'Giro' && d.debt_loan?.debt_type !== 'Rekening Koran'))
+    setGiroDetails(allDetails.filter(d => d.debt_loan?.debt_type === 'Giro'))
 
     const { data: odBills } = await supabase.from('bills')
       .select('id, installment, paid_amount, is_paid, installment_due_date, due_date, suppliers(name)')
@@ -65,16 +69,24 @@ export default function LaporanTagihanHutangPage() {
       .select('id, installment_amount').eq('debt_type', 'Rekening Koran').eq('is_active', true)
     setRkList((rkData ?? []) as { id: number; installment_amount: number }[])
 
-    // Rekening Koran paid details in range
+    // Rekening Koran paid details in range (filter client-side)
     const { data: rkPaidData } = await supabase.from('debt_loan_detail')
-      .select('installment_amount, debt_loan!inner(debt_type)')
-      .eq('debt_loan.debt_type', 'Rekening Koran')
+      .select('installment_amount, debt_loan(debt_type)')
       .eq('is_paid', true)
       .gte('installment_due_date', dateFrom)
       .lte('installment_due_date', dateTo)
-    const rkPaidTotal = (rkPaidData ?? []).reduce((s: number, d: { installment_amount: number }) => s + d.installment_amount, 0)
+    const rkPaidTotal = (rkPaidData ?? [])
+      .filter((d: { debt_loan: { debt_type: string } | null }) => d.debt_loan?.debt_type === 'Rekening Koran')
+      .reduce((s: number, d: { installment_amount: number }) => s + d.installment_amount, 0)
     setRkPaid(rkPaidTotal)
 
+    // Top 5 purchasing by total (filtered by due_date)
+    const { data: purData } = await supabase.from('purchasing')
+      .select('id, total, date, due_date, suppliers(name)')
+      .gte('due_date', dateFrom).lte('due_date', dateTo)
+      .order('total', { ascending: false }).limit(10)
+    setTop5Purchasing((purData ?? []) as PurchasingRow[])
+    } catch (e) { console.error('fetchAll error:', e) }
     setFetching(false)
   }
 
@@ -89,7 +101,6 @@ export default function LaporanTagihanHutangPage() {
   const paidBills = bills.filter(b => b.is_paid).reduce((s, b) => s + b.installment, 0)
   const paidGiro = giroDetails.filter(d => d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
   const totalPaid = paidLoanBank + paidBills + paidGiro + rkPaid
-  const top5Bills = [...bills].sort((a, b) => b.installment - a.installment).slice(0, 5)
   const top5Giro = [...giroDetails].sort((a, b) => b.installment_amount - a.installment_amount).slice(0, 5)
 
   const allCalEvents = [
@@ -182,15 +193,21 @@ export default function LaporanTagihanHutangPage() {
 
             <div className="space-y-3">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-1">Summary II</p>
-              {top5Bills.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm p-4">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">Top 5 Tagihan Dagang</p>
-                  {top5Bills.map((b, i) => (
-                    <div key={b.id} className="flex items-center justify-between py-1">
-                      <p className="text-xs text-gray-600"><span className="font-bold text-gray-400 mr-1">{i+1}.</span>{b.suppliers?.name ?? '-'}</p>
-                      <p className="text-xs font-semibold text-[#121358]">Rp {fmt(b.installment)}</p>
+              {top5Purchasing.length > 0 && (
+                <div className="bg-[#121358] rounded-xl p-4">
+                  <p className="text-xs font-semibold mb-2" style={{ color: '#B5BAFF' }}>Top 10 Tagihan Dagang</p>
+                  <div className="space-y-0 max-h-64 overflow-y-auto">
+                  {top5Purchasing.map((p, i) => (
+                    <div key={p.id} className="flex items-start justify-between py-1.5 gap-2 border-b border-white/10 last:border-0 rounded-lg px-1"
+                      style={{ backgroundColor: i < 5 ? 'transparent' : 'rgba(255,255,255,0.06)' }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-white">{p.suppliers?.name ?? '-'}</p>
+                        <p className="text-[10px] mt-0.5" style={{ color: '#B5BAFF' }}>{fmtDate(p.date)} | JT: {p.due_date ? fmtDate(p.due_date) : '-'}</p>
+                      </div>
+                      <p className="text-xs font-semibold shrink-0" style={{ color: '#FCB7C7' }}>Rp {fmt(p.total)}</p>
                     </div>
                   ))}
+                  </div>
                 </div>
               )}
               {top5Giro.length > 0 && (
