@@ -127,6 +127,13 @@ export default function LaporanTagihanHutangPage() {
           </div>
         </div>
 
+        {/* Legend */}
+        <div className="flex items-center gap-4 px-1">
+          {[['Tagihan Dagang','#9FA1FF'],['Giro','#121358'],['Loan & Bank','#FCB7C7']].map(([l,c]) => (
+            <div key={l} className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ backgroundColor: c }}></span><span className="text-[10px] text-gray-500">{l}</span></div>
+          ))}
+        </div>
+
         {fetching ? <div className="text-center text-sm text-gray-400 py-10">Memuat...</div> : (
           <>
             <div className="space-y-2">
@@ -196,10 +203,7 @@ export default function LaporanTagihanHutangPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4 px-1">
-              {[['Tagihan Dagang','#9FA1FF'],['Giro','#121358'],['Loan & Bank','#FCB7C7']].map(([l,c]) => (
-                <div key={l} className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ backgroundColor: c }}></span><span className="text-[10px] text-gray-500">{l}</span></div>
-              ))}
+            <div className="hidden">{/* legend moved above */}
             </div>
           </>
         )}
