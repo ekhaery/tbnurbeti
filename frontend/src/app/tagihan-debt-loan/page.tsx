@@ -40,7 +40,6 @@ export default function TagihanDebtLoanPage() {
   const [yearFilter, setYearFilter] = useState<string>(new Date().getFullYear().toString())
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [debtTypeFilter, setDebtTypeFilter] = useState('')
   const [bankFilter, setBankFilter] = useState('')
   const [bankQuery, setBankQuery] = useState('')
   const [bankDropdown, setBankDropdown] = useState(false)
@@ -65,8 +64,8 @@ export default function TagihanDebtLoanPage() {
       .from('debt_loan_detail')
       .select('id, code, date, due_date, installment_amount, installment_due_date, is_paid, payment_date, debt_loan(bank_account, debt_type)')
       .order('installment_due_date', { ascending: true })
-    // Filter out Rekening Koran client-side
-    const nonRk = (data ?? []).filter((d: DebtLoanDetail) => d.debt_loan?.debt_type !== 'Rekening Koran')
+    // Filter out Rekening Koran and Giro client-side
+    const nonRk = (data ?? []).filter((d: DebtLoanDetail) => d.debt_loan?.debt_type !== 'Rekening Koran' && d.debt_loan?.debt_type !== 'Giro')
     setList(nonRk)
     setFetching(false)
   }
@@ -102,7 +101,6 @@ export default function TagihanDebtLoanPage() {
   useEffect(() => { fetchRekeningKoran() }, [])
 
   const bankNames = Array.from(new Set(list.map(d => d.debt_loan?.bank_account ?? '').filter(Boolean))).sort()
-  const debtTypes = Array.from(new Set(list.map(d => d.debt_loan?.debt_type ?? '').filter(Boolean))).sort()
   const years = Array.from(new Set(list.map(d => d.installment_due_date ? new Date(d.installment_due_date).getFullYear().toString() : '').filter(Boolean))).sort()
 
   const filtered = list.filter(d => {
@@ -114,7 +112,6 @@ export default function TagihanDebtLoanPage() {
       if (dateFrom && d.installment_due_date && d.installment_due_date < dateFrom) return false
       if (dateTo && d.installment_due_date && d.installment_due_date > dateTo) return false
     }
-    if (debtTypeFilter && d.debt_loan?.debt_type !== debtTypeFilter) return false
     return true
   })
 
@@ -212,16 +209,6 @@ export default function TagihanDebtLoanPage() {
         {/* Filter card */}
         <div className="rounded-2xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
           <p className="text-xs font-semibold text-[#121358]">Apply Filter:</p>
-
-          {/* Debt Type filter */}
-          <select
-            value={debtTypeFilter}
-            onChange={e => setDebtTypeFilter(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358]"
-          >
-            <option value="">Semua Tipe Hutang</option>
-            {debtTypes.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
 
           {/* Bank filter */}
           <div className="relative">

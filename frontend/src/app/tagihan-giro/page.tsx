@@ -309,7 +309,7 @@ export default function TagihanGiroPage() {
         {/* Filter card */}
         <div className="rounded-2xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-[#121358]">Filter:</p>
+            <p className="text-xs font-semibold text-[#121358]">Filter Jatuh Tempo Cek:</p>
             <button
               onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterSupplierFilter(''); setFilterSupplierQuery('') }}
               className="text-2xl font-bold text-[#121358]/60 hover:text-[#121358] transition leading-none"
