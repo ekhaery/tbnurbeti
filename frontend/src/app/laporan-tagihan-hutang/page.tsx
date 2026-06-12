@@ -121,6 +121,7 @@ export default function LaporanTagihanHutangPage() {
   const billsPaidPct = billsTotalInstallment > 0 ? (billsTotalPaid / billsTotalInstallment * 100).toFixed(1) : '0.0'
   const billsUnpaid = billsTotalInstallment - billsTotalPaid
   const billsUnpaidPct = billsTotalInstallment > 0 ? (billsUnpaid / billsTotalInstallment * 100).toFixed(1) : '0.0'
+  const giroAvgPerDay = giroDetails.reduce((s, d) => s + d.installment_amount, 0) / dayCount
 
   const allCalEvents = [
     ...bills.map(b => ({ date: b.installment_due_date ?? '', label: b.suppliers?.name ?? '-', amount: b.installment, type: 'bills' })),
@@ -261,29 +262,42 @@ export default function LaporanTagihanHutangPage() {
                 </div>
               )}
               {topGiroDebt.length > 0 && (
-                <div className="rounded-xl overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-[#121358]">
-                    <p className="text-xs font-semibold text-white">Top 10 Giro</p>
-                    <button onClick={() => setSortGiroByDueDate(v => !v)}
-                      className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded transition ${sortGiroByDueDate ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white'}`}>
-                      <FontAwesomeIcon icon={faArrowUpAZ} className="w-3 h-3" />
-                      JT ↑
-                    </button>
-                  </div>
-                  <div className="p-4 space-y-0 max-h-64 overflow-y-auto" style={{ backgroundColor: '#6B6FFF' }}>
-                    {[...topGiroDebt].sort((a, b) => sortGiroByDueDate
-                      ? (a.due_date ?? '').localeCompare(b.due_date ?? '')
-                      : b.debt_amount - a.debt_amount
-                    ).map((d, i) => (
-                      <div key={d.id} className="flex items-start justify-between py-1.5 gap-2 border-b border-white/10 last:border-0 rounded-lg px-1"
-                        style={{ backgroundColor: i < 5 ? 'transparent' : 'rgba(255,255,255,0.06)' }}>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-white">{d.suppliers?.name ?? d.bank_account ?? '-'}</p>
-                          <p className="text-[10px] mt-0.5 text-white/60">{fmtDate(d.date)}{d.due_date ? ` | JT: ${fmtDate(d.due_date)}` : ''}</p>
+                <div className="flex gap-3 items-start">
+                  <div className="flex-[2] min-w-0 rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-[#121358]">
+                      <p className="text-xs font-semibold text-white">Top 10 Giro</p>
+                      <button onClick={() => setSortGiroByDueDate(v => !v)}
+                        className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded transition ${sortGiroByDueDate ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white'}`}>
+                        <FontAwesomeIcon icon={faArrowUpAZ} className="w-3 h-3" />
+                        JT ↑
+                      </button>
+                    </div>
+                    <div className="p-4 space-y-0 max-h-64 overflow-y-auto" style={{ backgroundColor: '#6B6FFF' }}>
+                      {[...topGiroDebt].sort((a, b) => sortGiroByDueDate
+                        ? (a.due_date ?? '').localeCompare(b.due_date ?? '')
+                        : b.debt_amount - a.debt_amount
+                      ).map((d, i) => (
+                        <div key={d.id} className="flex items-start justify-between py-1.5 gap-2 border-b border-white/10 last:border-0 rounded-lg px-1"
+                          style={{ backgroundColor: i < 5 ? 'transparent' : 'rgba(255,255,255,0.06)' }}>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-white">{d.suppliers?.name ?? d.bank_account ?? '-'}</p>
+                            <p className="text-[10px] mt-0.5 text-white/60">{fmtDate(d.date)}{d.due_date ? ` | JT: ${fmtDate(d.due_date)}` : ''}</p>
+                          </div>
+                          <p className="text-xs font-semibold shrink-0 text-white">Rp {fmt(d.debt_amount)}</p>
                         </div>
-                        <p className="text-xs font-semibold shrink-0 text-white">Rp {fmt(d.debt_amount)}</p>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex-[1] min-w-0 rounded-xl overflow-hidden">
+                    <div className="px-3 py-2.5 bg-[#121358]">
+                      <p className="text-xs font-semibold text-white">Kesimpulan</p>
+                    </div>
+                    <div className="p-3 space-y-2" style={{ backgroundColor: '#6B6FFF' }}>
+                      <div>
+                        <p className="text-[10px] text-white/60">Rata-rata top-up /hr</p>
+                        <p className="text-xs font-semibold text-white mt-0.5">Rp {fmt(Math.round(giroAvgPerDay))}</p>
                       </div>
-                    ))}
+                    </div>
                   </div>
                 </div>
               )}
