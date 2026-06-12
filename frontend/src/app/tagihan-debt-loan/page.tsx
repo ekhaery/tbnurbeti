@@ -36,7 +36,11 @@ export default function TagihanDebtLoanPage() {
   const [rkList, setRkList] = useState<RekeningKoran[]>([])
   const [fetching, setFetching] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('unpaid')
+  const [dateFilterMode, setDateFilterMode] = useState<'year' | 'range'>('year')
   const [yearFilter, setYearFilter] = useState<string>(new Date().getFullYear().toString())
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [debtTypeFilter, setDebtTypeFilter] = useState('')
   const [bankFilter, setBankFilter] = useState('')
   const [bankQuery, setBankQuery] = useState('')
   const [bankDropdown, setBankDropdown] = useState(false)
@@ -98,13 +102,19 @@ export default function TagihanDebtLoanPage() {
   useEffect(() => { fetchRekeningKoran() }, [])
 
   const bankNames = Array.from(new Set(list.map(d => d.debt_loan?.bank_account ?? '').filter(Boolean))).sort()
+  const debtTypes = Array.from(new Set(list.map(d => d.debt_loan?.debt_type ?? '').filter(Boolean))).sort()
   const years = Array.from(new Set(list.map(d => d.installment_due_date ? new Date(d.installment_due_date).getFullYear().toString() : '').filter(Boolean))).sort()
 
   const filtered = list.filter(d => {
     if (filter === 'paid' && !d.is_paid) return false
     if (filter === 'unpaid' && d.is_paid) return false
     if (bankFilter && d.debt_loan?.bank_account !== bankFilter) return false
-    if (yearFilter && d.installment_due_date && new Date(d.installment_due_date).getFullYear().toString() !== yearFilter) return false
+    if (dateFilterMode === 'year' && yearFilter && d.installment_due_date && new Date(d.installment_due_date).getFullYear().toString() !== yearFilter) return false
+    if (dateFilterMode === 'range') {
+      if (dateFrom && d.installment_due_date && d.installment_due_date < dateFrom) return false
+      if (dateTo && d.installment_due_date && d.installment_due_date > dateTo) return false
+    }
+    if (debtTypeFilter && d.debt_loan?.debt_type !== debtTypeFilter) return false
     return true
   })
 
@@ -203,28 +213,17 @@ export default function TagihanDebtLoanPage() {
         <div className="rounded-2xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
           <p className="text-xs font-semibold text-[#121358]">Apply Filter:</p>
 
-          <div className="bg-gray-100 rounded-xl p-1 flex gap-1">
-            {(['unpaid', 'paid', 'all'] as FilterStatus[]).map(f => (
-              <button key={f} onClick={() => setFilter(f)}
-                className={`flex-1 text-center text-sm font-medium py-2 rounded-xl transition-colors ${filter === f ? 'bg-slate-800 text-white' : 'bg-slate-200 sm:bg-transparent text-slate-500 sm:hover:bg-slate-200'}`}>
-                {f === 'unpaid' ? 'Belum Lunas' : f === 'paid' ? 'Lunas' : 'Semua'}
-              </button>
-            ))}
-          </div>
+          {/* Debt Type filter */}
+          <select
+            value={debtTypeFilter}
+            onChange={e => setDebtTypeFilter(e.target.value)}
+            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358]"
+          >
+            <option value="">Semua Tipe Hutang</option>
+            {debtTypes.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
 
-          <div className="flex gap-2 overflow-x-auto pb-0.5">
-            <button onClick={() => setYearFilter('')}
-              className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition ${!yearFilter ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
-              Semua Tahun
-            </button>
-            {years.map(y => (
-              <button key={y} onClick={() => setYearFilter(y)}
-                className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition ${yearFilter === y ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                {y}
-              </button>
-            ))}
-          </div>
-
+          {/* Bank filter */}
           <div className="relative">
             <input type="text" value={bankQuery}
               onChange={e => { setBankQuery(e.target.value); setBankFilter(''); setBankDropdown(true) }}
@@ -255,6 +254,59 @@ export default function TagihanDebtLoanPage() {
               </div>
             )}
           </div>
+
+          {/* Date filter mode toggle */}
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            <button onClick={() => setDateFilterMode('year')}
+              className={`flex-1 text-xs font-semibold py-1.5 rounded-md transition ${dateFilterMode === 'year' ? 'bg-[#121358] text-white' : 'text-gray-500'}`}>
+              Per Tahun
+            </button>
+            <button onClick={() => setDateFilterMode('range')}
+              className={`flex-1 text-xs font-semibold py-1.5 rounded-md transition ${dateFilterMode === 'range' ? 'bg-[#121358] text-white' : 'text-gray-500'}`}>
+              Rentang Tanggal
+            </button>
+          </div>
+
+          {dateFilterMode === 'year' ? (
+            <div className="flex gap-2 overflow-x-auto pb-0.5">
+              <button onClick={() => setYearFilter('')}
+                className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition ${!yearFilter ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                Semua Tahun
+              </button>
+              {years.map(y => (
+                <button key={y} onClick={() => setYearFilter(y)}
+                  className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition ${yearFilter === y ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                  {y}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-semibold text-[#121358] mb-1">Dari</label>
+                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                  style={{ fontSize: '11px' }}
+                  className="w-full bg-white border border-gray-200 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#121358] mb-1">Sampai</label>
+                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                  style={{ fontSize: '11px' }}
+                  className="w-full bg-white border border-gray-200 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        {/* Status tabs */}
+        <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1">
+          {(['unpaid', 'paid', 'all'] as FilterStatus[]).map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`flex-1 text-center text-sm font-medium py-2 rounded-xl transition-colors ${filter === f ? 'bg-slate-800 text-white' : 'bg-slate-200 sm:bg-transparent text-slate-500 sm:hover:bg-slate-200'}`}>
+              {f === 'unpaid' ? 'Belum Lunas' : f === 'paid' ? 'Lunas' : 'Semua'}
+            </button>
+          ))}
         </div>
 
         {/* Total hutang tahunan */}
@@ -264,7 +316,16 @@ export default function TagihanDebtLoanPage() {
           return (
             <div className="rounded-xl px-4 py-2.5 bg-[#121358] space-y-1.5">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Total Hutang Tahunan</p>
+                {dateFilterMode === 'range' && (dateFrom || dateTo) ? (
+                  <div style={{ color: '#B5BAFF' }}>
+                    <p className="text-xs font-semibold">Total Dalam Rentang</p>
+                    <p className="text-xs font-semibold sm:inline sm:ml-1">
+                      {dateFrom ? dateFrom.split('-').reverse().join('/') : '...'} - {dateTo ? dateTo.split('-').reverse().join('/') : '...'}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Total Hutang Tahunan</p>
+                )}
                 <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(installmentTotal + rkYearlyTotal)}</p>
               </div>
               <div className="border-t border-white/10 pt-1.5 space-y-1">

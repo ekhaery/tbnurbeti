@@ -10,6 +10,8 @@ import {
   type DebtLoanPeriod,
 } from '@/lib/debtLoanOptions'
 
+type Supplier = { id: number; name: string }
+
 type DebtLoan = {
   id: number
   bank_account: string
@@ -20,6 +22,8 @@ type DebtLoan = {
   installment_amount: number
   due_date: string | null
   period: DebtLoanPeriod | null
+  supplier_id: number | null
+  suppliers: { name: string } | null
 }
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
@@ -32,6 +36,8 @@ const emptyForm = () => ({
   installment_type: 'monthly' as string,
   installment_amount: '',
   due_date: '',
+  supplier_id: '' as number | '',
+  supplier_query: '',
 })
 
 function calcPeriodFn(date: string, dueDate: string): DebtLoanPeriod | null {
@@ -73,6 +79,8 @@ async function generateDetails(supabase: ReturnType<typeof createClient>, debtLo
 export default function TagihanGiroPage() {
   const supabase = createClient()
   const [list, setList] = useState<DebtLoan[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [supplierDropdown, setSupplierDropdown] = useState(false)
   const [fetching, setFetching] = useState(true)
 
   const [showForm, setShowForm] = useState(false)
@@ -89,12 +97,16 @@ export default function TagihanGiroPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const fetchData = async () => {
-    const { data } = await supabase.from('debt_loan').select('*').eq('debt_type', 'Giro').order('date', { ascending: false })
+    const { data } = await supabase.from('debt_loan').select('*, suppliers(name)').eq('debt_type', 'Giro').order('date', { ascending: false })
     setList((data as DebtLoan[]) ?? [])
     setFetching(false)
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    fetchData()
+    supabase.from('suppliers').select('id, name').order('name')
+      .then(({ data }: { data: Supplier[] | null }) => setSuppliers(data ?? []))
+  }, [])
 
   const set = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }))
   const setEdit = (field: string, value: string) => setEditForm(prev => ({ ...prev, [field]: value }))
@@ -112,6 +124,7 @@ export default function TagihanGiroPage() {
       debt_amount: parseFloat(form.debt_amount), installment_type: form.installment_type,
       installment_amount: parseFloat(form.installment_amount) || 0,
       due_date: form.due_date || null, period: period ?? null,
+      supplier_id: form.supplier_id || null,
     }).select('id').single()
     if (error || !newRecord) { setError(error?.message ?? 'Gagal menyimpan.'); setSaving(false); return }
     await generateDetails(supabase, newRecord.id, form, period)
@@ -120,7 +133,7 @@ export default function TagihanGiroPage() {
 
   const openEdit = (d: DebtLoan) => {
     setEditing(d); setEditError(null)
-    setEditForm({ bank_account: d.bank_account, date: d.date, debt_amount: String(d.debt_amount), installment_type: d.installment_type, installment_amount: String(d.installment_amount), due_date: d.due_date ?? '' })
+    setEditForm({ bank_account: d.bank_account, date: d.date, debt_amount: String(d.debt_amount), installment_type: d.installment_type, installment_amount: String(d.installment_amount), due_date: d.due_date ?? '', supplier_id: d.supplier_id ?? '', supplier_query: d.suppliers?.name ?? '' })
   }
 
   const handleEditSave = async () => {
@@ -131,6 +144,7 @@ export default function TagihanGiroPage() {
       debt_amount: parseFloat(editForm.debt_amount), installment_type: editForm.installment_type,
       installment_amount: parseFloat(editForm.installment_amount) || 0,
       due_date: editForm.due_date || null, period: editPeriod ?? null,
+      supplier_id: editForm.supplier_id || null,
     }).eq('id', editing!.id)
     if (error) { setEditError(error.message); setEditSaving(false); return }
     await supabase.from('debt_loan_detail').delete().eq('debt_loan_id', editing!.id)
@@ -157,6 +171,32 @@ export default function TagihanGiroPage() {
     const autoInstallment = calcAutoInstallment(f, p)
     return (
     <div className="px-5 py-4 space-y-3 max-h-[65vh] overflow-y-auto">
+      <div className="relative">
+        <label className="block text-xs text-gray-500 mb-1">Supplier</label>
+        <input type="text" value={f.supplier_query}
+          onChange={e => { setF('supplier_query', e.target.value); setF('supplier_id', ''); setSupplierDropdown(true) }}
+          onFocus={() => setSupplierDropdown(true)}
+          onBlur={() => setTimeout(() => setSupplierDropdown(false), 150)}
+          placeholder="Cari supplier..."
+          autoComplete="off"
+          className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${f.supplier_id ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-300'}`}
+        />
+        {supplierDropdown && (
+          <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+            <button type="button" onMouseDown={() => { setF('supplier_id', ''); setF('supplier_query', ''); setSupplierDropdown(false) }}
+              className={`w-full text-left px-4 py-2.5 text-sm transition ${!f.supplier_id ? 'bg-[#121358] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+              Tanpa Supplier
+            </button>
+            {suppliers.filter(s => s.name.toLowerCase().includes(f.supplier_query.toLowerCase())).map(s => (
+              <button key={s.id} type="button"
+                onMouseDown={() => { setF('supplier_id', String(s.id)); setF('supplier_query', s.name); setSupplierDropdown(false) }}
+                className={`w-full text-left px-4 py-2.5 text-sm transition ${f.supplier_id === s.id ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <div>
         <label className="block text-xs text-gray-500 mb-1">Bank Account</label>
         <select value={f.bank_account} onChange={e => setF('bank_account', e.target.value)}
@@ -231,6 +271,7 @@ export default function TagihanGiroPage() {
                       <p className="text-sm font-semibold text-gray-800">{d.bank_account}</p>
                       <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#9FA1FF]/20 text-[#121358]">Giro</span>
                     </div>
+                    {d.suppliers?.name && <p className="text-xs text-gray-500 mt-0.5">{d.suppliers.name}</p>}
                     <p className="text-xs text-gray-500 mt-0.5">{fmtDate(d.date)}</p>
                     <p className="text-xs text-gray-500 mt-0.5">Cicilan: {installmentLabel(d.installment_type)} · Rp {fmt(d.installment_amount)}</p>
                     {d.due_date && <p className="text-xs text-gray-500 mt-0.5">Jatuh Tempo: {fmtDate(d.due_date)}</p>}
