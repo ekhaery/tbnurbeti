@@ -106,6 +106,56 @@ export default function BillsPage() {
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Kumpulan Nota detail popup
+  const [selectedPurchasing, setSelectedPurchasing] = useState<PurchasingRow | null>(null)
+  const [purchasingBills, setPurchasingBills] = useState<Bill[]>([])
+  const [fetchingPBills, setFetchingPBills] = useState(false)
+  const [selectedBillIds, setSelectedBillIds] = useState<Set<number>>(new Set())
+  const [markingLunas, setMarkingLunas] = useState(false)
+
+  const openPurchasingDetail = async (p: PurchasingRow) => {
+    setSelectedPurchasing(p)
+    setSelectedBillIds(new Set())
+    setFetchingPBills(true)
+    const { data } = await supabase.from('bills')
+      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date)')
+      .eq('purchasing_id', p.id)
+      .order('installment_due_date', { ascending: true })
+    setPurchasingBills((data as Bill[]) ?? [])
+    setFetchingPBills(false)
+  }
+
+  const toggleBillId = (id: number) => {
+    setSelectedBillIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const handleLunas = async () => {
+    if (!selectedPurchasing || selectedBillIds.size === 0) return
+    setMarkingLunas(true)
+    const ids = Array.from(selectedBillIds)
+    for (const id of ids) {
+      const bill = purchasingBills.find(b => b.id === id)
+      if (!bill) continue
+      await supabase.from('bills').update({
+        is_paid: true,
+        paid_amount: bill.installment,
+        payment_date: new Date().toISOString().slice(0, 10)
+      }).eq('id', id)
+    }
+    const { data } = await supabase.from('bills')
+      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date)')
+      .eq('purchasing_id', selectedPurchasing.id)
+      .order('installment_due_date', { ascending: true })
+    setPurchasingBills((data as Bill[]) ?? [])
+    setSelectedBillIds(new Set())
+    setMarkingLunas(false)
+    fetchData()
+  }
+
   const fetchData = async () => {
     const { data } = await supabase
       .from('bills')
@@ -459,7 +509,7 @@ export default function BillsPage() {
                   const unpaidBills = pBills.filter(b => !b.is_paid)
                   const allPaid = pBills.length > 0 && unpaidBills.length === 0
                   return (
-                  <div key={p.id} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${allPaid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
+                  <div key={p.id} onClick={() => openPurchasingDetail(p)} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 cursor-pointer hover:shadow-md transition-shadow ${allPaid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-800">{p.suppliers?.name ?? '-'}</p>
@@ -952,6 +1002,85 @@ export default function BillsPage() {
                 {paying ? 'Menyimpan...' : 'Konfirmasi'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Kumpulan Nota Detail Popup */}
+      {selectedPurchasing && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
+
+            {/* Header */}
+            <div className="px-5 py-4 bg-[#121358] shrink-0">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white">{selectedPurchasing.suppliers?.name ?? '-'}</p>
+                  <p className="text-xs font-mono text-white/60 mt-0.5">{selectedPurchasing.code}</p>
+                  {selectedPurchasing.due_date && (
+                    <p className="text-xs text-white/60 mt-0.5">JT: {fmtDate(selectedPurchasing.due_date)}</p>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-bold text-white">Rp {fmt(selectedPurchasing.total)}</p>
+                  <button onClick={() => setSelectedPurchasing(null)} className="mt-1 w-6 h-6 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white ml-auto">
+                    <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Bills list */}
+            <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+              {fetchingPBills ? (
+                <p className="text-center text-sm text-gray-400 py-10">Memuat...</p>
+              ) : purchasingBills.length === 0 ? (
+                <p className="text-center text-sm text-gray-400 py-10">Tidak ada tagihan.</p>
+              ) : purchasingBills.map(b => {
+                const amount = b.paid_amount > 0 ? b.installment - b.paid_amount : b.installment
+                const isChecked = selectedBillIds.has(b.id)
+                return (
+                  <div key={b.id}
+                    onClick={() => !b.is_paid && toggleBillId(b.id)}
+                    className={`flex items-center gap-3 px-5 py-3 transition ${b.is_paid ? 'opacity-50' : 'cursor-pointer hover:bg-gray-50'} ${isChecked ? 'bg-blue-50' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={b.is_paid || isChecked}
+                      disabled={b.is_paid}
+                      onChange={() => !b.is_paid && toggleBillId(b.id)}
+                      onClick={e => e.stopPropagation()}
+                      className="w-4 h-4 accent-[#121358] shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-500">
+                        {b.installment_due_date ? fmtDate(b.installment_due_date) : '-'}
+                      </p>
+                      {b.is_paid && (
+                        <span className="text-[10px] font-semibold text-green-600">Lunas</span>
+                      )}
+                    </div>
+                    <p className={`text-sm font-semibold shrink-0 ${b.is_paid ? 'text-green-600' : 'text-[#121358]'}`}>
+                      Rp {fmt(amount)}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Footer buttons */}
+            <div className="flex gap-2 px-5 py-4 border-t border-gray-100 shrink-0">
+              <button onClick={() => setSelectedPurchasing(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">
+                Batal
+              </button>
+              <button
+                onClick={handleLunas}
+                disabled={markingLunas || selectedBillIds.size === 0}
+                className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
+                {markingLunas ? 'Menyimpan...' : `Lunas (${selectedBillIds.size})`}
+              </button>
+            </div>
+
           </div>
         </div>
       )}
