@@ -44,6 +44,8 @@ export default function SuppliersPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
+  const [popupEditMode, setPopupEditMode] = useState(false)
 
   const fetchData = async () => {
     const { data } = await supabase.from('suppliers').select('id, name, phone, address, sales_name, bank_detail').order('name')
@@ -173,7 +175,7 @@ export default function SuppliersPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 cursor-pointer" onClick={() => setSelectedSupplier(s)}>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-800">{s.name}</p>
                       {(s.sales_name || s.phone) && (
@@ -188,23 +190,6 @@ export default function SuppliersPage() {
                         </p>
                       )}
                     </div>
-                    <button
-                      onClick={() => {
-                        setEditId(s.id)
-                        setEditName(s.name)
-                        setEditPhone(s.phone ?? '')
-                        setEditAddress(s.address ?? '')
-                        setEditSalesName(s.sales_name ?? '')
-                        setEditBank({ bank: s.bank_detail?.bank ?? '', no_rek: s.bank_detail?.no_rek ?? '', rek_name: s.bank_detail?.rek_name ?? '' })
-                      }}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-[#121358]/10 text-gray-400 hover:text-[#121358] transition"
-                    >
-                      <FontAwesomeIcon icon={faPenToSquare} className="w-3.5 h-3.5" />
-                    </button>
-                    <button onClick={() => handleDelete(s)} disabled={deletingId === s.id}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500 disabled:opacity-50 transition">
-                      <FontAwesomeIcon icon={faTrash} className="w-3.5 h-3.5" />
-                    </button>
                   </div>
                 )}
               </div>
@@ -212,6 +197,127 @@ export default function SuppliersPage() {
           </div>
         )}
       </div>
+
+      {/* Supplier Detail Popup */}
+      {selectedSupplier && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+
+            {/* Header */}
+            <div className="px-5 py-4 bg-[#121358] flex items-start justify-between gap-3">
+              <div>
+                <p className="text-base font-bold text-white">{popupEditMode ? 'Edit Supplier' : selectedSupplier.name}</p>
+                {!popupEditMode && selectedSupplier.sales_name && (
+                  <p className="text-xs text-white/60 mt-0.5">Sales: {selectedSupplier.sales_name}</p>
+                )}
+              </div>
+              <button onClick={() => { setSelectedSupplier(null); setPopupEditMode(false) }} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0 transition">
+                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+              </button>
+            </div>
+
+            {popupEditMode ? (
+              /* Edit form */
+              <>
+                <div className="px-5 py-4 space-y-3 max-h-[60vh] overflow-y-auto">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Nama <span className="text-red-500">*</span></label>
+                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)} autoFocus className={inputCls} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Nama Sales</label>
+                      <input type="text" value={editSalesName} onChange={e => setEditSalesName(e.target.value)} placeholder="Opsional" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">No. Telepon</label>
+                      <input type="text" value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="Opsional" className={inputCls} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs text-gray-500 mb-1">Alamat</label>
+                      <input type="text" value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="Opsional" className={inputCls} />
+                    </div>
+                  </div>
+                  <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Info Rekening</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Bank</label>
+                        <input type="text" value={editBank.bank ?? ''} onChange={e => setEditBank(b => ({ ...b, bank: e.target.value }))} placeholder="Opsional" className={inputCls} />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">No. Rekening</label>
+                        <input type="text" value={editBank.no_rek ?? ''} onChange={e => setEditBank(b => ({ ...b, no_rek: e.target.value }))} placeholder="Opsional" className={inputCls} />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs text-gray-500 mb-1">Rekening Atas Nama</label>
+                        <input type="text" value={editBank.rek_name ?? ''} onChange={e => setEditBank(b => ({ ...b, rek_name: e.target.value }))} placeholder="Opsional" className={inputCls} />
+                      </div>
+                    </div>
+                  </div>
+                  {error && <p className="text-xs text-red-500">⚠️ {error}</p>}
+                </div>
+                <div className="flex gap-2 px-5 py-3 border-t border-gray-100">
+                  <button onClick={() => setPopupEditMode(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Batal</button>
+                  <button onClick={async () => {
+                    await handleEdit(selectedSupplier.id)
+                    const updated = { ...selectedSupplier, name: editName.trim(), phone: editPhone.trim() || null, address: editAddress.trim() || null, sales_name: editSalesName.trim() || null, bank_detail: buildBankDetail(editBank) }
+                    setSelectedSupplier(updated)
+                    setPopupEditMode(false)
+                  }} disabled={saving || !editName.trim()} className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
+                    {saving ? 'Menyimpan...' : 'Simpan'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* Detail view */
+              <>
+                <div className="px-5 py-4 space-y-3">
+                  {selectedSupplier.phone && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">No. Telepon</p>
+                      <p className="text-sm text-gray-800 mt-0.5">{selectedSupplier.phone}</p>
+                    </div>
+                  )}
+                  {selectedSupplier.address && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Alamat</p>
+                      <p className="text-sm text-gray-800 mt-0.5">{selectedSupplier.address}</p>
+                    </div>
+                  )}
+                  {selectedSupplier.bank_detail && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Info Rekening</p>
+                      <p className="text-sm text-gray-800 mt-0.5">
+                        {[selectedSupplier.bank_detail.bank, selectedSupplier.bank_detail.no_rek, selectedSupplier.bank_detail.rek_name].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                  )}
+                  {!selectedSupplier.phone && !selectedSupplier.address && !selectedSupplier.bank_detail && (
+                    <p className="text-sm text-gray-400 text-center py-2">Tidak ada detail tambahan.</p>
+                  )}
+                </div>
+                <div className="px-5 py-3 border-t border-gray-100 flex gap-2">
+                  <button onClick={() => {
+                    setEditName(selectedSupplier.name)
+                    setEditPhone(selectedSupplier.phone ?? '')
+                    setEditAddress(selectedSupplier.address ?? '')
+                    setEditSalesName(selectedSupplier.sales_name ?? '')
+                    setEditBank({ bank: selectedSupplier.bank_detail?.bank ?? '', no_rek: selectedSupplier.bank_detail?.no_rek ?? '', rek_name: selectedSupplier.bank_detail?.rek_name ?? '' })
+                    setPopupEditMode(true)
+                  }} className="flex-1 py-2 rounded-xl bg-[#121358] text-white text-sm font-semibold hover:bg-[#1a1c6e] transition flex items-center justify-center gap-1.5">
+                    <FontAwesomeIcon icon={faPenToSquare} className="w-3.5 h-3.5" /> Edit
+                  </button>
+                  <button onClick={() => { setSelectedSupplier(null); handleDelete(selectedSupplier) }} disabled={deletingId === selectedSupplier.id}
+                    className="w-10 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-500 disabled:opacity-50 transition flex items-center justify-center">
+                    <FontAwesomeIcon icon={faTrash} className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Add Supplier Modal */}
       {showAddModal && (

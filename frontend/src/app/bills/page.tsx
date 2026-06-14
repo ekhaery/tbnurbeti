@@ -30,7 +30,7 @@ type PurchasingRow = {
   due_date: string | null
   total: number
   status: string
-  suppliers: { name: string } | null
+  suppliers: { name: string; bank_detail: { bank?: string; no_rek?: string; rek_name?: string } | null } | null
 }
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
@@ -184,7 +184,7 @@ export default function BillsPage() {
     setFetchingPurchasing(true)
     supabase
       .from('purchasing')
-      .select('id, code, date, due_date, total, status, suppliers(name)')
+      .select('id, code, date, due_date, total, status, suppliers(name, bank_detail)')
       .not('due_date', 'is', null)
       .order('due_date', { ascending: true })
       .then(({ data }: { data: PurchasingRow[] | null }) => {
@@ -995,6 +995,13 @@ export default function BillsPage() {
                   {selectedPurchasing.due_date && (
                     <p className="text-xs text-white/60 mt-0.5">JT: {fmtDate(selectedPurchasing.due_date)}</p>
                   )}
+                  {selectedPurchasing.suppliers?.bank_detail && (() => {
+                    const bd = selectedPurchasing.suppliers!.bank_detail!
+                    const parts = [bd.bank, bd.no_rek, bd.rek_name].filter(Boolean)
+                    return parts.length > 0 ? (
+                      <p className="text-xs text-white/50 mt-0.5">{parts.join(' · ')}</p>
+                    ) : null
+                  })()}
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-bold text-white">Rp {fmt(selectedPurchasing.total)}</p>
