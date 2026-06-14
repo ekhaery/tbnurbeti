@@ -280,48 +280,36 @@ export default function BillsPage() {
             <h2 className="text-lg font-bold text-gray-800">Tagihan Dagang</h2>
             <p className="text-xs text-gray-500 mt-0.5">Tagihan dari pengadaan berjangka.</p>
           </div>
-          <div className="flex flex-col items-end gap-1.5">
-            <button onClick={() => { setShowPaidModal(true); setPaidPage(1) }} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#121358] text-white hover:bg-[#1a1c6e] transition shadow-sm text-xs font-semibold">
-              <FontAwesomeIcon icon={faReceipt} className="w-3.5 h-3.5 text-white" />
-              Lihat Riwayat Pembayaran
-            </button>
-          <div className="relative">
-            <button onClick={() => setShowCalendarMenu(v => !v)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#121358] text-white hover:bg-[#1a1c6e] transition shadow-sm text-xs font-semibold">
-              <FontAwesomeIcon icon={faCalendarDays} className="w-3.5 h-3.5 text-white" />
-              Lihat Jadwal Bayar
-            </button>
-            {showCalendarMenu && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setShowCalendarMenu(false)} />
-                <div className="absolute right-0 top-10 z-40 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden w-36">
-                  <button
-                    onClick={() => { setShowCalendarMenu(false); setShowCalendar(true) }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition"
-                  >
-                    Mingguan
-                  </button>
-                  <button
-                    onClick={() => { setShowCalendarMenu(false); setMonthCalendarDate(new Date()); setShowMonthCalendar(true) }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition border-t border-gray-100"
-                  >
-                    Bulanan
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-          </div>
         </div>
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-[#121358] rounded-xl shadow-sm p-3">
-            <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Belum Lunas</p>
-            <p className="text-base font-bold mt-0.5" style={{ color: '#FCB7C7' }}>Rp {fmt(totalUnpaid)}</p>
-          </div>
-          <div className="bg-[#121358] rounded-xl shadow-sm p-3">
-            <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Sudah Lunas</p>
-            <p className="text-base font-bold mt-0.5" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaid)}</p>
+          <button onClick={() => { setShowPaidModal(true); setPaidPage(1) }} className="bg-[#121358] rounded-xl shadow-sm p-3 text-left hover:bg-[#1a1c6e] transition w-full">
+            <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Riwayat</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <FontAwesomeIcon icon={faReceipt} className="w-3.5 h-3.5 text-white" />
+              <p className="text-sm font-bold text-white">Lihat Riwayat</p>
+            </div>
+          </button>
+          <div className="relative">
+            <button onClick={() => setShowCalendarMenu(v => !v)} className="w-full h-full bg-[#121358] rounded-xl shadow-sm p-3 text-left hover:bg-[#1a1c6e] transition">
+              <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Jadwal Bayar</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <FontAwesomeIcon icon={faCalendarDays} className="w-3.5 h-3.5 text-white" />
+                <p className="text-sm font-bold text-white">Lihat Jadwal</p>
+              </div>
+            </button>
+            {showCalendarMenu && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setShowCalendarMenu(false)} />
+                <div className="absolute right-0 top-full mt-1 z-40 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden w-36">
+                  <button onClick={() => { setShowCalendarMenu(false); setShowCalendar(true) }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">Mingguan</button>
+                  <button onClick={() => { setShowCalendarMenu(false); setShowMonthCalendar(true) }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition border-t border-gray-100">Bulanan</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
