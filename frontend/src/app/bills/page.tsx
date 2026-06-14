@@ -220,6 +220,11 @@ export default function BillsPage() {
   const totalUnpaid = bills.filter(b => !b.is_paid).reduce((s, b) => s + (b.installment - b.paid_amount), 0)
   const totalPaid = bills.filter(b => b.is_paid).reduce((s, b) => s + b.installment, 0)
 
+  const supplierBills = supplierFilter ? bills.filter(b => b.suppliers?.name === supplierFilter) : bills
+  const totalAll = supplierBills.reduce((s, b) => s + b.installment, 0)
+  const totalPaidAll = supplierBills.reduce((s, b) => s + b.paid_amount, 0)
+  const totalSisa = totalAll - totalPaidAll
+
   const openPay = (bill: Bill) => {
     setPayingBill(bill)
     setPayAmount(String(bill.installment - bill.paid_amount))
@@ -313,6 +318,29 @@ export default function BillsPage() {
           </div>
         </div>
 
+        {/* Card 1: Seluruhnya / Dibayarkan / Sisa */}
+        <div className="rounded-xl bg-[#121358] overflow-hidden">
+          {supplierFilter && (
+            <div className="px-4 pt-3 pb-1">
+              <p className="text-xs font-bold text-white">{supplierFilter}</p>
+            </div>
+          )}
+          <div className="px-4 py-2.5 grid grid-cols-3 gap-2">
+            <div>
+              <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Seluruhnya</p>
+              <p className="text-xs font-semibold text-white mt-0.5">Rp {fmt(totalAll)}</p>
+            </div>
+            <div>
+              <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Dibayarkan</p>
+              <p className="text-xs font-semibold mt-0.5" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaidAll)}</p>
+            </div>
+            <div>
+              <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Sisa</p>
+              <p className="text-xs font-semibold mt-0.5" style={{ color: '#FCB7C7' }}>Rp {fmt(totalSisa)}</p>
+            </div>
+          </div>
+        </div>
+
         {/* Filter card */}
         <div className="rounded-2xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
           <p className="text-xs font-semibold text-[#121358]">Apply Filter:</p>
@@ -389,67 +417,16 @@ export default function BillsPage() {
           </div>
         </div>
 
-        {/* Total tagihan summary */}
-        {(() => {
-          const supplierBills = supplierFilter ? bills.filter(b => b.suppliers?.name === supplierFilter) : bills
-          const totalAll = supplierBills.reduce((s, b) => s + b.installment, 0)
-          const totalPaidAll = supplierBills.reduce((s, b) => s + b.paid_amount, 0)
-          const totalSisa = totalAll - totalPaidAll
-          return (
-            <div className="rounded-xl bg-[#121358] overflow-hidden">
-              {/* Supplier name if filtered */}
-              {supplierFilter && (
-                <div className="px-4 pt-3 pb-1">
-                  <p className="text-xs font-bold text-white">{supplierFilter}</p>
-                </div>
-              )}
-              {/* Mobile layout */}
-              <div className="px-4 py-2.5 space-y-2 sm:hidden">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Total Tagihan Seluruhnya</p>
-                  <p className="text-xs font-semibold text-white">Rp {fmt(totalAll)}</p>
-                </div>
-                <div className="flex items-center justify-between border-t border-white/10 pt-2">
-                  <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Dibayarkan</p>
-                  <p className="text-xs font-semibold" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaidAll)}</p>
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px]" style={{ color: '#B5BAFF' }}>{monthFilter ? 'Total Tagihan Bulanan' : 'Total Tagihan Tahunan'} · {filtered.filter(b => !b.is_paid).length} tagihan</p>
-                  <p className="text-xs font-semibold" style={{ color: '#FCB7C7' }}>Rp {fmt(filtered.filter(b => !b.is_paid).reduce((s, b) => s + (b.installment - b.paid_amount), 0))}</p>
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Sisa</p>
-                  <p className="text-xs font-semibold" style={{ color: '#FCB7C7' }}>Rp {fmt(totalSisa)}</p>
-                </div>
-              </div>
-
-              {/* Desktop layout */}
-              <div className="hidden sm:block">
-                <div className="px-4 py-2.5 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>{monthFilter ? 'Total Tagihan Bulanan' : 'Total Tagihan Tahunan'}</p>
-                    <p className="text-[10px] mt-0.5 text-white">{filtered.length} tagihan</p>
-                  </div>
-                  <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(filtered.filter(b => !b.is_paid).reduce((s, b) => s + (b.installment - b.paid_amount), 0))}</p>
-                </div>
-                <div className="px-4 py-2.5 border-t border-white/10 grid grid-cols-3 gap-2">
-                  <div>
-                    <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Seluruhnya</p>
-                    <p className="text-xs font-semibold text-white mt-0.5">Rp {fmt(totalAll)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Dibayarkan</p>
-                    <p className="text-xs font-semibold mt-0.5" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaidAll)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Sisa</p>
-                    <p className="text-xs font-semibold mt-0.5" style={{ color: '#FCB7C7' }}>Rp {fmt(totalSisa)}</p>
-                  </div>
-                </div>
-              </div>
+        {/* Card 2: Tagihan Bulanan/Tahunan */}
+        <div className="rounded-xl bg-[#121358] overflow-hidden">
+          <div className="px-4 py-2.5 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>{monthFilter ? 'Total Tagihan Bulanan' : 'Total Tagihan Tahunan'}</p>
+              <p className="text-[10px] mt-0.5 text-white">{filtered.length} tagihan</p>
             </div>
-          )
-        })()}
+            <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(filtered.filter(b => !b.is_paid).reduce((s, b) => s + (b.installment - b.paid_amount), 0))}</p>
+          </div>
+        </div>
 
         {/* Tabs */}
         <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1">
