@@ -225,6 +225,16 @@ export default function BillsPage() {
   const totalPaidAll = supplierBills.reduce((s, b) => s + b.paid_amount, 0)
   const totalSisa = totalAll - totalPaidAll
 
+  // Month-filtered bills for Card 2 summary (by installment_due_date)
+  const monthBills = bills.filter(b => {
+    if (monthFilter && b.installment_due_date?.slice(0, 7) !== monthFilter) return false
+    if (supplierFilter && b.suppliers?.name !== supplierFilter) return false
+    return true
+  })
+  const monthTotalTagihan = monthBills.reduce((s, b) => s + b.installment, 0)
+  const monthTotalTerbayar = monthBills.reduce((s, b) => s + b.paid_amount, 0)
+  const monthSisaTagihan = monthBills.reduce((s, b) => s + (b.installment - b.paid_amount), 0)
+
   const openPay = (bill: Bill) => {
     setPayingBill(bill)
     setPayAmount(String(bill.installment - bill.paid_amount))
@@ -289,19 +299,19 @@ export default function BillsPage() {
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 gap-3">
-          <button onClick={() => { setShowPaidModal(true); setPaidPage(1) }} className="bg-[#121358] rounded-xl shadow-sm p-3 text-left hover:bg-[#1a1c6e] transition w-full">
-            <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Riwayat</p>
+          <button onClick={() => { setShowPaidModal(true); setPaidPage(1) }} className="bg-white border-2 border-[#121358] rounded-xl shadow-sm p-3 text-left hover:bg-gray-50 transition w-full">
+            <p className="text-xs font-semibold text-[#121358]">Riwayat</p>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <FontAwesomeIcon icon={faReceipt} className="w-3.5 h-3.5 text-white" />
-              <p className="text-sm font-bold text-white">Lihat Riwayat</p>
+              <FontAwesomeIcon icon={faReceipt} className="w-3.5 h-3.5 text-[#121358]" />
+              <p className="text-sm font-bold text-[#121358]">Lihat Riwayat</p>
             </div>
           </button>
           <div className="relative">
-            <button onClick={() => setShowCalendarMenu(v => !v)} className="w-full h-full bg-[#121358] rounded-xl shadow-sm p-3 text-left hover:bg-[#1a1c6e] transition">
-              <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Jadwal Bayar</p>
+            <button onClick={() => setShowCalendarMenu(v => !v)} className="w-full h-full bg-white border-2 border-[#121358] rounded-xl shadow-sm p-3 text-left hover:bg-gray-50 transition">
+              <p className="text-xs font-semibold text-[#121358]">Jadwal Bayar</p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <FontAwesomeIcon icon={faCalendarDays} className="w-3.5 h-3.5 text-white" />
-                <p className="text-sm font-bold text-white">Lihat Jadwal</p>
+                <FontAwesomeIcon icon={faCalendarDays} className="w-3.5 h-3.5 text-[#121358]" />
+                <p className="text-sm font-bold text-[#121358]">Lihat Jadwal</p>
               </div>
             </button>
             {showCalendarMenu && (
@@ -318,31 +328,24 @@ export default function BillsPage() {
           </div>
         </div>
 
-        {/* Card 1: Seluruhnya / Dibayarkan / Sisa */}
-        <div className="rounded-xl bg-[#121358] overflow-hidden">
-          {supplierFilter && (
-            <div className="px-4 pt-3 pb-1">
-              <p className="text-xs font-bold text-white">{supplierFilter}</p>
-            </div>
-          )}
-          <div className="px-4 py-2.5 grid grid-cols-3 gap-2">
-            <div>
-              <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Seluruhnya</p>
-              <p className="text-xs font-semibold text-white mt-0.5">Rp {fmt(totalAll)}</p>
-            </div>
-            <div>
-              <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Dibayarkan</p>
-              <p className="text-xs font-semibold mt-0.5" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaidAll)}</p>
-            </div>
-            <div>
-              <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Sisa</p>
-              <p className="text-xs font-semibold mt-0.5" style={{ color: '#FCB7C7' }}>Rp {fmt(totalSisa)}</p>
-            </div>
+        {/* Cards: Seluruhnya / Dibayarkan / Sisa */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-xl bg-[#121358] px-3 py-2.5">
+            <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Seluruhnya</p>
+            <p className="text-xs font-semibold text-white mt-0.5">Rp {fmt(totalAll)}</p>
+          </div>
+          <div className="rounded-xl bg-[#121358] px-3 py-2.5">
+            <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Dibayarkan</p>
+            <p className="text-xs font-semibold mt-0.5" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaidAll)}</p>
+          </div>
+          <div className="rounded-xl bg-[#121358] px-3 py-2.5">
+            <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Sisa</p>
+            <p className="text-xs font-semibold mt-0.5" style={{ color: '#FCB7C7' }}>Rp {fmt(totalSisa)}</p>
           </div>
         </div>
 
         {/* Filter card */}
-        <div className="rounded-2xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
+        <div className="rounded-2xl shadow-sm p-4 space-y-3 bg-white border-2 border-[#121358]">
           <p className="text-xs font-semibold text-[#121358]">Apply Filter:</p>
 
           {/* Status tabs */}
@@ -418,13 +421,20 @@ export default function BillsPage() {
         </div>
 
         {/* Card 2: Tagihan Bulanan/Tahunan */}
-        <div className="rounded-xl bg-[#121358] overflow-hidden">
-          <div className="px-4 py-2.5 flex items-center justify-between">
+        <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#8FB3E2' }}>
+          <div className="px-4 pt-2.5 pb-1 text-center">
+            <p className="text-xs font-semibold text-[#121358]">{monthFilter ? `Sisa Tagihan Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : 'Sisa Tagihan Tahunan'}</p>
+            <p className="text-sm font-bold text-[#121358] mt-0.5">Rp {fmt(monthSisaTagihan)}</p>
+          </div>
+          <div className="px-4 pb-2.5 pt-1 grid grid-cols-2 gap-2 border-t border-[#121358]/10 mt-1">
             <div>
-              <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>{monthFilter ? 'Total Tagihan Bulanan' : 'Total Tagihan Tahunan'}</p>
-              <p className="text-[10px] mt-0.5 text-white">{filtered.length} tagihan</p>
+              <p className="text-[10px] text-[#1a2a5e]">{monthFilter ? `Total Tagihan Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : 'Total Tagihan Tahunan'}</p>
+              <p className="text-xs font-semibold text-[#121358] mt-0.5">Rp {fmt(monthTotalTagihan)}</p>
             </div>
-            <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(filtered.filter(b => !b.is_paid).reduce((s, b) => s + (b.installment - b.paid_amount), 0))}</p>
+            <div className="text-right">
+              <p className="text-[10px] text-[#1a2a5e]">Total Terbayar</p>
+              <p className="text-xs font-semibold text-[#121358] mt-0.5">Rp {fmt(monthTotalTerbayar)}</p>
+            </div>
           </div>
         </div>
 
@@ -541,7 +551,7 @@ export default function BillsPage() {
                   <button
                     type="button"
                     onClick={e => { e.stopPropagation(); setCalendarWeekStart(getMonday(firstDate)); setShowCalendar(true) }}
-                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition" style={{ backgroundColor: '#AEE2FF', color: '#121358' }}
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition" style={{ backgroundColor: '#8FB3E2', color: '#121358' }}
                   >
                     <FontAwesomeIcon icon={faEye} className="w-2.5 h-2.5" />
                     Kalender
