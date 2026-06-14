@@ -106,11 +106,13 @@ export default function BuatTransaksiPage() {
     setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: false, focused: -1 } : s))
   }
 
-  const filteredProducts = (query: string) =>
-    query.trim() === ''
-      ? products
-      : products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()) ||
+  const filteredProducts = (query: string) => {
+    const withStock = products.filter(p => p.stock > 0)
+    return query.trim() === ''
+      ? withStock
+      : withStock.filter(p => p.name.toLowerCase().includes(query.toLowerCase()) ||
           (p.categories?.name ?? '').toLowerCase().includes(query.toLowerCase()))
+  }
 
   const validItems = items.filter(r => r.product_id && r.qty && r.price_sold)
   const subtotal = (r: ItemRow) => (parseFloat(r.price_sold) || 0) * (parseInt(r.qty) || 0) - (parseFloat(r.discount) || 0)
