@@ -248,11 +248,15 @@ export default function KunjunganSalesPage() {
                   <div className="divide-y divide-gray-100">
                     {debtList.map(d => {
                       const totalPaid = d.debt_loan_detail.filter(x => x.is_paid).reduce((s, x) => s + x.installment_amount, 0)
-                      const sisa = Math.max(0, Math.round(d.debt_amount - totalPaid))
+                      const sisa = Math.max(0, d.debt_amount - totalPaid)
+                      const pctRemaining = d.debt_amount > 0 ? (sisa / d.debt_amount * 100) : 0
                       const pct = d.debt_amount > 0 ? Math.min(100, Math.round(totalPaid / d.debt_amount * 100)) : 0
+                      const sisaDisplay = Math.round(sisa)
                       const isOverdue = d.due_date ? d.due_date <= localDateStr() : false
+                      const isPracticallyPaid = pctRemaining < 1
+                      const rowBg = isOverdue ? (isPracticallyPaid ? 'bg-gray-100' : 'bg-red-50') : ''
                       return (
-                        <div key={d.id} className={`flex items-start justify-between px-4 py-3 gap-3 ${isOverdue ? 'bg-gray-100' : ''}`}>
+                        <div key={d.id} className={`flex items-start justify-between px-4 py-3 gap-3 ${rowBg}`}>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-semibold text-gray-700">{d.bank_account}</p>
                             <p className="text-[10px] text-gray-400">{d.debt_type}</p>
@@ -260,8 +264,8 @@ export default function KunjunganSalesPage() {
                           </div>
                           <div className="text-right shrink-0">
                             <p className="text-sm font-semibold text-[#121358]">Rp {fmt(d.debt_amount)}</p>
-                            <p className="text-[10px] text-green-600">Dibayar: Rp {fmt(totalPaid)} ({pct}%)</p>
-                            <p className={`text-[10px] font-semibold ${sisa === 0 ? 'text-green-600' : 'text-red-500'}`}>Sisa: Rp {fmt(sisa)}</p>
+                            <p className="text-[10px] text-green-600">Dibayar: Rp {fmt(Math.round(totalPaid))} ({pct}%)</p>
+                            <p className={`text-[10px] font-semibold ${isPracticallyPaid ? 'text-green-600' : 'text-red-500'}`}>Sisa: Rp {fmt(isPracticallyPaid ? 0 : sisaDisplay)}</p>
                           </div>
                         </div>
                       )
