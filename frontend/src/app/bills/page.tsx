@@ -446,7 +446,7 @@ export default function BillsPage() {
 
         {/* Tabs */}
         <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1">
-          {(['cicilan', 'jatuh_tempo'] as const).map(t => (
+          {(['jatuh_tempo', 'cicilan'] as const).map(t => (
             <button key={t} onClick={() => setBillsTab(t)}
               className={`flex-1 text-center text-sm font-medium py-2 rounded-xl transition-colors ${billsTab === t ? 'bg-slate-800 text-white' : 'bg-slate-200 sm:bg-transparent text-slate-500 sm:hover:bg-slate-200'}`}>
               {t === 'cicilan' ? 'Cicilan' : 'Kumpulan Nota'}
