@@ -444,12 +444,22 @@ export default function TagihanGiroPage() {
             return true
           })
           const totalDebt = filteredList.reduce((s, d) => s + d.debt_amount, 0)
+          const totalPaidGiro = filteredList.reduce((s, d) => s + (paidMap[d.id] ?? 0), 0)
+          const sisaHutang = Math.max(0, Math.round(totalDebt - totalPaidGiro))
           return filteredList.length > 0 ? (
-            <div className="bg-[#121358] rounded-xl px-4 py-3 space-y-1">
+            <div className="bg-[#121358] rounded-xl px-4 py-3 space-y-1.5">
               {filterSupplierFilter && <p className="text-xs font-bold text-white">{filterSupplierFilter}</p>}
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Total Hutang Giro</p>
-                <p className="text-sm font-bold" style={{ color: '#FCB7C7' }}>Rp {fmt(totalDebt)}</p>
+                <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>Sisa Hutang Giro</p>
+                <p className="text-sm font-bold text-white">Rp {fmt(sisaHutang)}</p>
+              </div>
+              <div className="flex items-center justify-between border-t border-white/10 pt-1">
+                <p className="text-xs" style={{ color: '#B5BAFF' }}>Terbayar</p>
+                <p className="text-xs font-semibold" style={{ color: '#D9F9DF' }}>Rp {fmt(totalPaidGiro)}</p>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs" style={{ color: '#B5BAFF' }}>Total Hutang Giro</p>
+                <p className="text-xs font-semibold" style={{ color: '#FCB7C7' }}>Rp {fmt(totalDebt)}</p>
               </div>
               <p className="text-[10px] text-white/50">{filteredList.length} giro</p>
             </div>
