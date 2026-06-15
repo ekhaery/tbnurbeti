@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faTrash, faChevronLeft } from '@fortawesome/free-solid-svg-icons'
 import Link from 'next/link'
 import TransaksiTabs from '@/lib/TransaksiTabs'
+import { localDateStr } from '@/lib/date'
 
 type Product = {
   id: number
@@ -40,7 +41,7 @@ const fmt = (n: number) => n.toLocaleString('id-ID')
 
 function generateCode() {
   const now = new Date()
-  const d = now.toISOString().slice(0, 10).replace(/-/g, '')
+  const d = localDateStr(now).replace(/-/g, '')
   const t = now.toTimeString().slice(0, 8).replace(/:/g, '')
   return `INV-${d}-${t}`
 }
@@ -50,7 +51,7 @@ export default function BuatTransaksiPage() {
   const { appUser } = useAuth()
 
   const [products, setProducts] = useState<Product[]>([])
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(localDateStr())
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem()])
   const [autocomplete, setAutocomplete] = useState<AutocompleteState[]>([{ open: false, focused: -1 }])
@@ -236,7 +237,7 @@ export default function BuatTransaksiPage() {
     setSuccess(`Transaksi ${code} berhasil disimpan.`)
     setNotes('')
     setItems([emptyItem()])
-    setDate(new Date().toISOString().slice(0, 10))
+    setDate(localDateStr())
     fetchProducts()
   }
 

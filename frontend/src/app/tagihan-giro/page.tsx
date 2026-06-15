@@ -9,6 +9,7 @@ import {
   INSTALLMENT_TYPE_OPTIONS,
   type DebtLoanPeriod,
 } from '@/lib/debtLoanOptions'
+import { localDateStr } from '@/lib/date'
 
 type Supplier = { id: number; name: string }
 
@@ -31,7 +32,7 @@ const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'n
 
 const emptyForm = () => ({
   bank_account: BANK_ACCOUNT_OPTIONS[0] as string,
-  date: new Date().toISOString().slice(0, 10),
+  date: localDateStr(),
   debt_amount: '',
   installment_type: 'monthly' as string,
   installment_amount: '',
@@ -69,7 +70,7 @@ async function generateDetails(supabase: ReturnType<typeof createClient>, debtLo
       date: form.date,
       due_date: form.due_date || null,
       installment_amount: installmentAmount,
-      installment_due_date: due.toISOString().slice(0, 10),
+      installment_due_date: localDateStr(due),
       is_paid: false,
     }
   })
@@ -619,7 +620,7 @@ export default function TagihanGiroPage() {
         const days = Array.from({ length: 7 }, (_, i) => {
           const d = new Date(calWeekStart); d.setDate(d.getDate() + i); return d
         })
-        const todayStr = new Date().toISOString().slice(0, 10)
+        const todayStr = localDateStr()
         const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
         const prevWeek = () => setCalWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })
         const nextWeek = () => setCalWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })
@@ -645,7 +646,7 @@ export default function TagihanGiroPage() {
               </div>
               <div className="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto">
                 {days.map((day, idx) => {
-                  const dateStr = day.toISOString().slice(0, 10)
+                  const dateStr = localDateStr(day)
                   const isToday = dateStr === todayStr
                   const dayDetails = calDetails.filter(d => d.installment_due_date === dateStr)
                   const dayTotal = dayDetails.reduce((s, d) => s + d.installment_amount, 0)

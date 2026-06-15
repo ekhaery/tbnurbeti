@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus, faXmark, faPen, faTrash, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
 import { RECEIVABLES_STATUS_OPTIONS, receivablesStatusConfig } from '@/lib/receivablesOptions'
+import { localDateStr } from '@/lib/date'
 
 type Customer = { id: number; name: string }
 
@@ -32,7 +33,7 @@ const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'n
 
 const emptyForm = () => ({
   customer_id: '' as number | '',
-  date: new Date().toISOString().slice(0, 10),
+  date: localDateStr(),
   due_date: '',
   total: '',
   remaining_amount: '',
@@ -40,7 +41,7 @@ const emptyForm = () => ({
 })
 
 const emptyDetail = () => ({
-  date: new Date().toISOString().slice(0, 10),
+  date: localDateStr(),
   amount: '',
   notes: '',
 })

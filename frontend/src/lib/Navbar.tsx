@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { faBell } from '@fortawesome/free-solid-svg-icons'
+import { localDateStr } from '@/lib/date'
 
 const settingsLinks = [
   { label: 'Category', href: '/settings/categories', icon: faGear },
@@ -27,7 +28,7 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!appUser) return
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateStr()
     supabase
       .from('user_activities')
       .select('id', { count: 'exact', head: true })

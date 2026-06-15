@@ -10,6 +10,7 @@ import {
   DEBT_TYPE_OPTIONS,
   INSTALLMENT_TYPE_OPTIONS,
 } from '@/lib/debtLoanOptions'
+import { localDateStr } from '@/lib/date'
 
 type DebtLoanDetail = {
   id: number
@@ -52,7 +53,7 @@ export default function TagihanDebtLoanPage() {
 
   // Add debt modal
   const [showAddDebt, setShowAddDebt] = useState(false)
-  const [addForm, setAddForm] = useState({ bank_account: BANK_ACCOUNT_OPTIONS[0] as string, debt_type: DEBT_TYPE_OPTIONS[0] as string, date: new Date().toISOString().slice(0, 10), debt_amount: '', installment_type: 'monthly' as string, installment_amount: '', due_date: '' })
+  const [addForm, setAddForm] = useState({ bank_account: BANK_ACCOUNT_OPTIONS[0] as string, debt_type: DEBT_TYPE_OPTIONS[0] as string, date: localDateStr(), debt_amount: '', installment_type: 'monthly' as string, installment_amount: '', due_date: '' })
   const [addSaving, setAddSaving] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
 
@@ -68,7 +69,7 @@ export default function TagihanDebtLoanPage() {
     setAddSaving(false)
     if (error) { setAddError(error.message); return }
     setShowAddDebt(false)
-    setAddForm({ bank_account: BANK_ACCOUNT_OPTIONS[0] as string, debt_type: DEBT_TYPE_OPTIONS[0] as string, date: new Date().toISOString().slice(0, 10), debt_amount: '', installment_type: 'monthly' as string, installment_amount: '', due_date: '' })
+    setAddForm({ bank_account: BANK_ACCOUNT_OPTIONS[0] as string, debt_type: DEBT_TYPE_OPTIONS[0] as string, date: localDateStr(), debt_amount: '', installment_type: 'monthly' as string, installment_amount: '', due_date: '' })
     fetchData(); fetchRekeningKoran()
   }
 
@@ -161,7 +162,7 @@ export default function TagihanDebtLoanPage() {
     if (!paying) return
     setSaving(true)
     const { error } = await supabase.from('debt_loan_detail')
-      .update({ is_paid: true, payment_date: new Date().toISOString().slice(0, 10) })
+      .update({ is_paid: true, payment_date: localDateStr() })
       .eq('id', paying.id)
     setSaving(false)
     if (error) return
@@ -175,7 +176,7 @@ export default function TagihanDebtLoanPage() {
     const amount = parseFloat(rkPayAmount)
     if (!amount || amount <= 0) { setRkError('Masukkan jumlah pembayaran.'); return }
     setRkSaving(true); setRkError(null)
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateStr()
     const { error } = await supabase.from('debt_loan_detail').insert({
       debt_loan_id: payingRk.id,
       date: today,

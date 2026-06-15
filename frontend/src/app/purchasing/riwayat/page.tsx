@@ -10,6 +10,7 @@ import { getArrivalStatus, ARRIVAL_STATUS } from '@/lib/arrivalStatus'
 import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
 import { useAuth } from '@/context/AuthContext'
 import { PURCHASING_STATUS } from '@/lib/purchasingStatus'
+import { localDateStr } from '@/lib/date'
 
 type StockBatch = { id: number; is_available: boolean }
 
@@ -209,7 +210,7 @@ export default function RiwayatPurchasingPage() {
           purchasing_id: editing.id,
           supplier_id: Number(editSupplierId),
           due_date: finalDueDateStr,
-          installment_due_date: installmentDue.toISOString().slice(0, 10),
+          installment_due_date: localDateStr(installmentDue),
           month: finalMonth,
           installment,
           paid_amount: 0,

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faMoneyBillWave, faCheck, faXmark, faCalendarDays, faChevronDown, faChevronUp, faEye, faReceipt } from '@fortawesome/free-solid-svg-icons'
+import { localDateStr } from '@/lib/date'
 
 type Bill = {
   id: number
@@ -143,7 +144,7 @@ export default function BillsPage() {
       await supabase.from('bills').update({
         is_paid: true,
         paid_amount: bill.installment,
-        payment_date: new Date().toISOString().slice(0, 10)
+        payment_date: localDateStr()
       }).eq('id', id)
     }
     const { data } = await supabase.from('bills')
@@ -255,7 +256,7 @@ export default function BillsPage() {
     if (newPaid > payingBill.installment) { setError(`Melebihi sisa tagihan Rp ${fmt(payingBill.installment - payingBill.paid_amount)}.`); return }
     setPaying(true)
     const { error } = await supabase.from('bills')
-      .update({ paid_amount: newPaid, payment_date: new Date().toISOString().slice(0, 10) })
+      .update({ paid_amount: newPaid, payment_date: localDateStr() })
       .eq('id', payingBill.id)
     setPaying(false)
     if (error) { setError(error.message); return }
@@ -674,8 +675,8 @@ export default function BillsPage() {
         const grouped = paginated.reduce<Record<string, typeof paginated>>((acc, b) => {
           const day = b.updated_at.slice(0, 10)
           const label = (() => {
-            const today = new Date().toISOString().slice(0, 10)
-            const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+            const today = localDateStr()
+            const yesterday = localDateStr(new Date(Date.now() - 86400000))
             if (day === today) return 'Hari Ini'
             if (day === yesterday) return 'Kemarin'
             return new Date(day).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -758,7 +759,7 @@ export default function BillsPage() {
           const d = new Date(startDate); d.setDate(startDate.getDate() + i); return d
         })
         const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
-        const todayStr = new Date().toISOString().slice(0, 10)
+        const todayStr = localDateStr()
         const prevMonth = () => setMonthCalendarDate(new Date(year, month - 1, 1))
         const nextMonth = () => setMonthCalendarDate(new Date(year, month + 1, 1))
         const monthLabel = firstDay.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
@@ -789,7 +790,7 @@ export default function BillsPage() {
               {/* Calendar grid */}
               <div className="grid grid-cols-7 divide-x divide-gray-100 max-h-[55vh] overflow-y-auto">
                 {cells.map((day, idx) => {
-                  const dateStr = day.toISOString().slice(0, 10)
+                  const dateStr = localDateStr(day)
                   const isCurrentMonth = day.getMonth() === month
                   const isToday = dateStr === todayStr
                   const dayBills = bills.filter(b => b.installment_due_date === dateStr)
@@ -846,7 +847,7 @@ export default function BillsPage() {
         const prevWeek = () => setCalendarWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })
         const nextWeek = () => setCalendarWeekStart(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })
         const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
-        const todayStr = new Date().toISOString().slice(0, 10)
+        const todayStr = localDateStr()
 
         return (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
@@ -869,7 +870,7 @@ export default function BillsPage() {
               {/* Day rows */}
               <div className="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto">
                 {days.map((day, idx) => {
-                  const dateStr = day.toISOString().slice(0, 10)
+                  const dateStr = localDateStr(day)
                   const isToday = dateStr === todayStr
                   const dayBills = filtered.filter(b => b.installment_due_date === dateStr)
 

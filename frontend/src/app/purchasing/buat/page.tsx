@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { toTitleCase } from '@/lib/utils'
 import type { PurchasingStatus } from '@/lib/purchasingStatus'
 import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
+import { localDateStr } from '@/lib/date'
 
 type Supplier = { id: number; name: string }
 type Category = { id: number; name: string }
@@ -41,7 +42,7 @@ export default function BuatPurchasingPage() {
   const [newProductPrice, setNewProductPrice] = useState('')
   const [addingProduct, setAddingProduct] = useState(false)
   const [supplierId, setSupplierId] = useState<number | ''>('')
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(localDateStr())
   const [notes, setNotes] = useState('')
   const [jatuhTempo, setJatuhTempo] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem()])
@@ -282,7 +283,7 @@ export default function BuatPurchasingPage() {
           purchasing_id: pur.id,
           supplier_id: Number(supplierId),
           due_date: finalDueDateStr,
-          installment_due_date: installmentDue.toISOString().slice(0, 10),
+          installment_due_date: localDateStr(installmentDue),
           month: finalMonth,
           installment,
           paid_amount: 0,

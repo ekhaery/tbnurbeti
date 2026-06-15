@@ -11,6 +11,7 @@ import {
   INSTALLMENT_TYPE_OPTIONS,
   type DebtLoanPeriod,
 } from '@/lib/debtLoanOptions'
+import { localDateStr } from '@/lib/date'
 
 type DebtLoan = {
   id: number
@@ -31,7 +32,7 @@ const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'n
 const emptyForm = () => ({
   bank_account: BANK_ACCOUNT_OPTIONS[0] as string,
   debt_type: DEBT_TYPE_OPTIONS[0] as string,
-  date: new Date().toISOString().slice(0, 10),
+  date: localDateStr(),
   debt_amount: '',
   installment_type: 'monthly' as string,
   installment_amount: '',
@@ -67,7 +68,7 @@ async function generateDetails(supabase: ReturnType<typeof createClient>, debtLo
       date: form.date,
       due_date: form.due_date || null,
       installment_amount: installmentAmount,
-      installment_due_date: due.toISOString().slice(0, 10),
+      installment_due_date: localDateStr(due),
       is_paid: false,
     }
   })

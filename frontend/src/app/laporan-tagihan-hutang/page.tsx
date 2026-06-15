@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCalendarDays, faXmark, faChevronLeft, faChevronRight, faArrowUpAZ } from '@fortawesome/free-solid-svg-icons'
+import { localDateStr } from '@/lib/date'
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -12,7 +13,7 @@ const now = new Date()
 const defaultFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
 const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
 const defaultTo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-const todayStr = now.toISOString().slice(0, 10)
+const todayStr = localDateStr(now)
 
 type BillRow = { id: number; installment: number; paid_amount: number; is_paid: boolean; installment_due_date: string | null; due_date: string; suppliers: { name: string } | null }
 type PurchasingRow = { id: number; total: number; date: string; due_date: string | null; suppliers: { name: string } | null }
@@ -393,7 +394,7 @@ export default function LaporanTagihanHutangPage() {
                 <div className="divide-y divide-gray-100">
                   {Array.from({length:7},(_,i) => {
                     const d=new Date(calWeekStart); d.setDate(d.getDate()+i)
-                    const ds=d.toISOString().slice(0,10)
+                    const ds=localDateStr(d)
                     const isToday=ds===todayStr
                     const evs=allCalEvents.filter(e=>e.date===ds)
                     const days=['Sen','Sel','Rab','Kam','Jum','Sab','Min']
@@ -427,7 +428,7 @@ export default function LaporanTagihanHutangPage() {
                       const start=new Date(first); start.setDate(1-off)
                       return Array.from({length:42},(_,i) => {
                         const d=new Date(start); d.setDate(start.getDate()+i)
-                        const ds=d.toISOString().slice(0,10)
+                        const ds=localDateStr(d)
                         const isToday=ds===todayStr, inMo=d.getMonth()===mo
                         const evs=allCalEvents.filter(e=>e.date===ds)
                         return (

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import Link from 'next/link'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faXmark, faChevronLeft, faReceipt, faMoneyBillWave } from '@fortawesome/free-solid-svg-icons'
+import { localDateStr } from '@/lib/date'
 
 type Supplier = { id: number; name: string }
 
@@ -18,9 +19,9 @@ type BillRow = {
   purchasing: { code: string } | null
 }
 
-type DebtDetailRow = {
-  id: number; installment_due_date: string | null; installment_amount: number
-  is_paid: boolean; debt_loan: { bank_account: string; debt_type: string } | null
+type DebtLoanRow = {
+  id: number; bank_account: string; debt_type: string; debt_amount: number; due_date: string | null
+  debt_loan_detail: { installment_amount: number; is_paid: boolean }[]
 }
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
@@ -40,7 +41,7 @@ export default function KunjunganSalesPage() {
 
   const [loadingPembayaran, setLoadingPembayaran] = useState(false)
   const [billsList, setBillsList] = useState<BillRow[] | null>(null)
-  const [debtList, setDebtList] = useState<DebtDetailRow[] | null>(null)
+  const [debtList, setDebtList] = useState<DebtLoanRow[] | null>(null)
   const [showPembayaran, setShowPembayaran] = useState(false)
 
 
@@ -73,15 +74,15 @@ export default function KunjunganSalesPage() {
       supabase.from('bills')
         .select('id, bill_no, installment_due_date, installment, paid_amount, is_paid, purchasing(code)')
         .eq('supplier_id', selectedSupplier.id)
+        .gt('paid_amount', 0)
         .order('installment_due_date', { ascending: false }),
-      supabase.from('debt_loan_detail')
-        .select('id, installment_due_date, installment_amount, is_paid, debt_loan(bank_account, debt_type)')
-        .eq('debt_loan.supplier_id', selectedSupplier.id)
-        .order('installment_due_date', { ascending: false }),
+      supabase.from('debt_loan')
+        .select('id, bank_account, debt_type, debt_amount, due_date, debt_loan_detail(installment_amount, is_paid)')
+        .eq('supplier_id', selectedSupplier.id)
+        .order('due_date', { ascending: false }),
     ])
     setBillsList((billsRes.data ?? []) as BillRow[])
-    const filtered = ((debtRes.data ?? []) as DebtDetailRow[]).filter(d => d.debt_loan !== null)
-    setDebtList(filtered)
+    setDebtList((debtRes.data ?? []) as DebtLoanRow[])
     setShowPembayaran(true); setLoadingPembayaran(false)
   }
 
@@ -175,7 +176,16 @@ export default function KunjunganSalesPage() {
             </div>
             <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
               {pesananList === null || pesananList.length === 0 ? (
-                <p className="text-center text-sm text-gray-400 py-10">Tidak ada data pesanan.</p>
+                <div className="px-5 py-6 space-y-3">
+                  <p className="text-center text-sm text-gray-400">Tidak ada data pesanan.</p>
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                    <p className="text-xs text-blue-700 leading-relaxed">
+                      Jika tidak ada data pesanan namun ada Tagihan &amp; Riwayat Pembayaran,
+                      artinya admin hanya memasukan tagihan &amp; riwayat pembayaran sebagai data saja.
+                      Tujuannya untuk melihat tagihan mendatang dan pencatatan uang keluar.
+                    </p>
+                  </div>
+                </div>
               ) : pesananList.map(p => (
                 <div key={p.id} className="flex items-start justify-between px-4 py-3 gap-3">
                   <div className="flex-1 min-w-0">
@@ -236,21 +246,26 @@ export default function KunjunganSalesPage() {
                 <div>
                   <p className="px-4 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide bg-gray-50 border-b border-gray-100">Debt & Giro ({debtList.length})</p>
                   <div className="divide-y divide-gray-100">
-                    {debtList.map(d => (
-                      <div key={d.id} className="flex items-start justify-between px-4 py-3 gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-gray-700">{d.debt_loan?.bank_account ?? '-'}</p>
-                          <p className="text-[10px] text-gray-400">{d.debt_loan?.debt_type}</p>
-                          {d.installment_due_date && <p className="text-xs text-gray-500 mt-0.5">{fmtDate(d.installment_due_date)}</p>}
+                    {debtList.map(d => {
+                      const totalPaid = d.debt_loan_detail.filter(x => x.is_paid).reduce((s, x) => s + x.installment_amount, 0)
+                      const sisa = Math.max(0, Math.round(d.debt_amount - totalPaid))
+                      const pct = d.debt_amount > 0 ? Math.min(100, Math.round(totalPaid / d.debt_amount * 100)) : 0
+                      const isOverdue = d.due_date ? d.due_date <= localDateStr() : false
+                      return (
+                        <div key={d.id} className={`flex items-start justify-between px-4 py-3 gap-3 ${isOverdue ? 'bg-gray-100' : ''}`}>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-gray-700">{d.bank_account}</p>
+                            <p className="text-[10px] text-gray-400">{d.debt_type}</p>
+                            {d.due_date && <p className="text-xs text-gray-500 mt-0.5">JT: {fmtDate(d.due_date)}</p>}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-semibold text-[#121358]">Rp {fmt(d.debt_amount)}</p>
+                            <p className="text-[10px] text-green-600">Dibayar: Rp {fmt(totalPaid)} ({pct}%)</p>
+                            <p className={`text-[10px] font-semibold ${sisa === 0 ? 'text-green-600' : 'text-red-500'}`}>Sisa: Rp {fmt(sisa)}</p>
+                          </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-semibold text-[#121358]">Rp {fmt(d.installment_amount)}</p>
-                          <span className={`text-[10px] font-semibold ${d.is_paid ? 'text-green-600' : 'text-red-500'}`}>
-                            {d.is_paid ? 'Lunas' : 'Belum'}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}
