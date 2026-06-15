@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 
 const tabs = [
   { label: 'Daftar Produk', href: '/products/list' },
@@ -10,10 +11,16 @@ const tabs = [
 
 export default function ProductTabs() {
   const pathname = usePathname()
+  const { appUser } = useAuth()
+  const isAdmin = appUser?.role === 'admin'
+
+  const visibleTabs = isAdmin
+    ? [...tabs, { label: 'Setting', href: '/products/settings' }]
+    : tabs
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1">
-      {tabs.map((tab) => {
+      {visibleTabs.map((tab) => {
         const active = pathname === tab.href
         return (
           <Link
