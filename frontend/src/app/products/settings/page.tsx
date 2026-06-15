@@ -7,9 +7,26 @@ import ProductTabs from '@/lib/ProductTabs'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faXmark } from '@fortawesome/free-solid-svg-icons'
 
+type NoStockProduct = { name: string; base_price: number; price: number }
+const fmt = (n: number) => n.toLocaleString('id-ID')
+
 export default function ProductSettingsPage() {
   const { appUser, loading } = useAuth()
   const router = useRouter()
+
+  const [noStockProducts, setNoStockProducts] = useState<NoStockProduct[] | null>(null)
+  const [loadingNoStock, setLoadingNoStock] = useState(false)
+  const [noStockError, setNoStockError] = useState<string | null>(null)
+
+  const handleFetchNoStock = async () => {
+    setLoadingNoStock(true)
+    setNoStockError(null)
+    const res = await fetch('/api/products-no-stock')
+    const json = await res.json()
+    setLoadingNoStock(false)
+    if (res.ok) setNoStockProducts(json.products)
+    else setNoStockError(json.error ?? 'Gagal.')
+  }
 
   const [triggeringStock, setTriggeringStock] = useState(false)
   const [triggerResult, setTriggerResult] = useState<{ count: number; names: string[] } | null>(null)
@@ -50,6 +67,34 @@ export default function ProductSettingsPage() {
             className="text-sm font-semibold px-5 py-2.5 rounded-full bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white transition shadow-sm">
             {triggeringStock ? 'Loading...' : 'Trigger Stock'}
           </button>
+        </div>
+
+        {/* Lihat Daftar Produk Tanpa Stock Batches */}
+        <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Lihat Daftar Produk Tanpa Stock Batches</p>
+            <p className="text-xs text-gray-500 mt-0.5">Produk dengan harga beli = 0 dan belum memiliki data stok. Update base_price dan klik Setting &gt; Trigger Stok untuk membuat data produk bisa dibeli.</p>
+          </div>
+          {noStockError && <p className="text-xs font-semibold text-red-500">⚠️ {noStockError}</p>}
+          <button onClick={handleFetchNoStock} disabled={loadingNoStock}
+            className="text-sm font-semibold px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white transition shadow-sm">
+            {loadingNoStock ? 'Memuat...' : 'Lihat Produk'}
+          </button>
+          {noStockProducts !== null && (
+            <div className="mt-2">
+              <p className="text-xs text-gray-500 mb-2">{noStockProducts.length} produk ditemukan</p>
+              {noStockProducts.length > 0 && (
+                <div className="max-h-72 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-100">
+                  {noStockProducts.map((p, i) => (
+                    <div key={i} className="flex items-center justify-between px-4 py-2.5 gap-3">
+                      <p className="text-sm text-gray-700 flex-1 min-w-0 truncate">{p.name}</p>
+                      <p className="text-xs text-gray-400 shrink-0">Rp {fmt(p.price)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
