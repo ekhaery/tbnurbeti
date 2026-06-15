@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus, faXmark, faPen, faTrash, faCalendarDays, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons'
+import { faPlus, faXmark, faPen, faTrash, faCalendarDays, faChevronLeft, faChevronRight, faEllipsisVertical } from '@fortawesome/free-solid-svg-icons'
 import {
   BANK_ACCOUNT_OPTIONS,
   INSTALLMENT_TYPE_OPTIONS,
@@ -78,6 +78,8 @@ async function generateDetails(supabase: ReturnType<typeof createClient>, debtLo
 
 type CalDetail = { id: number; installment_due_date: string | null; due_date: string | null; installment_amount: number; debt_loan: { bank_account: string; debt_amount: number; suppliers: { name: string } | null } | null }
 
+type GiroCicilan = { id: number; installment_due_date: string | null; installment_amount: number; is_paid: boolean; due_date: string | null; debt_loan: { bank_account: string; debt_type: string; suppliers: { name: string } | null } | null }
+
 function CalChip({ d, fmt }: { d: CalDetail; fmt: (n: number) => string }) {
   const dl = d.debt_loan
   const name = dl?.suppliers?.name ?? dl?.bank_account ?? '-'
@@ -127,6 +129,49 @@ export default function TagihanGiroPage() {
   const [deleting, setDeleting] = useState<DebtLoan | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
+  const [giroTab, setGiroTab] = useState<'cicilan' | 'kumpulan'>('kumpulan')
+  const [cicilanList, setCicilanList] = useState<GiroCicilan[]>([])
+  const [fetchingCicilan, setFetchingCicilan] = useState(false)
+
+  const [kebabOpen, setKebabOpen] = useState<number | null>(null)
+  const [lihatCicilanTarget, setLihatCicilanTarget] = useState<DebtLoan | null>(null)
+  const [lihatCicilanList, setLihatCicilanList] = useState<GiroCicilan[]>([])
+  const [fetchingLihatCicilan, setFetchingLihatCicilan] = useState(false)
+  const [checkedCicilanIds, setCheckedCicilanIds] = useState<Set<number>>(new Set())
+  const [markingLunas, setMarkingLunas] = useState(false)
+
+  const openLihatCicilan = async (d: DebtLoan) => {
+    setLihatCicilanTarget(d)
+    setKebabOpen(null)
+    setCheckedCicilanIds(new Set())
+    setFetchingLihatCicilan(true)
+    const { data } = await supabase.from('debt_loan_detail')
+      .select('id, installment_due_date, installment_amount, is_paid, due_date, debt_loan(bank_account, debt_type, suppliers(name))')
+      .eq('debt_loan_id', d.id)
+      .order('installment_due_date', { ascending: true })
+    setLihatCicilanList((data ?? []) as GiroCicilan[])
+    setFetchingLihatCicilan(false)
+  }
+
+  const toggleCicilanCheck = (id: number) => {
+    setCheckedCicilanIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const handleMarkLunas = async () => {
+    if (checkedCicilanIds.size === 0) return
+    setMarkingLunas(true)
+    for (const id of Array.from(checkedCicilanIds)) {
+      await supabase.from('debt_loan_detail').update({ is_paid: true }).eq('id', id)
+    }
+    setLihatCicilanList(prev => prev.map(c => checkedCicilanIds.has(c.id) ? { ...c, is_paid: true } : c))
+    setCheckedCicilanIds(new Set())
+    setMarkingLunas(false)
+  }
+
   const fetchData = async () => {
     const { data } = await supabase.from('debt_loan').select('*, suppliers(name)').eq('debt_type', 'Giro').order('date', { ascending: false })
     setList((data as DebtLoan[]) ?? [])
@@ -142,9 +187,20 @@ export default function TagihanGiroPage() {
     setCalDetails((data ?? []) as typeof calDetails)
   }
 
+  const fetchCicilan = async () => {
+    setFetchingCicilan(true)
+    const { data } = await supabase.from('debt_loan_detail')
+      .select('id, installment_due_date, installment_amount, is_paid, due_date, debt_loan(bank_account, debt_type, suppliers(name))')
+      .order('installment_due_date', { ascending: true })
+    const filtered = ((data ?? []) as GiroCicilan[]).filter(d => d.debt_loan?.debt_type === 'Giro')
+    setCicilanList(filtered)
+    setFetchingCicilan(false)
+  }
+
   useEffect(() => {
     fetchData()
     fetchCalDetails()
+    fetchCicilan()
     supabase.from('suppliers').select('id, name').order('name')
       .then(({ data }: { data: Supplier[] | null }) => setSuppliers(data ?? []))
   }, [])
@@ -378,7 +434,18 @@ export default function TagihanGiroPage() {
           ) : null
         })()}
 
-        {fetching ? (
+        {/* Tabs */}
+        <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1">
+          {(['kumpulan', 'cicilan'] as const).map(t => (
+            <button key={t} onClick={() => setGiroTab(t)}
+              className={`flex-1 text-center text-sm font-medium py-2 rounded-xl transition-colors ${giroTab === t ? 'bg-slate-800 text-white' : 'bg-slate-200 sm:bg-transparent text-slate-500 sm:hover:bg-slate-200'}`}>
+              {t === 'kumpulan' ? 'Kumpulan Giro' : 'Cicilan'}
+            </button>
+          ))}
+        </div>
+
+        {/* Kumpulan Giro tab */}
+        {giroTab === 'kumpulan' && (fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
         ) : list.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-10">Belum ada data.</div>
@@ -391,6 +458,8 @@ export default function TagihanGiroPage() {
               return true
             }).map(d => (
               <div key={d.id} className="relative bg-white rounded-xl shadow-sm p-4 border-l-4 border-[#9FA1FF]">
+                {/* Kebab backdrop */}
+                {kebabOpen === d.id && <div className="fixed inset-0 z-10" onClick={() => setKebabOpen(null)} />}
                 <div className="flex items-start justify-between gap-3 pr-8">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -407,14 +476,64 @@ export default function TagihanGiroPage() {
                     <p className="text-sm font-bold text-[#121358]">Rp {fmt(d.debt_amount)}</p>
                   </div>
                 </div>
-                <button onClick={() => openEdit(d)}
-                  className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-full text-[#121358]/50 hover:bg-[#121358]/10 hover:text-[#121358] transition">
-                  <FontAwesomeIcon icon={faPen} className="w-3 h-3" />
-                </button>
+                {/* Kebab button */}
+                <div className="absolute top-3 right-3 z-20">
+                  <button onClick={() => setKebabOpen(kebabOpen === d.id ? null : d.id)}
+                    className="w-7 h-7 flex items-center justify-center rounded-full text-[#121358]/50 hover:bg-[#121358]/10 hover:text-[#121358] transition">
+                    <FontAwesomeIcon icon={faEllipsisVertical} className="w-3.5 h-3.5" />
+                  </button>
+                  {kebabOpen === d.id && (
+                    <div className="absolute right-0 top-8 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden w-40">
+                      <button onClick={() => { setKebabOpen(null); openEdit(d) }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition">
+                        <FontAwesomeIcon icon={faPen} className="w-3 h-3 text-gray-400" /> Edit
+                      </button>
+                      <button onClick={() => openLihatCicilan(d)}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition border-t border-gray-100">
+                        <FontAwesomeIcon icon={faCalendarDays} className="w-3 h-3 text-gray-400" /> Lihat cicilan
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
-        )}
+        ))}
+
+        {/* Cicilan tab */}
+        {giroTab === 'cicilan' && (fetchingCicilan ? (
+          <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
+        ) : (() => {
+          const filtered = cicilanList.filter(d => {
+            if (filterDateFrom && (d.installment_due_date ?? '') < filterDateFrom) return false
+            if (filterDateTo && (d.installment_due_date ?? '') > filterDateTo) return false
+            if (filterSupplierFilter && d.debt_loan?.suppliers?.name !== filterSupplierFilter) return false
+            return true
+          })
+          return filtered.length === 0 ? (
+            <div className="text-center text-sm text-gray-400 py-10">Tidak ada cicilan.</div>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map(d => (
+                <div key={d.id} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${d.is_paid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">{d.debt_loan?.suppliers?.name ?? d.debt_loan?.bank_account ?? '-'}</p>
+                      {d.installment_due_date && <p className="text-xs text-gray-500 mt-0.5">Cicilan: {fmtDate(d.installment_due_date)}</p>}
+                      {d.due_date && <p className="text-xs text-gray-500 mt-0.5">JT: {fmtDate(d.due_date)}</p>}
+                    </div>
+                    <div className="text-right shrink-0 space-y-1">
+                      <p className="text-sm font-bold text-[#121358]">Rp {fmt(d.installment_amount)}</p>
+                      <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${d.is_paid ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'}`}>
+                        {d.is_paid ? 'Lunas' : 'Belum'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        })())}
       </div>
 
       {/* Weekly Calendar Modal */}
@@ -542,6 +661,75 @@ export default function TagihanGiroPage() {
               <button onClick={() => setDeleting(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Batal</button>
               <button onClick={handleDelete} disabled={confirmingDelete} className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white text-sm font-semibold transition">
                 {confirmingDelete ? 'Menghapus...' : 'Hapus'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lihat Cicilan popup */}
+      {lihatCicilanTarget && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="px-5 py-4 bg-[#121358] shrink-0 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-white">{lihatCicilanTarget.suppliers?.name ?? lihatCicilanTarget.bank_account}</p>
+                <p className="text-xs text-white/60 mt-0.5">{lihatCicilanTarget.bank_account} · Rp {fmt(lihatCicilanTarget.debt_amount)}</p>
+                {lihatCicilanTarget.due_date && <p className="text-xs text-white/60 mt-0.5">JT: {fmtDate(lihatCicilanTarget.due_date)}</p>}
+              </div>
+              <button onClick={() => setLihatCicilanTarget(null)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0 transition">
+                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {fetchingLihatCicilan ? (
+                <p className="text-center text-sm text-gray-400 py-10">Memuat...</p>
+              ) : lihatCicilanList.length === 0 ? (
+                <p className="text-center text-sm text-gray-400 py-10">Tidak ada cicilan.</p>
+              ) : (
+                <>
+                  <div className="px-5 py-2 border-b border-gray-100 flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={lihatCicilanList.filter(c => !c.is_paid).length > 0 && lihatCicilanList.filter(c => !c.is_paid).every(c => checkedCicilanIds.has(c.id))}
+                      onChange={() => {
+                        const unpaid = lihatCicilanList.filter(c => !c.is_paid).map(c => c.id)
+                        const allChecked = unpaid.every(id => checkedCicilanIds.has(id))
+                        setCheckedCicilanIds(allChecked ? new Set() : new Set(unpaid))
+                      }}
+                      className="w-4 h-4 accent-[#121358] shrink-0"
+                    />
+                    <p className="text-xs font-semibold text-gray-500">Checklist Semua Untuk Lunasi</p>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {lihatCicilanList.map(c => (
+                      <div key={c.id}
+                        onClick={() => !c.is_paid && toggleCicilanCheck(c.id)}
+                        className={`flex items-center gap-3 px-5 py-3 transition ${c.is_paid ? 'opacity-50' : 'cursor-pointer hover:bg-gray-50'} ${checkedCicilanIds.has(c.id) ? 'bg-blue-50' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={c.is_paid || checkedCicilanIds.has(c.id)}
+                          disabled={c.is_paid}
+                          onChange={() => !c.is_paid && toggleCicilanCheck(c.id)}
+                          onClick={e => e.stopPropagation()}
+                          className="w-4 h-4 accent-[#121358] shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-500">{c.installment_due_date ? fmtDate(c.installment_due_date) : '-'}</p>
+                          {c.is_paid && <span className="text-[10px] font-semibold text-green-600">Lunas</span>}
+                        </div>
+                        <p className="text-sm font-semibold text-[#121358] shrink-0">Rp {fmt(c.installment_amount)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex gap-2 px-5 py-3 border-t border-gray-100 shrink-0">
+              <button onClick={() => setLihatCicilanTarget(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Tutup</button>
+              <button onClick={handleMarkLunas} disabled={markingLunas || checkedCicilanIds.size === 0}
+                className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
+                {markingLunas ? 'Menyimpan...' : `Lunas (${checkedCicilanIds.size})`}
               </button>
             </div>
           </div>
