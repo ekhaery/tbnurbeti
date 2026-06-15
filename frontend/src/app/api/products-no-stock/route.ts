@@ -36,5 +36,5 @@ export async function GET() {
   const { data, error } = await adminClient.rpc('get_products_no_stock')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ products: data ?? [] })
+  return NextResponse.json({ products: (data ?? []) as { id: number; name: string; base_price: number; price: number }[] })
 }

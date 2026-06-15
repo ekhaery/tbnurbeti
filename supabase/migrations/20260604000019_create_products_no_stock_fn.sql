@@ -1,9 +1,9 @@
 create or replace function get_products_no_stock()
-returns table(name text, base_price numeric, price numeric)
+returns table(id integer, name text, base_price numeric, price numeric)
 language sql
 security definer
 as $$
-  select p.name, p.base_price, p.price
+  select p.id, p.name, p.base_price, p.price
   from products p
   where not exists (
     select 1 from stock_batches sb where sb.product_id = p.id
