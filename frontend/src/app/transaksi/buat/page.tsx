@@ -58,22 +58,39 @@ export default function BuatTransaksiPage() {
   const [success, setSuccess] = useState<string | null>(null)
 
   const fetchProducts = async () => {
-    const { data } = await supabase
-      .from('products')
-      .select('id, name, price, categories(name)')
-      .eq('is_discontinued', false)
-      .eq('is_deleted', false)
-      .order('name')
-    // Get available stock from stock_batches
-    const { data: batches } = await supabase
-      .from('stock_batches')
-      .select('product_id, qty_remaining')
-      .eq('is_available', true)
-    const stockMap: Record<number, number> = {}
-    for (const b of (batches ?? []) as { product_id: number; qty_remaining: number }[]) {
-      stockMap[b.product_id] = (stockMap[b.product_id] ?? 0) + b.qty_remaining
+    const chunkSize = 1000
+    let from = 0
+    let allProducts: Omit<Product, 'stock'>[] = []
+    while (true) {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, price, categories(name)')
+        .eq('is_discontinued', false)
+        .eq('is_deleted', false)
+        .order('name')
+        .range(from, from + chunkSize - 1)
+      if (error || !data || data.length === 0) break
+      allProducts = [...allProducts, ...(data as Omit<Product, 'stock'>[])]
+      if (data.length < chunkSize) break
+      from += chunkSize
     }
-    setProducts(((data ?? []) as Omit<Product, 'stock'>[]).map(p => ({ ...p, stock: stockMap[p.id] ?? 0 })))
+    // Get available stock from stock_batches
+    from = 0
+    const stockMap: Record<number, number> = {}
+    while (true) {
+      const { data, error } = await supabase
+        .from('stock_batches')
+        .select('product_id, qty_remaining')
+        .eq('is_available', true)
+        .range(from, from + chunkSize - 1)
+      if (error || !data || data.length === 0) break
+      for (const b of data as { product_id: number; qty_remaining: number }[]) {
+        stockMap[b.product_id] = (stockMap[b.product_id] ?? 0) + b.qty_remaining
+      }
+      if (data.length < chunkSize) break
+      from += chunkSize
+    }
+    setProducts(allProducts.map(p => ({ ...p, stock: stockMap[p.id] ?? 0 })))
   }
 
   useEffect(() => { fetchProducts() }, [])
