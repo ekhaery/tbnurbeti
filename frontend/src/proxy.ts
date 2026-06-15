@@ -38,7 +38,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user && isLoginPage) {
-    return NextResponse.redirect(new URL('/products/bulk-input', request.url))
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   return supabaseResponse
