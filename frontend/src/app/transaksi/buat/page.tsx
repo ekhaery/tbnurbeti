@@ -348,16 +348,9 @@ export default function BuatTransaksiPage() {
                               autocomplete[i].focused === optIdx ? 'bg-[#121358] text-white' : 'hover:bg-gray-50 text-gray-700'
                             }`}
                           >
-                            <span>
-                              <span className="font-medium">{p.name}</span>
-                              {p.categories?.name && (
-                                <span className={`ml-1 text-xs ${autocomplete[i].focused === optIdx ? 'text-white/70' : 'text-gray-400'}`}>
-                                  ({p.categories.name})
-                                </span>
-                              )}
-                            </span>
+                            <span className="font-medium">{p.name}</span>
                             <span className={`text-xs shrink-0 ${autocomplete[i].focused === optIdx ? 'text-white/70' : 'text-gray-400'}`}>
-                              stok: {p.stock}
+                              Rp {p.price.toLocaleString('id-ID')} · stok: {p.stock}
                             </span>
                           </button>
                         ))}
