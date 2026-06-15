@@ -48,7 +48,7 @@ export default function SuppliersPage() {
   const [popupEditMode, setPopupEditMode] = useState(false)
 
   const fetchData = async () => {
-    const { data } = await supabase.from('suppliers').select('id, name, phone, address, sales_name, bank_detail').order('name')
+    const { data } = await supabase.from('suppliers').select('id, name, phone, address, sales_name, bank_detail').order('id', { ascending: false })
     setSuppliers((data as Supplier[]) ?? [])
     setFetching(false)
   }
