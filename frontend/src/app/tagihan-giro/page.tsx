@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus, faXmark, faPen, faTrash, faCalendarDays, faChevronLeft, faChevronRight, faEllipsisVertical } from '@fortawesome/free-solid-svg-icons'
+import { faPlus, faXmark, faPen, faTrash, faCalendarDays, faChevronLeft, faChevronRight, faEllipsisVertical, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
 import {
   BANK_ACCOUNT_OPTIONS,
   INSTALLMENT_TYPE_OPTIONS,
@@ -132,6 +132,18 @@ export default function TagihanGiroPage() {
   const [giroTab, setGiroTab] = useState<'cicilan' | 'kumpulan'>('kumpulan')
   const [cicilanList, setCicilanList] = useState<GiroCicilan[]>([])
   const [fetchingCicilan, setFetchingCicilan] = useState(false)
+  const [expandedCicilanWeeks, setExpandedCicilanWeeks] = useState<Set<string>>(new Set())
+  const [confirmLunasTarget, setConfirmLunasTarget] = useState<GiroCicilan | null>(null)
+  const [confirmingLunas, setConfirmingLunas] = useState(false)
+
+  const handleConfirmLunas = async () => {
+    if (!confirmLunasTarget) return
+    setConfirmingLunas(true)
+    await supabase.from('debt_loan_detail').update({ is_paid: true }).eq('id', confirmLunasTarget.id)
+    setCicilanList(prev => prev.map(c => c.id === confirmLunasTarget.id ? { ...c, is_paid: true } : c))
+    setConfirmLunasTarget(null)
+    setConfirmingLunas(false)
+  }
 
   const [kebabOpen, setKebabOpen] = useState<number | null>(null)
   const [lihatCicilanTarget, setLihatCicilanTarget] = useState<DebtLoan | null>(null)
@@ -505,32 +517,66 @@ export default function TagihanGiroPage() {
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
         ) : (() => {
           const filtered = cicilanList.filter(d => {
+            if (d.is_paid) return false
             if (filterDateFrom && (d.installment_due_date ?? '') < filterDateFrom) return false
             if (filterDateTo && (d.installment_due_date ?? '') > filterDateTo) return false
             if (filterSupplierFilter && d.debt_loan?.suppliers?.name !== filterSupplierFilter) return false
             return true
           })
-          return filtered.length === 0 ? (
+          const getWeekKey = (dateStr: string) => {
+            const d = new Date(dateStr)
+            const day = d.getDay() === 0 ? 6 : d.getDay() - 1
+            const mon = new Date(d); mon.setDate(d.getDate() - day)
+            const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+            return `${mon.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} – ${sun.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`
+          }
+          const grouped = filtered.reduce<Record<string, GiroCicilan[]>>((acc, d) => {
+            const key = d.installment_due_date ? getWeekKey(d.installment_due_date) : 'Tanpa Tanggal'
+            if (!acc[key]) acc[key] = []
+            acc[key].push(d)
+            return acc
+          }, {})
+          return Object.keys(grouped).length === 0 ? (
             <div className="text-center text-sm text-gray-400 py-10">Tidak ada cicilan.</div>
           ) : (
             <div className="space-y-2">
-              {filtered.map(d => (
-                <div key={d.id} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${d.is_paid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800">{d.debt_loan?.suppliers?.name ?? d.debt_loan?.bank_account ?? '-'}</p>
-                      {d.installment_due_date && <p className="text-xs text-gray-500 mt-0.5">Cicilan: {fmtDate(d.installment_due_date)}</p>}
-                      {d.due_date && <p className="text-xs text-gray-500 mt-0.5">JT: {fmtDate(d.due_date)}</p>}
-                    </div>
-                    <div className="text-right shrink-0 space-y-1">
-                      <p className="text-sm font-bold text-[#121358]">Rp {fmt(d.installment_amount)}</p>
-                      <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${d.is_paid ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'}`}>
-                        {d.is_paid ? 'Lunas' : 'Belum'}
-                      </span>
-                    </div>
+              {Object.entries(grouped).map(([week, items]) => {
+                const total = items.reduce((s, d) => s + d.installment_amount, 0)
+                const isOpen = expandedCicilanWeeks.has(week)
+                return (
+                  <div key={week} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <button onClick={() => setExpandedCicilanWeeks(prev => { const n = new Set(prev); n.has(week) ? n.delete(week) : n.add(week); return n })}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition">
+                      <div className="flex-1 min-w-0 text-left">
+                        <p className="text-xs font-semibold text-gray-600">{week}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{items.length} cicilan</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <p className="text-sm font-bold text-[#121358]">Rp {fmt(total)}</p>
+                        <FontAwesomeIcon icon={isOpen ? faChevronUp : faChevronDown} className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </button>
+                    {isOpen && (
+                      <div className="border-t border-gray-100 divide-y divide-gray-100">
+                        {items.map(d => (
+                          <div key={d.id} className="flex items-center px-4 py-3 gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-gray-800">{d.debt_loan?.suppliers?.name ?? d.debt_loan?.bank_account ?? '-'}</p>
+                              {d.installment_due_date && <p className="text-xs text-gray-500 mt-0.5">{fmtDate(d.installment_due_date)}</p>}
+                              {d.due_date && <p className="text-xs text-gray-500 mt-0.5">JT: {fmtDate(d.due_date)}</p>}
+                            </div>
+                            <p className="text-sm font-bold text-[#121358] shrink-0">Rp {fmt(d.installment_amount)}</p>
+                            <button onClick={() => setConfirmLunasTarget(d)}
+                              className="shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-[#121358] text-white hover:bg-[#1a1c6e] transition">
+                              Lunas
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )
         })())}
@@ -730,6 +776,29 @@ export default function TagihanGiroPage() {
               <button onClick={handleMarkLunas} disabled={markingLunas || checkedCicilanIds.size === 0}
                 className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
                 {markingLunas ? 'Menyimpan...' : `Lunas (${checkedCicilanIds.size})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Lunas popup */}
+      {confirmLunasTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+            <div className="px-5 py-4 bg-[#121358]">
+              <p className="text-sm font-bold text-white">Konfirmasi Lunas</p>
+            </div>
+            <div className="px-5 py-4 space-y-1">
+              <p className="text-sm text-gray-700">Tandai cicilan ini sebagai lunas?</p>
+              <p className="text-xs text-gray-500">{confirmLunasTarget.debt_loan?.suppliers?.name ?? confirmLunasTarget.debt_loan?.bank_account ?? '-'}</p>
+              {confirmLunasTarget.installment_due_date && <p className="text-xs text-gray-500">{fmtDate(confirmLunasTarget.installment_due_date)} · Rp {fmt(confirmLunasTarget.installment_amount)}</p>}
+            </div>
+            <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
+              <button onClick={() => setConfirmLunasTarget(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Tidak</button>
+              <button onClick={handleConfirmLunas} disabled={confirmingLunas}
+                className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
+                {confirmingLunas ? 'Menyimpan...' : 'Ya'}
               </button>
             </div>
           </div>
