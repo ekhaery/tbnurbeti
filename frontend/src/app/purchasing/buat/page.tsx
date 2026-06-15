@@ -78,7 +78,7 @@ export default function BuatPurchasingPage() {
   useEffect(() => {
     supabase.from('suppliers').select('id, name').order('name')
       .then(({ data }: { data: Supplier[] | null }) => setSuppliers(data ?? []))
-    supabase.from('products').select('id, name, categories(name)').order('name')
+    supabase.from('products').select('id, name, categories(name)').eq('is_deleted', false).order('name')
       .then(({ data }: { data: Product[] | null }) => setProducts(data ?? []))
     supabase.from('categories').select('id, name').order('name')
       .then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))

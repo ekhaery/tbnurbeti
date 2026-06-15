@@ -62,6 +62,7 @@ export default function BuatTransaksiPage() {
       .from('products')
       .select('id, name, price, categories(name)')
       .eq('is_discontinued', false)
+      .eq('is_deleted', false)
       .order('name')
     // Get available stock from stock_batches
     const { data: batches } = await supabase

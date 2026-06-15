@@ -73,7 +73,7 @@ export default function BulkInputPage() {
       let from = 0
       const allNames: string[] = []
       while (true) {
-        const { data, error } = await supabase.from('products').select('name').range(from, from + chunkSize - 1)
+        const { data, error } = await supabase.from('products').select('name').eq('is_deleted', false).range(from, from + chunkSize - 1)
         if (error || !data || data.length === 0) break
         allNames.push(...(data as { name: string }[]).map(p => p.name))
         if (data.length < chunkSize) break
