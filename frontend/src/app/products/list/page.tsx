@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPenToSquare, faArrowUpAZ } from '@fortawesome/free-solid-svg-icons'
+import { faPenToSquare, faArrowUpAZ, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
 import ProductTabs from '@/lib/ProductTabs'
 
 type Product = {
@@ -17,6 +17,7 @@ type Product = {
   price: number
   stock: number
   updated_at: string
+  is_deleted: boolean
   categories: { name: string } | null
 }
 
@@ -61,6 +62,20 @@ export default function ProductListPage() {
 
   const isAdmin = appUser?.role === 'admin'
 
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const [deleteInput, setDeleteInput] = useState('')
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDelete = async () => {
+    if (!deleteTarget || deleteInput !== 'delete') return
+    setDeleting(true)
+    await supabase.from('products').update({ is_deleted: true }).eq('id', deleteTarget.id)
+    setProducts(prev => prev.filter(p => p.id !== deleteTarget.id))
+    setDeleteTarget(null)
+    setDeleteInput('')
+    setDeleting(false)
+  }
+
   useEffect(() => {
     supabase
       .from('categories')
@@ -78,7 +93,8 @@ export default function ProductListPage() {
       while (true) {
         const { data, error } = await supabase
           .from('products')
-          .select('id, code, name, base_price, price, updated_at, categories(name)')
+          .select('id, code, name, base_price, price, updated_at, is_deleted, categories(name)')
+          .eq('is_deleted', false)
           .range(from, from + chunkSize - 1)
         if (error || !data || data.length === 0) break
         allProducts = [...allProducts, ...(data as Product[])]
@@ -261,13 +277,24 @@ export default function ProductListPage() {
                   <p className={`text-xs font-medium ${p.stock <= 0 ? 'text-red-400' : 'text-green-600'}`}>
                     Stok: {p.stock}
                   </p>
-                  <button
-                    onClick={() => router.push(`/products/edit/${p.id}`)}
-                    className="mt-1 w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-[#121358]/10 text-gray-400 hover:text-[#121358] transition"
-                    title="Edit produk"
-                  >
-                    <FontAwesomeIcon icon={faPenToSquare} className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1 mt-1">
+                    <button
+                      onClick={() => router.push(`/products/edit/${p.id}`)}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-[#121358]/10 text-gray-400 hover:text-[#121358] transition"
+                      title="Edit produk"
+                    >
+                      <FontAwesomeIcon icon={faPenToSquare} className="w-3.5 h-3.5" />
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => { setDeleteTarget(p); setDeleteInput('') }}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500 transition"
+                        title="Hapus produk"
+                      >
+                        <FontAwesomeIcon icon={faTrash} className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -310,6 +337,44 @@ export default function ProductListPage() {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation popup */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+            <div className="px-5 py-4 bg-red-600 flex items-center justify-between">
+              <p className="text-sm font-bold text-white">Hapus Produk</p>
+              <button onClick={() => setDeleteTarget(null)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition">
+                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm text-gray-700">Anda akan menghapus produk <span className="font-semibold">{deleteTarget.name}</span>.</p>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1.5">Tulis kata <span className="font-semibold text-red-500">&quot;delete&quot;</span> untuk menghapus produk</label>
+                <input
+                  type="text"
+                  value={deleteInput}
+                  onChange={e => setDeleteInput(e.target.value)}
+                  placeholder="delete"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Batal</button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteInput !== 'delete' || deleting}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-sm font-semibold transition"
+              >
+                {deleting ? 'Menghapus...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

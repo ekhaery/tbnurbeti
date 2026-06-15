@@ -61,6 +61,19 @@ export default function EditProductPage() {
     setSuccess(false)
     setSaving(true)
 
+    // Check name uniqueness (exclude self)
+    const { data: existing } = await supabase
+      .from('products')
+      .select('id')
+      .ilike('name', toTitleCase(form.name.trim()))
+      .neq('id', id)
+      .limit(1)
+    if (existing && existing.length > 0) {
+      setError(`Nama produk "${toTitleCase(form.name.trim())}" sudah ada.`)
+      setSaving(false)
+      return
+    }
+
     const { error: updateError } = await supabase
       .from('products')
       .update({
