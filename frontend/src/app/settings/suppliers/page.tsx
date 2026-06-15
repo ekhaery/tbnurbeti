@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus, faPenToSquare, faTrash, faCheck, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faPlus, faPenToSquare, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
 
 type BankDetail = { bank?: string; no_rek?: string; rek_name?: string }
+type SupplierDetail = { product_categories?: number[]; products?: number[] }
 type Supplier = {
   id: number
   name: string
@@ -13,7 +14,10 @@ type Supplier = {
   address: string | null
   sales_name: string | null
   bank_detail: BankDetail | null
+  detail: SupplierDetail | null
 }
+type Category = { id: number; name: string }
+type Product = { id: number; name: string }
 
 const emptyBank = (): BankDetail => ({ bank: '', no_rek: '', rek_name: '' })
 
@@ -24,36 +28,71 @@ export default function SuppliersPage() {
   const [fetching, setFetching] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [categories, setCategories] = useState<Category[]>([])
+  const [productsList, setProductsList] = useState<Product[]>([])
+
   // add form
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
   const [newAddress, setNewAddress] = useState('')
   const [newSalesName, setNewSalesName] = useState('')
   const [newBank, setNewBank] = useState<BankDetail>(emptyBank())
+  const [newCategories, setNewCategories] = useState<number[]>([])
+  const [newProducts, setNewProducts] = useState<number[]>([])
+  const [newCatQuery, setNewCatQuery] = useState('')
+  const [newCatDropdown, setNewCatDropdown] = useState(false)
+  const [newProdQuery, setNewProdQuery] = useState('')
+  const [newProdDropdown, setNewProdDropdown] = useState(false)
   const [adding, setAdding] = useState(false)
 
   // edit
-  const [editId, setEditId] = useState<number | null>(null)
   const [editName, setEditName] = useState('')
   const [editPhone, setEditPhone] = useState('')
   const [editAddress, setEditAddress] = useState('')
   const [editSalesName, setEditSalesName] = useState('')
   const [editBank, setEditBank] = useState<BankDetail>(emptyBank())
+  const [editCategories, setEditCategories] = useState<number[]>([])
+  const [editProducts, setEditProducts] = useState<number[]>([])
+  const [catQuery, setCatQuery] = useState('')
+  const [catDropdown, setCatDropdown] = useState(false)
+  const [prodQuery, setProdQuery] = useState('')
+  const [prodDropdown, setProdDropdown] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const [deletingId, setDeletingId] = useState<number | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
   const [popupEditMode, setPopupEditMode] = useState(false)
 
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null)
+  const [deleteInput, setDeleteInput] = useState('')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
   const fetchData = async () => {
-    const { data } = await supabase.from('suppliers').select('id, name, phone, address, sales_name, bank_detail').order('id', { ascending: false })
+    const { data } = await supabase.from('suppliers')
+      .select('id, name, phone, address, sales_name, bank_detail, detail')
+      .order('id', { ascending: false })
     setSuppliers((data as Supplier[]) ?? [])
     setFetching(false)
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    fetchData()
+    supabase.from('categories').select('id, name').order('name')
+      .then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
+    // fetch products in chunks
+    const fetchProds = async () => {
+      const chunkSize = 1000; let from = 0; const all: Product[] = []
+      while (true) {
+        const { data, error } = await supabase.from('products').select('id, name').eq('is_deleted', false).order('name').range(from, from + chunkSize - 1)
+        if (error || !data || data.length === 0) break
+        all.push(...(data as Product[])); if (data.length < chunkSize) break; from += chunkSize
+      }
+      setProductsList(all)
+    }
+    fetchProds()
+  }, [])
 
   const buildBankDetail = (b: BankDetail) => {
     const obj: BankDetail = {}
@@ -63,52 +102,61 @@ export default function SuppliersPage() {
     return Object.keys(obj).length ? obj : null
   }
 
+  const buildDetail = (cats: number[], prods: number[]): SupplierDetail | null => {
+    if (cats.length === 0 && prods.length === 0) return null
+    return { product_categories: cats, products: prods }
+  }
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newName.trim()) return
-    setAdding(true)
-    setError(null)
+    setAdding(true); setError(null)
     const { error } = await supabase.from('suppliers').insert({
-      name: newName.trim(),
-      phone: newPhone.trim() || null,
-      address: newAddress.trim() || null,
-      sales_name: newSalesName.trim() || null,
-      bank_detail: buildBankDetail(newBank),
+      name: newName.trim(), phone: newPhone.trim() || null, address: newAddress.trim() || null,
+      sales_name: newSalesName.trim() || null, bank_detail: buildBankDetail(newBank),
+      detail: buildDetail(newCategories, newProducts),
     })
     setAdding(false)
     if (error) { setError(error.message); return }
     setNewName(''); setNewPhone(''); setNewAddress(''); setNewSalesName(''); setNewBank(emptyBank())
-    setShowAddModal(false)
-    fetchData()
+    setNewCategories([]); setNewProducts([]); setNewCatQuery(''); setNewProdQuery('')
+    setShowAddModal(false); fetchData()
   }
 
   const handleEdit = async (id: number) => {
     if (!editName.trim()) return
-    setSaving(true)
-    setError(null)
+    setSaving(true); setError(null)
     const { error } = await supabase.from('suppliers').update({
-      name: editName.trim(),
-      phone: editPhone.trim() || null,
-      address: editAddress.trim() || null,
-      sales_name: editSalesName.trim() || null,
-      bank_detail: buildBankDetail(editBank),
+      name: editName.trim(), phone: editPhone.trim() || null, address: editAddress.trim() || null,
+      sales_name: editSalesName.trim() || null, bank_detail: buildBankDetail(editBank),
+      detail: buildDetail(editCategories, editProducts),
     }).eq('id', id)
     setSaving(false)
     if (error) { setError(error.message); return }
-    setEditId(null)
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget || deleteInput !== 'delete') return
+    setConfirmingDelete(true)
+    await supabase.from('suppliers').delete().eq('id', deleteTarget.id)
+    setConfirmingDelete(false); setDeleteTarget(null); setDeleteInput(''); setSelectedSupplier(null)
     fetchData()
   }
 
-  const handleDelete = async (s: Supplier) => {
-    if (!confirm(`Hapus supplier "${s.name}"?`)) return
-    setDeletingId(s.id)
-    await supabase.from('suppliers').delete().eq('id', s.id)
-    setDeletingId(null)
-    fetchData()
+  const openEdit = (s: Supplier) => {
+    setEditName(s.name); setEditPhone(s.phone ?? ''); setEditAddress(s.address ?? '')
+    setEditSalesName(s.sales_name ?? '')
+    setEditBank({ bank: s.bank_detail?.bank ?? '', no_rek: s.bank_detail?.no_rek ?? '', rek_name: s.bank_detail?.rek_name ?? '' })
+    setEditCategories(s.detail?.product_categories ?? [])
+    setEditProducts(s.detail?.products ?? [])
+    setCatQuery(''); setProdQuery('')
+    setPopupEditMode(true)
   }
+
+  const toggleCat = (id: number) => setEditCategories(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  const toggleProd = (id: number) => setEditProducts(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
 
   const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]'
-  const editInputCls = 'border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -126,18 +174,12 @@ export default function SuppliersPage() {
           </button>
         </div>
 
-        {error && (
-          <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">⚠️ {error}</div>
-        )}
+        {error && <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">⚠️ {error}</div>}
 
         {/* Search */}
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
+        <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
           placeholder="Cari nama supplier..."
-          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358] shadow-sm"
-        />
+          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358] shadow-sm" />
 
         {/* List */}
         {fetching ? (
@@ -147,50 +189,17 @@ export default function SuppliersPage() {
         ) : (
           <div className="space-y-2">
             {suppliers.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase())).map(s => (
-              <div key={s.id} className="bg-white rounded-xl shadow-sm px-4 py-3">
-                {editId === s.id ? (
-                  <div className="space-y-2">
-                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)} autoFocus
-                      className={`w-full ${editInputCls}`} />
-                    <div className="grid grid-cols-2 gap-2">
-                      <input type="text" value={editSalesName} onChange={e => setEditSalesName(e.target.value)} placeholder="Nama Sales" className={editInputCls} />
-                      <input type="text" value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="No. Telepon" className={editInputCls} />
-                      <input type="text" value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="Alamat" className={`col-span-2 ${editInputCls}`} />
-                    </div>
-                    <div className="border border-gray-200 rounded-lg p-2 space-y-2">
-                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Info Rekening</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input type="text" value={editBank.bank ?? ''} onChange={e => setEditBank(b => ({ ...b, bank: e.target.value }))} placeholder="Bank" className={editInputCls} />
-                        <input type="text" value={editBank.no_rek ?? ''} onChange={e => setEditBank(b => ({ ...b, no_rek: e.target.value }))} placeholder="No. Rekening" className={editInputCls} />
-                        <input type="text" value={editBank.rek_name ?? ''} onChange={e => setEditBank(b => ({ ...b, rek_name: e.target.value }))} placeholder="Rekening Atas Nama" className={`col-span-2 ${editInputCls}`} />
-                      </div>
-                    </div>
-                    <div className="flex gap-2 justify-end">
-                      <button onClick={() => setEditId(null)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-500 transition">
-                        <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => handleEdit(s.id)} disabled={saving} className="w-8 h-8 flex items-center justify-center rounded-lg bg-green-100 hover:bg-green-200 text-green-600 transition">
-                        <FontAwesomeIcon icon={faCheck} className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3 cursor-pointer" onClick={() => setSelectedSupplier(s)}>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800">{s.name}</p>
-                      {(s.sales_name || s.phone) && (
-                        <p className="text-xs text-gray-400 mt-0.5 truncate">
-                          {[s.sales_name, s.phone].filter(Boolean).join(' · ')}
-                        </p>
-                      )}
-                      {s.address && <p className="text-xs text-gray-400 truncate">{s.address}</p>}
-                      {s.bank_detail && (
-                        <p className="text-xs text-gray-400 mt-0.5 truncate">
-                          {[s.bank_detail.bank, s.bank_detail.no_rek, s.bank_detail.rek_name ? `a.n. ${s.bank_detail.rek_name}` : null].filter(Boolean).join(' · ')}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+              <div key={s.id} className="bg-white rounded-xl shadow-sm px-4 py-3 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setSelectedSupplier(s)}>
+                <p className="text-sm font-medium text-gray-800">{s.name}</p>
+                {(s.sales_name || s.phone) && (
+                  <p className="text-xs text-gray-400 mt-0.5 truncate">{[s.sales_name, s.phone].filter(Boolean).join(' · ')}</p>
+                )}
+                {s.address && <p className="text-xs text-gray-400 truncate">{s.address}</p>}
+                {s.bank_detail && (
+                  <p className="text-xs text-gray-400 mt-0.5 truncate">
+                    {[s.bank_detail.bank, s.bank_detail.no_rek, s.bank_detail.rek_name ? `a.n. ${s.bank_detail.rek_name}` : null].filter(Boolean).join(' · ')}
+                  </p>
                 )}
               </div>
             ))}
@@ -198,28 +207,28 @@ export default function SuppliersPage() {
         )}
       </div>
 
-      {/* Supplier Detail Popup */}
+      {/* Supplier Detail / Edit Popup */}
       {selectedSupplier && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
 
             {/* Header */}
-            <div className="px-5 py-4 bg-[#121358] flex items-start justify-between gap-3">
+            <div className="px-5 py-4 bg-[#121358] flex items-start justify-between gap-3 shrink-0">
               <div>
                 <p className="text-base font-bold text-white">{popupEditMode ? 'Edit Supplier' : selectedSupplier.name}</p>
                 {!popupEditMode && selectedSupplier.sales_name && (
                   <p className="text-xs text-white/60 mt-0.5">Sales: {selectedSupplier.sales_name}</p>
                 )}
               </div>
-              <button onClick={() => { setSelectedSupplier(null); setPopupEditMode(false) }} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0 transition">
+              <button onClick={() => { setSelectedSupplier(null); setPopupEditMode(false) }}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0 transition">
                 <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
               </button>
             </div>
 
             {popupEditMode ? (
-              /* Edit form */
               <>
-                <div className="px-5 py-4 space-y-3 max-h-[60vh] overflow-y-auto">
+                <div className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Nama <span className="text-red-500">*</span></label>
                     <input type="text" value={editName} onChange={e => setEditName(e.target.value)} autoFocus className={inputCls} />
@@ -238,6 +247,8 @@ export default function SuppliersPage() {
                       <input type="text" value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="Opsional" className={inputCls} />
                     </div>
                   </div>
+
+                  {/* Bank */}
                   <div className="border border-gray-200 rounded-lg p-3 space-y-2">
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Info Rekening</p>
                     <div className="grid grid-cols-2 gap-2">
@@ -255,14 +266,90 @@ export default function SuppliersPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Kategori Produk */}
+                  <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Kategori Produk</p>
+                    {editCategories.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {editCategories.map(id => {
+                          const cat = categories.find(c => c.id === id)
+                          return cat ? (
+                            <span key={id} className="flex items-center gap-1 text-xs font-medium bg-[#121358]/10 text-[#121358] px-2 py-1 rounded-full">
+                              {cat.name}
+                              <button type="button" onClick={() => toggleCat(id)} className="ml-0.5 hover:text-red-500">×</button>
+                            </span>
+                          ) : null
+                        })}
+                      </div>
+                    )}
+                    <div className="relative">
+                      <input type="text" value={catQuery} onChange={e => { setCatQuery(e.target.value); setCatDropdown(true) }}
+                        onFocus={() => setCatDropdown(true)} onBlur={() => setTimeout(() => setCatDropdown(false), 150)}
+                        placeholder="Cari kategori..." className={inputCls} />
+                      {catDropdown && (
+                        <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
+                          {categories.filter(c => c.name.toLowerCase().includes(catQuery.toLowerCase())).map(c => (
+                            <button key={c.id} type="button"
+                              onMouseDown={() => { toggleCat(c.id); setCatQuery('') }}
+                              className={`w-full text-left px-4 py-2 text-sm transition flex items-center justify-between ${editCategories.includes(c.id) ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                              {c.name}
+                              {editCategories.includes(c.id) && <span className="text-xs">✓</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tambahkan Produk */}
+                  <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Tambahkan Produk</p>
+                    {editProducts.length > 0 && (
+                      <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                        {editProducts.map(id => {
+                          const prod = productsList.find(p => p.id === id)
+                          return prod ? (
+                            <span key={id} className="flex items-center gap-1 text-xs font-medium bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
+                              {prod.name}
+                              <button type="button" onClick={() => toggleProd(id)} className="ml-0.5 hover:text-red-500">×</button>
+                            </span>
+                          ) : null
+                        })}
+                      </div>
+                    )}
+                    <div className="relative">
+                      <input type="text" value={prodQuery} onChange={e => { setProdQuery(e.target.value); setProdDropdown(true) }}
+                        onFocus={() => setProdDropdown(true)} onBlur={() => setTimeout(() => setProdDropdown(false), 150)}
+                        placeholder="Cari produk..." className={inputCls} />
+                      {prodDropdown && (
+                        <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
+                          {productsList.filter(p => p.name.toLowerCase().includes(prodQuery.toLowerCase())).slice(0, 50).map(p => (
+                            <button key={p.id} type="button"
+                              onMouseDown={() => { toggleProd(p.id); setProdQuery('') }}
+                              className={`w-full text-left px-4 py-2 text-sm transition flex items-center justify-between ${editProducts.includes(p.id) ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                              {p.name}
+                              {editProducts.includes(p.id) && <span className="text-xs">✓</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {error && <p className="text-xs text-red-500">⚠️ {error}</p>}
                 </div>
-                <div className="flex gap-2 px-5 py-3 border-t border-gray-100">
+                <div className="flex gap-2 px-5 py-3 border-t border-gray-100 shrink-0">
                   <button onClick={() => setPopupEditMode(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Batal</button>
                   <button onClick={async () => {
                     await handleEdit(selectedSupplier.id)
-                    const updated = { ...selectedSupplier, name: editName.trim(), phone: editPhone.trim() || null, address: editAddress.trim() || null, sales_name: editSalesName.trim() || null, bank_detail: buildBankDetail(editBank) }
+                    const updated: Supplier = {
+                      ...selectedSupplier, name: editName.trim(), phone: editPhone.trim() || null,
+                      address: editAddress.trim() || null, sales_name: editSalesName.trim() || null,
+                      bank_detail: buildBankDetail(editBank), detail: buildDetail(editCategories, editProducts),
+                    }
                     setSelectedSupplier(updated)
+                    setSuppliers(prev => prev.map(s => s.id === updated.id ? updated : s))
                     setPopupEditMode(false)
                   }} disabled={saving || !editName.trim()} className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
                     {saving ? 'Menyimpan...' : 'Simpan'}
@@ -270,9 +357,8 @@ export default function SuppliersPage() {
                 </div>
               </>
             ) : (
-              /* Detail view */
               <>
-                <div className="px-5 py-4 space-y-3">
+                <div className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
                   {selectedSupplier.phone && (
                     <div>
                       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">No. Telepon</p>
@@ -293,23 +379,40 @@ export default function SuppliersPage() {
                       </p>
                     </div>
                   )}
-                  {!selectedSupplier.phone && !selectedSupplier.address && !selectedSupplier.bank_detail && (
+                  {(selectedSupplier.detail?.product_categories ?? []).length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Kategori Produk</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {(selectedSupplier.detail?.product_categories ?? []).map(id => {
+                          const cat = categories.find(c => c.id === id)
+                          return cat ? <span key={id} className="text-xs bg-[#121358]/10 text-[#121358] px-2 py-0.5 rounded-full">{cat.name}</span> : null
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {(selectedSupplier.detail?.products ?? []).length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Produk ({(selectedSupplier.detail?.products ?? []).length})</p>
+                      <div className="flex flex-wrap gap-1 mt-1 max-h-32 overflow-y-auto">
+                        {(selectedSupplier.detail?.products ?? []).map(id => {
+                          const prod = productsList.find(p => p.id === id)
+                          return prod ? <span key={id} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{prod.name}</span> : null
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {!selectedSupplier.phone && !selectedSupplier.address && !selectedSupplier.bank_detail &&
+                    !(selectedSupplier.detail?.product_categories?.length) && !(selectedSupplier.detail?.products?.length) && (
                     <p className="text-sm text-gray-400 text-center py-2">Tidak ada detail tambahan.</p>
                   )}
                 </div>
-                <div className="px-5 py-3 border-t border-gray-100 flex gap-2">
-                  <button onClick={() => {
-                    setEditName(selectedSupplier.name)
-                    setEditPhone(selectedSupplier.phone ?? '')
-                    setEditAddress(selectedSupplier.address ?? '')
-                    setEditSalesName(selectedSupplier.sales_name ?? '')
-                    setEditBank({ bank: selectedSupplier.bank_detail?.bank ?? '', no_rek: selectedSupplier.bank_detail?.no_rek ?? '', rek_name: selectedSupplier.bank_detail?.rek_name ?? '' })
-                    setPopupEditMode(true)
-                  }} className="flex-1 py-2 rounded-xl bg-[#121358] text-white text-sm font-semibold hover:bg-[#1a1c6e] transition flex items-center justify-center gap-1.5">
+                <div className="px-5 py-3 border-t border-gray-100 flex gap-2 shrink-0">
+                  <button onClick={() => openEdit(selectedSupplier)}
+                    className="flex-1 py-2 rounded-xl bg-[#121358] text-white text-sm font-semibold hover:bg-[#1a1c6e] transition flex items-center justify-center gap-1.5">
                     <FontAwesomeIcon icon={faPenToSquare} className="w-3.5 h-3.5" /> Edit
                   </button>
-                  <button onClick={() => { setSelectedSupplier(null); handleDelete(selectedSupplier) }} disabled={deletingId === selectedSupplier.id}
-                    className="w-10 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-500 disabled:opacity-50 transition flex items-center justify-center">
+                  <button onClick={() => { setDeleteTarget(selectedSupplier); setDeleteInput('') }}
+                    className="w-10 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-500 transition flex items-center justify-center">
                     <FontAwesomeIcon icon={faTrash} className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -319,13 +422,43 @@ export default function SuppliersPage() {
         </div>
       )}
 
+      {/* Delete confirmation popup */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+            <div className="px-5 py-4 bg-red-600 flex items-center justify-between">
+              <p className="text-sm font-bold text-white">Hapus Supplier</p>
+              <button onClick={() => setDeleteTarget(null)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition">
+                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm text-gray-700">Anda akan menghapus <span className="font-semibold">{deleteTarget.name}</span> secara permanen.</p>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1.5">Tulis <span className="font-semibold text-red-500">&quot;delete&quot;</span> untuk mengkonfirmasi</label>
+                <input type="text" value={deleteInput} onChange={e => setDeleteInput(e.target.value)}
+                  placeholder="delete" autoFocus
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+              </div>
+            </div>
+            <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Batal</button>
+              <button onClick={handleDelete} disabled={deleteInput !== 'delete' || confirmingDelete}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-sm font-semibold transition">
+                {confirmingDelete ? 'Menghapus...' : 'Hapus'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add Supplier Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-800">Tambah Supplier</h3>
-              <button onClick={() => setShowAddModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition">
+            <div className="px-5 py-4 bg-[#121358] flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white">Tambah Supplier</h3>
+              <button onClick={() => setShowAddModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
                 <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -364,6 +497,74 @@ export default function SuppliersPage() {
                       <label className="block text-xs text-gray-500 mb-1">Rekening Atas Nama</label>
                       <input type="text" value={newBank.rek_name ?? ''} onChange={e => setNewBank(b => ({ ...b, rek_name: e.target.value }))} placeholder="Opsional" className={inputCls} />
                     </div>
+                  </div>
+                </div>
+
+                {/* Kategori Produk */}
+                <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Kategori Produk</p>
+                  {newCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {newCategories.map(id => {
+                        const cat = categories.find(c => c.id === id)
+                        return cat ? (
+                          <span key={id} className="flex items-center gap-1 text-xs font-medium bg-[#121358]/10 text-[#121358] px-2 py-1 rounded-full">
+                            {cat.name}
+                            <button type="button" onClick={() => setNewCategories(prev => prev.filter(x => x !== id))} className="ml-0.5 hover:text-red-500">×</button>
+                          </span>
+                        ) : null
+                      })}
+                    </div>
+                  )}
+                  <div className="relative">
+                    <input type="text" value={newCatQuery} onChange={e => { setNewCatQuery(e.target.value); setNewCatDropdown(true) }}
+                      onFocus={() => setNewCatDropdown(true)} onBlur={() => setTimeout(() => setNewCatDropdown(false), 150)}
+                      placeholder="Cari kategori..." className={inputCls} />
+                    {newCatDropdown && (
+                      <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
+                        {categories.filter(c => c.name.toLowerCase().includes(newCatQuery.toLowerCase())).map(c => (
+                          <button key={c.id} type="button"
+                            onMouseDown={() => { setNewCategories(prev => prev.includes(c.id) ? prev.filter(x => x !== c.id) : [...prev, c.id]); setNewCatQuery('') }}
+                            className={`w-full text-left px-4 py-2 text-sm transition flex items-center justify-between ${newCategories.includes(c.id) ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                            {c.name}{newCategories.includes(c.id) && <span className="text-xs">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tambahkan Produk */}
+                <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Tambahkan Produk</p>
+                  {newProducts.length > 0 && (
+                    <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                      {newProducts.map(id => {
+                        const prod = productsList.find(p => p.id === id)
+                        return prod ? (
+                          <span key={id} className="flex items-center gap-1 text-xs font-medium bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
+                            {prod.name}
+                            <button type="button" onClick={() => setNewProducts(prev => prev.filter(x => x !== id))} className="ml-0.5 hover:text-red-500">×</button>
+                          </span>
+                        ) : null
+                      })}
+                    </div>
+                  )}
+                  <div className="relative">
+                    <input type="text" value={newProdQuery} onChange={e => { setNewProdQuery(e.target.value); setNewProdDropdown(true) }}
+                      onFocus={() => setNewProdDropdown(true)} onBlur={() => setTimeout(() => setNewProdDropdown(false), 150)}
+                      placeholder="Cari produk..." className={inputCls} />
+                    {newProdDropdown && (
+                      <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
+                        {productsList.filter(p => p.name.toLowerCase().includes(newProdQuery.toLowerCase())).slice(0, 50).map(p => (
+                          <button key={p.id} type="button"
+                            onMouseDown={() => { setNewProducts(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id]); setNewProdQuery('') }}
+                            className={`w-full text-left px-4 py-2 text-sm transition flex items-center justify-between ${newProducts.includes(p.id) ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                            {p.name}{newProducts.includes(p.id) && <span className="text-xs">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
