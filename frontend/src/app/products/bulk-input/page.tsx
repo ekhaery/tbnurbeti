@@ -60,6 +60,21 @@ export default function BulkInputPage() {
 
   const isAdmin = appUser?.role === 'admin'
 
+  const [triggeringStock, setTriggeringStock] = useState(false)
+  const [triggerResult, setTriggerResult] = useState<{ count: number; names: string[] } | null>(null)
+  const [triggerError, setTriggerError] = useState<string | null>(null)
+
+  const handleTriggerStock = async () => {
+    setTriggeringStock(true)
+    setTriggerResult(null)
+    setTriggerError(null)
+    const res = await fetch('/api/trigger-stock', { method: 'POST' })
+    const json = await res.json()
+    setTriggeringStock(false)
+    if (res.ok) setTriggerResult({ count: json.count, names: json.names ?? [] })
+    else setTriggerError(json.error ?? 'Gagal.')
+  }
+
   useEffect(() => {
     supabase
       .from('categories')
@@ -172,6 +187,17 @@ export default function BulkInputPage() {
       <div className="px-4 pt-3 pb-4 max-w-xl mx-auto space-y-4">
         {/* Tabs */}
         <ProductTabs />
+
+        {/* Admin: Trigger Stock button */}
+        {isAdmin && (
+          <div className="flex justify-end items-center gap-2">
+            {triggerError && <span className="text-xs font-semibold text-red-500">{triggerError}</span>}
+            <button onClick={handleTriggerStock} disabled={triggeringStock}
+              className="text-xs font-semibold px-4 py-2 rounded-full bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white transition shadow-sm">
+              {triggeringStock ? 'Loading...' : 'Trigger Stock'}
+            </button>
+          </div>
+        )}
 
         <div>
           <h2 className="text-lg font-bold text-gray-800">Buat Produk Baru</h2>
@@ -389,6 +415,29 @@ export default function BulkInputPage() {
               >
                 Ya, Simpan
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Trigger Stock result popup */}
+      {triggerResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+            <div className="px-5 py-4 bg-green-600 flex items-center justify-between">
+              <p className="text-sm font-bold text-white">Berhasil menambahkan {triggerResult.count} produk</p>
+              <button onClick={() => setTriggerResult(null)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition">✕</button>
+            </div>
+            {triggerResult.names.length > 0 ? (
+              <div className="max-h-64 overflow-y-auto divide-y divide-gray-100">
+                {triggerResult.names.map((name, i) => (
+                  <p key={i} className="px-5 py-2 text-sm text-gray-700">{name}</p>
+                ))}
+              </div>
+            ) : (
+              <p className="px-5 py-4 text-sm text-gray-400">Tidak ada produk baru yang ditambahkan.</p>
+            )}
+            <div className="px-5 py-3 border-t border-gray-100">
+              <button onClick={() => setTriggerResult(null)} className="w-full py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Tutup</button>
             </div>
           </div>
         </div>
