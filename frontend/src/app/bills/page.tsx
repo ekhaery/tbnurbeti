@@ -225,6 +225,12 @@ export default function BillsPage() {
   const totalPaidAll = supplierBills.reduce((s, b) => s + b.paid_amount, 0)
   const totalSisa = totalAll - totalPaidAll
 
+  // Paid amount per purchasing_id (for Kumpulan Nota progress)
+  const purchasingPaidMap = bills.reduce<Record<number, number>>((acc, b) => {
+    acc[b.purchasing_id] = (acc[b.purchasing_id] ?? 0) + b.paid_amount
+    return acc
+  }, {})
+
   // Month-filtered bills for Card 2 summary (by installment_due_date)
   const monthBills = bills.filter(b => {
     if (monthFilter && b.installment_due_date?.slice(0, 7) !== monthFilter) return false
@@ -510,7 +516,20 @@ export default function BillsPage() {
                           )}
                         </div>
                       </div>
-                      <p className="text-sm font-bold text-[#121358] shrink-0">Rp {fmt(p.total)}</p>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold text-[#121358]">Rp {fmt(p.total)}</p>
+                        {(() => {
+                          const paid = purchasingPaidMap[p.id] ?? 0
+                          const sisa = Math.max(0, Math.round(p.total - paid))
+                          const pct = p.total > 0 ? Math.min(100, Math.round(paid / p.total * 100)) : 0
+                          return paid > 0 ? (
+                            <div className="mt-1">
+                              <p className="text-[10px] text-green-600">Terbayar: Rp {fmt(paid)} ({pct}%)</p>
+                              <p className={`text-[10px] font-bold ${sisa === 0 ? 'text-green-600' : 'text-red-500'}`}>Sisa: Rp {fmt(sisa)}</p>
+                            </div>
+                          ) : null
+                        })()}
+                      </div>
                     </div>
                   </div>
                   )

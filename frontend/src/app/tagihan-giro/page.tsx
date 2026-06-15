@@ -544,6 +544,7 @@ export default function TagihanGiroPage() {
             if (filterSupplierFilter && d.debt_loan?.suppliers?.name !== filterSupplierFilter) return false
             return true
           })
+          filtered.sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? ''))
           const getWeekKey = (dateStr: string) => {
             const d = new Date(dateStr)
             const day = d.getDay() === 0 ? 6 : d.getDay() - 1
