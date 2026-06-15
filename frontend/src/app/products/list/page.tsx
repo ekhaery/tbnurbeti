@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase-browser'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 
+import Link from 'next/link'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPenToSquare, faArrowUpAZ, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faPenToSquare, faArrowUpAZ, faTrash, faXmark, faChevronLeft } from '@fortawesome/free-solid-svg-icons'
 import ProductTabs from '@/lib/ProductTabs'
 
 type Product = {
@@ -166,6 +167,10 @@ export default function ProductListPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-4 max-w-2xl mx-auto space-y-4">
+        {/* Back to home */}
+        <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#121358] hover:opacity-70 transition">
+          <FontAwesomeIcon icon={faChevronLeft} className="w-3 h-3" /> Home
+        </Link>
         {/* Tabs */}
         <ProductTabs />
 

@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faTrash, faChevronLeft } from '@fortawesome/free-solid-svg-icons'
+import Link from 'next/link'
 import TransaksiTabs from '@/lib/TransaksiTabs'
 
 type Product = {
@@ -242,6 +243,9 @@ export default function BuatTransaksiPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
+        <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#121358] hover:opacity-70 transition">
+          <FontAwesomeIcon icon={faChevronLeft} className="w-3 h-3" /> Home
+        </Link>
         <TransaksiTabs />
 
         <div>

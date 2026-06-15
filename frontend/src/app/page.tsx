@@ -8,7 +8,7 @@ const cards = [
   {
     label: 'Kunjungan Sales',
     icon: faHandshake,
-    href: '#',
+    href: '/kunjungan-sales',
     bg: '#121358',
     text: 'white',
     sub: 'Catat kunjungan sales hari ini',
