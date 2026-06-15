@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck, faFileInvoiceDollar, faHandHoldingDollar, faMoneyCheckDollar, faReceipt, faUserGroup, faArrowTrendUp, faMoneyBillWave, faChartBar, faIdCard } from '@fortawesome/free-solid-svg-icons'
+import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck, faFileInvoiceDollar, faHandHoldingDollar, faMoneyCheckDollar, faReceipt, faUserGroup, faArrowTrendUp, faMoneyBillWave, faChartBar, faIdCard, faHouse } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
@@ -167,6 +167,22 @@ export default function Navbar() {
 
         {/* Drawer body */}
         <div className="flex-1 overflow-y-auto py-4 space-y-4">
+
+          {/* Aktifitas Harian */}
+          <div>
+            <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Aktifitas Harian</p>
+            <Link
+              href="/"
+              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                pathname === '/'
+                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FontAwesomeIcon icon={faHouse} className="w-4 h-4 text-gray-400" />
+              Home
+            </Link>
+          </div>
 
           {/* Laporan */}
           <div>
