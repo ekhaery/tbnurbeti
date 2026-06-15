@@ -128,6 +128,7 @@ export default function TagihanGiroPage() {
 
   const [deleting, setDeleting] = useState<DebtLoan | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [paidMap, setPaidMap] = useState<Record<number, number>>({})
 
   const [giroTab, setGiroTab] = useState<'cicilan' | 'kumpulan'>('kumpulan')
   const [cicilanList, setCicilanList] = useState<GiroCicilan[]>([])
@@ -187,6 +188,15 @@ export default function TagihanGiroPage() {
   const fetchData = async () => {
     const { data } = await supabase.from('debt_loan').select('*, suppliers(name)').eq('debt_type', 'Giro').order('date', { ascending: false })
     setList((data as DebtLoan[]) ?? [])
+    // Fetch paid totals per debt_loan_id
+    const { data: paidData } = await supabase.from('debt_loan_detail')
+      .select('debt_loan_id, installment_amount')
+      .eq('is_paid', true)
+    const map: Record<number, number> = {}
+    for (const row of (paidData ?? []) as { debt_loan_id: number; installment_amount: number }[]) {
+      map[row.debt_loan_id] = (map[row.debt_loan_id] ?? 0) + row.installment_amount
+    }
+    setPaidMap(map)
     setFetching(false)
   }
 
@@ -469,7 +479,7 @@ export default function TagihanGiroPage() {
               if (filterSupplierFilter && d.suppliers?.name !== filterSupplierFilter) return false
               return true
             }).map(d => (
-              <div key={d.id} className="relative bg-white rounded-xl shadow-sm p-4 border-l-4 border-[#9FA1FF]">
+              <div key={d.id} className={`relative bg-white rounded-xl shadow-sm p-4 border-l-4 ${d.debt_amount > 0 && Math.round(d.debt_amount - (paidMap[d.id] ?? 0)) <= 0 ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
                 {/* Kebab backdrop */}
                 {kebabOpen === d.id && <div className="fixed inset-0 z-10" onClick={() => setKebabOpen(null)} />}
                 <div className="flex items-start justify-between gap-3 pr-8">
@@ -486,6 +496,17 @@ export default function TagihanGiroPage() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-[#121358]">Rp {fmt(d.debt_amount)}</p>
+                    {(() => {
+                      const paid = paidMap[d.id] ?? 0
+                      const sisa = Math.max(0, Math.round(d.debt_amount - paid))
+                      const pct = d.debt_amount > 0 ? Math.min(100, Math.round(paid / d.debt_amount * 100)) : 0
+                      return paid > 0 ? (
+                        <div className="mt-1 text-right">
+                          <p className="text-[10px] text-green-600">Terbayar: Rp {fmt(paid)} ({pct}%)</p>
+                          <p className={`text-[10px] ${sisa === 0 ? 'text-green-600' : 'text-gray-400'}`}>Sisa: Rp {fmt(sisa)}</p>
+                        </div>
+                      ) : null
+                    })()}
                   </div>
                 </div>
                 {/* Kebab button */}
