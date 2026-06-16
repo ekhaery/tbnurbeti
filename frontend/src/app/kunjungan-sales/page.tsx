@@ -62,11 +62,9 @@ export default function KunjunganSalesPage() {
   const [debtList, setDebtList] = useState<DebtLoanRow[] | null>(null)
   const [showPembayaran, setShowPembayaran] = useState(false)
 
-  const [selectedPurchasingNota, setSelectedPurchasingNota] = useState<PurchasingNotaRow | null>(null)
-  const [purchasingNotaBills, setPurchasingNotaBills] = useState<NotaBillRow[]>([])
-  const [fetchingPNotaBills, setFetchingPNotaBills] = useState(false)
-  const [selectedPBillIds, setSelectedPBillIds] = useState<Set<number>>(new Set())
-  const [markingLunas, setMarkingLunas] = useState(false)
+  const [expandedNotaId, setExpandedNotaId] = useState<number | null>(null)
+  const [notaBillsCache, setNotaBillsCache] = useState<Record<number, NotaBillRow[]>>({})
+  const [fetchingNotaId, setFetchingNotaId] = useState<number | null>(null)
 
   const [weekPurchasing, setWeekPurchasing] = useState<WeekPurchasing[] | null>(null)
   const [weekDebtLoan, setWeekDebtLoan] = useState<WeekDebtLoan[] | null>(null)
@@ -109,7 +107,7 @@ export default function KunjunganSalesPage() {
     setSelectedSupplier(s); setSupplierQuery(s.name); setSupplierDropdown(false)
     setPesananList(null); setPurchasingNotaList(null); setAllBillsForSupplier([]); setDebtList(null)
     setShowPesanan(false); setShowPembayaran(false); setShowSupplierWeek(false)
-    setSelectedPurchasingNota(null)
+    setExpandedNotaId(null); setNotaBillsCache({})
   }
 
   const fetchPesanan = async () => {
@@ -146,36 +144,17 @@ export default function KunjunganSalesPage() {
     setShowPembayaran(true); setLoadingPembayaran(false)
   }
 
-  const openPurchasingNotaDetail = async (p: PurchasingNotaRow) => {
-    setSelectedPurchasingNota(p)
-    setSelectedPBillIds(new Set())
-    setFetchingPNotaBills(true)
+  const toggleNotaExpand = async (p: PurchasingNotaRow) => {
+    if (expandedNotaId === p.id) { setExpandedNotaId(null); return }
+    setExpandedNotaId(p.id)
+    if (notaBillsCache[p.id]) return
+    setFetchingNotaId(p.id)
     const { data } = await supabase.from('bills')
       .select('id, bill_no, purchasing_id, due_date, installment_due_date, installment, paid_amount, is_paid, payment_date')
       .eq('purchasing_id', p.id)
       .order('installment_due_date', { ascending: true })
-    setPurchasingNotaBills((data as NotaBillRow[]) ?? [])
-    setFetchingPNotaBills(false)
-  }
-
-  const handleLunasNota = async () => {
-    if (!selectedPurchasingNota || selectedPBillIds.size === 0) return
-    setMarkingLunas(true)
-    for (const id of Array.from(selectedPBillIds)) {
-      const bill = purchasingNotaBills.find(b => b.id === id)
-      if (!bill) continue
-      await supabase.from('bills').update({
-        is_paid: true, paid_amount: bill.installment, payment_date: localDateStr()
-      }).eq('id', id)
-    }
-    const { data } = await supabase.from('bills')
-      .select('id, bill_no, purchasing_id, due_date, installment_due_date, installment, paid_amount, is_paid, payment_date')
-      .eq('purchasing_id', selectedPurchasingNota.id)
-      .order('installment_due_date', { ascending: true })
-    setPurchasingNotaBills((data as NotaBillRow[]) ?? [])
-    setSelectedPBillIds(new Set())
-    setMarkingLunas(false)
-    fetchPembayaran()
+    setNotaBillsCache(prev => ({ ...prev, [p.id]: (data as NotaBillRow[]) ?? [] }))
+    setFetchingNotaId(null)
   }
 
   const hasSelection = !!selectedSupplier
@@ -461,40 +440,68 @@ export default function KunjunganSalesPage() {
                       const paid = purchasingPaidMap[p.id] ?? 0
                       const sisa = Math.max(0, Math.round(p.total - paid))
                       const pct = p.total > 0 ? Math.min(100, Math.round(paid / p.total * 100)) : 0
+                      const isExpanded = expandedNotaId === p.id
+                      const cachedBills = notaBillsCache[p.id]
                       return (
-                        <div key={p.id} onClick={() => openPurchasingNotaDetail(p)}
-                          className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition border-l-4 ${allPaid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-gray-800">{p.suppliers?.name ?? '-'}</p>
-                              <p className="text-xs text-gray-400 font-mono mt-0.5">{p.code}</p>
-                              <p className="text-xs text-gray-500 mt-0.5">Tanggal: {fmtDate(p.date)}</p>
-                              {p.due_date && <p className="text-xs text-gray-500 mt-0.5">JT: {fmtDate(p.due_date)}</p>}
-                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                                  p.status === 'completed' ? 'bg-green-100 text-green-600' :
-                                  p.status === 'created' ? 'bg-blue-100 text-blue-600' :
-                                  'bg-orange-100 text-orange-500'
-                                }`}>{p.status}</span>
-                                {pBills.length > 0 && (allPaid ? (
-                                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-600">Lunas</span>
-                                ) : (
-                                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">
-                                    Belum Lunas · {unpaidBills.length} tagihan
-                                  </span>
-                                ))}
+                        <div key={p.id} className={`border-l-4 ${allPaid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
+                          <div onClick={() => toggleNotaExpand(p)}
+                            className="px-4 py-3 cursor-pointer hover:bg-gray-50 transition">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-gray-800">{p.suppliers?.name ?? '-'}</p>
+                                <p className="text-xs text-gray-400 font-mono mt-0.5">{p.code}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">Tanggal: {fmtDate(p.date)}</p>
+                                {p.due_date && <p className="text-xs text-gray-500 mt-0.5">JT: {fmtDate(p.due_date)}</p>}
+                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                                    p.status === 'completed' ? 'bg-green-100 text-green-600' :
+                                    p.status === 'created' ? 'bg-blue-100 text-blue-600' :
+                                    'bg-orange-100 text-orange-500'
+                                  }`}>{p.status}</span>
+                                  {pBills.length > 0 && (allPaid ? (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-600">Lunas</span>
+                                  ) : (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">
+                                      Belum Lunas · {unpaidBills.length} tagihan
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="flex items-start gap-2 shrink-0">
+                                <div className="text-right">
+                                  <p className="text-sm font-bold text-[#121358]">Rp {fmt(p.total)}</p>
+                                  {paid > 0 && (
+                                    <div className="mt-1">
+                                      <p className="text-[10px] text-green-600">Terbayar: Rp {fmt(paid)} ({pct}%)</p>
+                                      <p className={`text-[10px] font-bold ${sisa === 0 ? 'text-green-600' : 'text-red-500'}`}>Sisa: Rp {fmt(sisa)}</p>
+                                    </div>
+                                  )}
+                                </div>
+                                <FontAwesomeIcon icon={faChevronDown}
+                                  className={`w-3 h-3 text-gray-400 mt-1 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
                               </div>
                             </div>
-                            <div className="text-right shrink-0">
-                              <p className="text-sm font-bold text-[#121358]">Rp {fmt(p.total)}</p>
-                              {paid > 0 && (
-                                <div className="mt-1">
-                                  <p className="text-[10px] text-green-600">Terbayar: Rp {fmt(paid)} ({pct}%)</p>
-                                  <p className={`text-[10px] font-bold ${sisa === 0 ? 'text-green-600' : 'text-red-500'}`}>Sisa: Rp {fmt(sisa)}</p>
-                                </div>
-                              )}
-                            </div>
                           </div>
+                          {isExpanded && (
+                            <div className="border-t border-gray-100 bg-gray-50 divide-y divide-gray-100">
+                              {fetchingNotaId === p.id ? (
+                                <p className="px-5 py-3 text-xs text-gray-400">Memuat...</p>
+                              ) : !cachedBills || cachedBills.length === 0 ? (
+                                <p className="px-5 py-3 text-xs text-gray-400">Tidak ada tagihan.</p>
+                              ) : cachedBills.map(b => {
+                                const amount = b.paid_amount > 0 && !b.is_paid ? b.installment - b.paid_amount : b.installment
+                                return (
+                                  <div key={b.id} className="flex items-center justify-between px-5 py-2.5">
+                                    <div>
+                                      <p className="text-xs text-gray-500">{b.installment_due_date ? fmtDate(b.installment_due_date) : '-'}</p>
+                                      {b.is_paid && <span className="text-[10px] font-semibold text-green-600">Lunas</span>}
+                                    </div>
+                                    <p className={`text-sm font-semibold ${b.is_paid ? 'text-green-600' : 'text-[#121358]'}`}>Rp {fmt(amount)}</p>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
                       )
                     })}
@@ -538,72 +545,6 @@ export default function KunjunganSalesPage() {
             </div>
             <div className="px-5 py-3 border-t border-gray-100 shrink-0">
               <button onClick={() => setShowPembayaran(false)} className="w-full py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Tutup</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Kumpulan Nota Detail Popup */}
-      {selectedPurchasingNota && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="px-5 py-4 bg-[#121358] shrink-0">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-white">{selectedPurchasingNota.suppliers?.name ?? '-'}</p>
-                  <p className="text-xs font-mono text-white/60 mt-0.5">{selectedPurchasingNota.code}</p>
-                  {selectedPurchasingNota.due_date && (
-                    <p className="text-xs text-white/60 mt-0.5">JT: {fmtDate(selectedPurchasingNota.due_date)}</p>
-                  )}
-                  {selectedPurchasingNota.suppliers?.bank_detail && (() => {
-                    const bd = selectedPurchasingNota.suppliers!.bank_detail!
-                    const parts = [bd.bank, bd.no_rek, bd.rek_name].filter(Boolean)
-                    return parts.length > 0 ? (
-                      <p className="text-xs text-white/50 mt-0.5">{parts.join(' · ')}</p>
-                    ) : null
-                  })()}
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-bold text-white">Rp {fmt(selectedPurchasingNota.total)}</p>
-                  <button onClick={() => setSelectedPurchasingNota(null)} className="mt-1 w-6 h-6 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white ml-auto">
-                    <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
-              {fetchingPNotaBills ? (
-                <p className="text-center text-sm text-gray-400 py-10">Memuat...</p>
-              ) : purchasingNotaBills.length === 0 ? (
-                <p className="text-center text-sm text-gray-400 py-10">Tidak ada tagihan.</p>
-              ) : purchasingNotaBills.map(b => {
-                const amount = b.paid_amount > 0 ? b.installment - b.paid_amount : b.installment
-                const isChecked = selectedPBillIds.has(b.id)
-                return (
-                  <div key={b.id}
-                    onClick={() => !b.is_paid && setSelectedPBillIds(prev => { const n = new Set(prev); n.has(b.id) ? n.delete(b.id) : n.add(b.id); return n })}
-                    className={`flex items-center gap-3 px-5 py-3 transition ${b.is_paid ? 'opacity-50' : 'cursor-pointer hover:bg-gray-50'} ${isChecked ? 'bg-blue-50' : ''}`}>
-                    <input type="checkbox" checked={b.is_paid || isChecked} disabled={b.is_paid}
-                      onChange={() => !b.is_paid && setSelectedPBillIds(prev => { const n = new Set(prev); n.has(b.id) ? n.delete(b.id) : n.add(b.id); return n })}
-                      onClick={e => e.stopPropagation()}
-                      className="w-4 h-4 accent-[#121358] shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500">{b.installment_due_date ? fmtDate(b.installment_due_date) : '-'}</p>
-                      {b.is_paid && <span className="text-[10px] font-semibold text-green-600">Lunas</span>}
-                    </div>
-                    <p className={`text-sm font-semibold shrink-0 ${b.is_paid ? 'text-green-600' : 'text-[#121358]'}`}>Rp {fmt(amount)}</p>
-                  </div>
-                )
-              })}
-            </div>
-            <div className="flex gap-2 px-5 py-4 border-t border-gray-100 shrink-0">
-              <button onClick={() => setSelectedPurchasingNota(null)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">
-                Batal
-              </button>
-              <button onClick={handleLunasNota} disabled={markingLunas || selectedPBillIds.size === 0}
-                className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
-                {markingLunas ? 'Menyimpan...' : `Lunas (${selectedPBillIds.size})`}
-              </button>
             </div>
           </div>
         </div>
