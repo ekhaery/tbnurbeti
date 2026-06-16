@@ -128,6 +128,9 @@ export default function KunjunganSalesPage() {
 
   const hasSelection = !!selectedSupplier
   const totalWeek = (weekPurchasing?.length ?? 0) + (weekDebtLoan?.length ?? 0)
+  const totalWeekAmount =
+    (weekDebtLoan?.reduce((s, d) => s + d.debt_amount, 0) ?? 0) +
+    (weekPurchasing?.reduce((s, p) => s + p.total, 0) ?? 0)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -146,11 +149,11 @@ export default function KunjunganSalesPage() {
         {/* Week Due Button */}
         <button
           onClick={() => setShowWeek(true)}
-          className="self-start flex items-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-full shadow-sm transition"
+          className="self-start flex items-center gap-2 px-4 py-2.5 bg-rose-700 hover:bg-rose-800 text-white text-sm font-semibold rounded-full shadow-sm transition"
         >
           Jatuh Tempo Minggu Ini
           {totalWeek > 0 && (
-            <span className="bg-white text-red-500 text-[11px] font-bold px-2 py-0.5 rounded-full leading-none">
+            <span className="bg-white text-rose-700 text-[11px] font-bold px-2 py-0.5 rounded-full leading-none">
               {totalWeek}
             </span>
           )}
@@ -265,10 +268,10 @@ export default function KunjunganSalesPage() {
       {showWeek && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="px-5 py-4 bg-red-500 flex items-center justify-between shrink-0">
+            <div className="px-5 py-4 bg-rose-700 flex items-center justify-between shrink-0">
               <div>
                 <p className="text-sm font-bold text-white">Jatuh Tempo Minggu Ini</p>
-                <p className="text-xs text-white/70 mt-0.5">{totalWeek} tagihan</p>
+                <p className="text-xs text-white/70 mt-0.5">{totalWeek} tagihan · <span className="font-bold text-white">Rp {fmt(totalWeekAmount)}</span></p>
               </div>
               <button onClick={() => setShowWeek(false)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
                 <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
