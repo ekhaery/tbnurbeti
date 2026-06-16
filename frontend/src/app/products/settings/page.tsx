@@ -88,19 +88,6 @@ export default function ProductSettingsPage() {
           <p className="text-xs text-gray-500 mt-0.5">Pengaturan khusus admin.</p>
         </div>
 
-        {/* Trigger Stock */}
-        <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
-          <div>
-            <p className="text-sm font-semibold text-gray-800">Trigger Stock</p>
-            <p className="text-xs text-gray-500 mt-0.5">Tambahkan opening stock untuk produk yang belum memiliki data stok.</p>
-          </div>
-          {triggerError && <p className="text-xs font-semibold text-red-500">⚠️ {triggerError}</p>}
-          <button onClick={handleTriggerStock} disabled={triggeringStock}
-            className="text-sm font-semibold px-5 py-2.5 rounded-full bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white transition shadow-sm">
-            {triggeringStock ? 'Loading...' : 'Trigger Stock'}
-          </button>
-        </div>
-
         {/* Lihat Daftar Produk Tanpa Stock Batches */}
         <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
           <div>
@@ -138,6 +125,19 @@ export default function ProductSettingsPage() {
               )}
             </div>
           )}
+        </div>
+
+        {/* Trigger Stock */}
+        <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Trigger Stock</p>
+            <p className="text-xs text-gray-500 mt-0.5">Tambahkan opening stock untuk produk yang belum memiliki data stok.</p>
+          </div>
+          {triggerError && <p className="text-xs font-semibold text-red-500">⚠️ {triggerError}</p>}
+          <button onClick={handleTriggerStock} disabled={triggeringStock}
+            className="text-sm font-semibold px-5 py-2.5 rounded-full bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white transition shadow-sm">
+            {triggeringStock ? 'Loading...' : 'Trigger Stock'}
+          </button>
         </div>
       </div>
 

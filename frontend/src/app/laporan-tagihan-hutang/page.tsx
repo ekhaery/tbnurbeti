@@ -18,6 +18,7 @@ const todayStr = localDateStr(now)
 type BillRow = { id: number; installment: number; paid_amount: number; is_paid: boolean; installment_due_date: string | null; due_date: string; suppliers: { name: string } | null }
 type PurchasingRow = { id: number; total: number; date: string; due_date: string | null; suppliers: { name: string } | null }
 type DetailRow = { id: number; installment_amount: number; is_paid: boolean; installment_due_date: string | null; due_date: string | null; debt_loan: { bank_account: string; debt_type: string; suppliers?: { name: string } | null } | null }
+type SupplierCheckRow = { supplier_id: number; name: string; debt_loan_count: number; debt_loan_total: number; bills_count: number; bills_total: number }
 
 export default function LaporanTagihanHutangPage() {
   const supabase = createClient()
@@ -42,6 +43,9 @@ export default function LaporanTagihanHutangPage() {
   })
   const [calMonth, setCalMonth] = useState(new Date())
   const [showCalMenu, setShowCalMenu] = useState(false)
+  const [showSupplierCheck, setShowSupplierCheck] = useState(false)
+  const [supplierCheckData, setSupplierCheckData] = useState<SupplierCheckRow[] | null>(null)
+  const [loadingSupplierCheck, setLoadingSupplierCheck] = useState(false)
 
   const fetchAll = async () => {
     setFetching(true)
@@ -104,6 +108,41 @@ export default function LaporanTagihanHutangPage() {
 
   useEffect(() => { fetchAll() }, [dateFrom, dateTo])
 
+  const fetchSupplierCheck = async () => {
+    if (supplierCheckData !== null) { setShowSupplierCheck(true); return }
+    setLoadingSupplierCheck(true)
+    const [{ data: dlData }, { data: bData }] = await Promise.all([
+      supabase.from('debt_loan').select('supplier_id, debt_amount, suppliers(name)'),
+      supabase.from('bills').select('supplier_id, installment, suppliers(name)'),
+    ])
+    const dlMap: Record<number, { name: string; count: number; total: number }> = {}
+    for (const d of (dlData ?? [])) {
+      const sid = (d as { supplier_id: number }).supplier_id
+      if (!dlMap[sid]) dlMap[sid] = { name: ((d as { suppliers: { name: string } | null }).suppliers)?.name ?? '-', count: 0, total: 0 }
+      dlMap[sid].count++
+      dlMap[sid].total += (d as { debt_amount: number }).debt_amount
+    }
+    const bMap: Record<number, { name: string; count: number; total: number }> = {}
+    for (const b of (bData ?? [])) {
+      const sid = (b as { supplier_id: number }).supplier_id
+      if (!bMap[sid]) bMap[sid] = { name: ((b as { suppliers: { name: string } | null }).suppliers)?.name ?? '-', count: 0, total: 0 }
+      bMap[sid].count++
+      bMap[sid].total += (b as { installment: number }).installment
+    }
+    const result: SupplierCheckRow[] = []
+    for (const [sidStr, dl] of Object.entries(dlMap)) {
+      const sid = Number(sidStr)
+      const b = bMap[sid]
+      if (b && dl.count >= 1 && b.count >= 1) {
+        result.push({ supplier_id: sid, name: dl.name, debt_loan_count: dl.count, debt_loan_total: dl.total, bills_count: b.count, bills_total: b.total })
+      }
+    }
+    result.sort((a, b) => a.name.localeCompare(b.name))
+    setSupplierCheckData(result)
+    setLoadingSupplierCheck(false)
+    setShowSupplierCheck(true)
+  }
+
   const debtLoanBank = loanDetails.filter(d => !d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
   const debtBills = bills.filter(b => !b.is_paid).reduce((s, b) => s + (b.installment - b.paid_amount), 0)
   const debtGiro = giroDetails.filter(d => !d.is_paid).reduce((s, d) => s + d.installment_amount, 0)
@@ -150,6 +189,11 @@ export default function LaporanTagihanHutangPage() {
           <h2 className="text-lg font-bold text-gray-800">Laporan Tagihan Hutang</h2>
           <p className="text-xs text-gray-500 mt-0.5">Ringkasan semua kewajiban hutang.</p>
         </div>
+
+        <button onClick={fetchSupplierCheck} disabled={loadingSupplierCheck}
+          className="w-full flex items-center justify-center bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-full transition">
+          {loadingSupplierCheck ? 'Memuat...' : 'Check Supplier dengan tagihan dagang & giro'}
+        </button>
 
         <div className="rounded-2xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
           <p className="text-xs font-semibold text-[#121358]">Rentang Tanggal:</p>
@@ -446,6 +490,39 @@ export default function LaporanTagihanHutangPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showSupplierCheck && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowSupplierCheck(false)} />
+          <div className="fixed inset-x-4 top-16 z-50 bg-white rounded-2xl shadow-xl overflow-hidden" style={{ maxHeight: '75vh' }}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <p className="text-sm font-bold text-gray-800">Supplier dengan Tagihan Dagang &amp; Giro</p>
+              <button onClick={() => setShowSupplierCheck(false)}>
+                <FontAwesomeIcon icon={faXmark} className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-2" style={{ maxHeight: 'calc(75vh - 52px)' }}>
+              {supplierCheckData?.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-8">Tidak ada supplier yang punya tagihan dagang sekaligus giro. Maka sejauh ini tidak ada pencatatan tagihan yang double.</p>
+              ) : (
+                supplierCheckData?.map(row => (
+                  <div key={row.supplier_id} className="bg-gray-50 rounded-xl p-3 space-y-1.5">
+                    <p className="text-sm font-bold text-gray-800">{row.name}</p>
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Tagihan Dagang (bills)</span>
+                      <span>{row.bills_count} tagihan · Rp {fmt(row.bills_total)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Giro / Loan</span>
+                      <span>{row.debt_loan_count} transaksi · Rp {fmt(row.debt_loan_total)}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
