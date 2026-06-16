@@ -24,6 +24,16 @@ type DebtLoanRow = {
   debt_loan_detail: { installment_amount: number; is_paid: boolean }[]
 }
 
+type WeekPurchasing = {
+  id: number; code: string; date: string; due_date: string; total: number
+  suppliers: { name: string } | null
+}
+
+type WeekDebtLoan = {
+  id: number; debt_type: string; due_date: string; debt_amount: number
+  suppliers: { name: string } | null
+}
+
 const fmt = (n: number) => n.toLocaleString('id-ID')
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -44,10 +54,40 @@ export default function KunjunganSalesPage() {
   const [debtList, setDebtList] = useState<DebtLoanRow[] | null>(null)
   const [showPembayaran, setShowPembayaran] = useState(false)
 
+  const [weekPurchasing, setWeekPurchasing] = useState<WeekPurchasing[] | null>(null)
+  const [weekDebtLoan, setWeekDebtLoan] = useState<WeekDebtLoan[] | null>(null)
+  const [showWeek, setShowWeek] = useState(false)
 
   useEffect(() => {
     supabase.from('suppliers').select('id, name').order('name')
       .then(({ data }: { data: Supplier[] | null }) => setSuppliers(data ?? []))
+  }, [])
+
+  useEffect(() => {
+    const now = new Date()
+    const dow = now.getDay()
+    const diffToMon = dow === 0 ? 6 : dow - 1
+    const mon = new Date(now)
+    mon.setDate(now.getDate() - diffToMon)
+    const sun = new Date(mon)
+    sun.setDate(mon.getDate() + 6)
+    const weekStart = localDateStr(mon)
+    const weekEnd = localDateStr(sun)
+    Promise.all([
+      supabase.from('purchasing')
+        .select('id, code, date, due_date, total, suppliers(name)')
+        .gte('due_date', weekStart)
+        .lte('due_date', weekEnd)
+        .order('due_date', { ascending: true }),
+      supabase.from('debt_loan')
+        .select('id, debt_type, due_date, debt_amount, suppliers(name)')
+        .gte('due_date', weekStart)
+        .lte('due_date', weekEnd)
+        .order('due_date', { ascending: true }),
+    ]).then(([purchRes, debtRes]) => {
+      setWeekPurchasing((purchRes.data ?? []) as WeekPurchasing[])
+      setWeekDebtLoan((debtRes.data ?? []) as WeekDebtLoan[])
+    })
   }, [])
 
   const selectSupplier = (s: Supplier) => {
@@ -87,6 +127,7 @@ export default function KunjunganSalesPage() {
   }
 
   const hasSelection = !!selectedSupplier
+  const totalWeek = (weekPurchasing?.length ?? 0) + (weekDebtLoan?.length ?? 0)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -101,6 +142,19 @@ export default function KunjunganSalesPage() {
             <p className="text-xs text-gray-500 mt-0.5">Lihat riwayat pesanan & pembayaran per supplier.</p>
           </div>
         </div>
+
+        {/* Week Due Button */}
+        <button
+          onClick={() => setShowWeek(true)}
+          className="self-start flex items-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-full shadow-sm transition"
+        >
+          Jatuh Tempo Minggu Ini
+          {totalWeek > 0 && (
+            <span className="bg-white text-red-500 text-[11px] font-bold px-2 py-0.5 rounded-full leading-none">
+              {totalWeek}
+            </span>
+          )}
+        </button>
 
         {/* Filter Card */}
         <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
@@ -202,6 +256,66 @@ export default function KunjunganSalesPage() {
             </div>
             <div className="px-5 py-3 border-t border-gray-100 shrink-0">
               <button onClick={() => setShowPesanan(false)} className="w-full py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Tutup</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Jatuh Tempo Minggu Ini Popup */}
+      {showWeek && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="px-5 py-4 bg-red-500 flex items-center justify-between shrink-0">
+              <div>
+                <p className="text-sm font-bold text-white">Jatuh Tempo Minggu Ini</p>
+                <p className="text-xs text-white/70 mt-0.5">{totalWeek} tagihan</p>
+              </div>
+              <button onClick={() => setShowWeek(false)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {totalWeek === 0 ? (
+                <p className="text-center text-sm text-gray-400 py-10">Tidak ada tagihan yang jatuh tempo minggu ini.</p>
+              ) : (
+                <>
+                  {weekDebtLoan && weekDebtLoan.length > 0 && (
+                    <div>
+                      <p className="px-4 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide bg-gray-50 border-b border-gray-100">Debt &amp; Loan ({weekDebtLoan.length})</p>
+                      <div className="divide-y divide-gray-100">
+                        {weekDebtLoan.map(d => (
+                          <div key={d.id} className="px-4 py-3">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-sm font-semibold text-gray-800">{d.suppliers?.name ?? '-'}</p>
+                              {d.debt_type && <span className="text-xs text-gray-500">· {d.debt_type}</span>}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">Jatuh Tempo: {fmtDate(d.due_date)}</p>
+                            <p className="text-sm font-bold text-[#121358] mt-0.5">Rp {fmt(d.debt_amount)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {weekPurchasing && weekPurchasing.length > 0 && (
+                    <div>
+                      <p className="px-4 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide bg-gray-50 border-b border-gray-100">Purchasing ({weekPurchasing.length})</p>
+                      <div className="divide-y divide-gray-100">
+                        {weekPurchasing.map(p => (
+                          <div key={p.id} className="px-4 py-3">
+                            <p className="text-sm font-semibold text-gray-800">{p.suppliers?.name ?? '-'}</p>
+                            <p className="text-xs text-gray-500 mt-1">Tanggal Nota: {fmtDate(p.date)}</p>
+                            <p className="text-xs text-gray-500">Jatuh Tempo: {fmtDate(p.due_date)}</p>
+                            <p className="text-sm font-bold text-[#121358] mt-0.5">Rp {fmt(p.total)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100 shrink-0">
+              <button onClick={() => setShowWeek(false)} className="w-full py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Tutup</button>
             </div>
           </div>
         </div>
