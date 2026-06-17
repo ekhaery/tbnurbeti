@@ -79,10 +79,27 @@ export default function BuatPurchasingPage() {
   useEffect(() => {
     supabase.from('suppliers').select('id, name').order('name')
       .then(({ data }: { data: Supplier[] | null }) => setSuppliers(data ?? []))
-    supabase.from('products').select('id, name, categories(name)').eq('is_deleted', false).order('name')
-      .then(({ data }: { data: Product[] | null }) => setProducts(data ?? []))
     supabase.from('categories').select('id, name').order('name')
       .then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
+    // Chunked fetch to bypass Supabase's 1000-row default limit
+    ;(async () => {
+      const chunkSize = 1000
+      let from = 0
+      let all: Product[] = []
+      while (true) {
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, name, categories(name)')
+          .eq('is_deleted', false)
+          .order('name')
+          .range(from, from + chunkSize - 1)
+        if (error || !data || data.length === 0) break
+        all = [...all, ...(data as Product[])]
+        if (data.length < chunkSize) break
+        from += chunkSize
+      }
+      setProducts(all)
+    })()
   }, [])
 
   const updateItem = (i: number, field: keyof ItemRow, value: string | number) => {
