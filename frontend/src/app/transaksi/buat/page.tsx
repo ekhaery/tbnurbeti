@@ -55,7 +55,8 @@ export default function BuatTransaksiPage() {
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem()])
   const [autocomplete, setAutocomplete] = useState<AutocompleteState[]>([{ open: false, focused: -1 }])
-  const [isInitialTransformation, setIsInitialTransformation] = useState(false)
+  const [isInitialTransformation, setIsInitialTransformation] = useState(true)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -148,8 +149,8 @@ export default function BuatTransaksiPage() {
     return null
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async () => {
+    setShowConfirm(false)
     setError(null)
     setSuccess(null)
 
@@ -272,7 +273,7 @@ export default function BuatTransaksiPage() {
           <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">⚠️ {error}</div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={e => e.preventDefault()} className="space-y-4">
 
           {/* Header card */}
           <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
@@ -457,13 +458,65 @@ export default function BuatTransaksiPage() {
           )}
 
           <button
-            type="submit"
+            type="button"
+            onClick={() => { if (validItems.length > 0) setShowConfirm(true) }}
             disabled={submitting || validItems.length === 0}
             className="w-full bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white font-semibold py-3 rounded-xl transition text-sm"
           >
             {submitting ? 'Menyimpan...' : 'Simpan Transaksi'}
           </button>
         </form>
+
+        {showConfirm && (
+          <>
+            <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowConfirm(false)} />
+            <div className="fixed inset-x-4 top-16 z-50 bg-white rounded-2xl shadow-xl overflow-hidden" style={{ maxHeight: '80vh' }}>
+              <div className="px-4 py-3 border-b border-gray-100">
+                <p className="text-sm font-bold text-gray-800">Konfirmasi Transaksi</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Periksa kembali sebelum menyimpan.</p>
+              </div>
+              <div className="overflow-y-auto px-4 py-3 space-y-3" style={{ maxHeight: 'calc(80vh - 110px)' }}>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Tanggal</span>
+                  <span className="font-semibold text-gray-700">{date}</span>
+                </div>
+                {isInitialTransformation && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 text-[10px] font-semibold text-amber-700">
+                    Initial Transformation — COGS & stok tidak dicatat sekarang.
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {validItems.map((row, i) => {
+                    const product = products.find(p => p.id === Number(row.product_id))
+                    return (
+                      <div key={i} className="bg-gray-50 rounded-xl px-3 py-2.5 space-y-1">
+                        <p className="text-xs font-semibold text-gray-800">{product?.name ?? '-'}</p>
+                        <div className="flex justify-between text-[10px] text-gray-500">
+                          <span>{row.qty} × Rp {fmt(parseFloat(row.price_sold) || 0)}{parseFloat(row.discount) > 0 ? ` − Rp ${fmt(parseFloat(row.discount))} diskon` : ''}</span>
+                          <span className="font-semibold text-gray-700">Rp {fmt(subtotal(row))}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-gray-100">
+                  <span className="text-xs text-gray-500">Total</span>
+                  <span className="text-sm font-bold text-[#121358]">Rp {fmt(total)}</span>
+                </div>
+              </div>
+              <div className="flex gap-2 px-4 py-3 border-t border-gray-100">
+                <button onClick={() => setShowConfirm(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">
+                  Batal
+                </button>
+                <button onClick={handleSubmit}
+                  className="flex-1 py-2.5 rounded-xl bg-[#121358] text-white text-sm font-semibold hover:bg-[#1a1c6e] transition">
+                  Sudah Benar
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
