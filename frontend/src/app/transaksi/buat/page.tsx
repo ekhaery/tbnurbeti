@@ -55,6 +55,7 @@ export default function BuatTransaksiPage() {
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem()])
   const [autocomplete, setAutocomplete] = useState<AutocompleteState[]>([{ open: false, focused: -1 }])
+  const [isInitialTransformation, setIsInitialTransformation] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -154,12 +155,14 @@ export default function BuatTransaksiPage() {
 
     if (validItems.length === 0) { setError('Isi minimal satu produk.'); return }
 
-    for (const row of validItems) {
-      const product = products.find(p => p.id === Number(row.product_id))
-      if (!product) { setError('Produk tidak ditemukan.'); return }
-      if (parseInt(row.qty) > product.stock) {
-        setError(`Stok ${product.name} tidak cukup. Tersedia: ${product.stock}`)
-        return
+    if (!isInitialTransformation) {
+      for (const row of validItems) {
+        const product = products.find(p => p.id === Number(row.product_id))
+        if (!product) { setError('Produk tidak ditemukan.'); return }
+        if (parseInt(row.qty) > product.stock) {
+          setError(`Stok ${product.name} tidak cukup. Tersedia: ${product.stock}`)
+          return
+        }
       }
     }
 
@@ -169,68 +172,76 @@ export default function BuatTransaksiPage() {
     // 1. Insert transaction header
     const { data: trx, error: trxErr } = await supabase
       .from('transactions')
-      .insert({ code, date, notes: notes.trim() || null, created_by: appUser?.id })
+      .insert({ code, date, notes: notes.trim() || null, created_by: appUser?.id, is_initial_transformation: isInitialTransformation })
       .select('id').single()
 
     if (trxErr || !trx) { setError(trxErr?.message ?? 'Gagal menyimpan.'); setSubmitting(false); return }
 
-    // 2. FIFO consumption per item
-    for (const row of validItems) {
-      const productId = Number(row.product_id)
-      const qtyNeeded = parseInt(row.qty)
-      const discount = parseFloat(row.discount) || 0
-      const priceSold = (parseFloat(row.price_sold) || 0) * qtyNeeded - discount
-
-      // Fetch batches oldest first
-      const { data: batches, error: batchErr } = await supabase
-        .from('stock_batches')
-        .select('id, qty_remaining, base_price')
-        .eq('product_id', productId)
-        .eq('is_available', true)
-        .gt('qty_remaining', 0)
-        .order('received_at', { ascending: true })
-        .order('id', { ascending: true })
-
-      if (batchErr || !batches) { setError(batchErr?.message ?? 'Gagal membaca stok.'); setSubmitting(false); return }
-
-      // Calculate total COGS via FIFO
-      let totalCogs = 0
-      let remaining = qtyNeeded
-      const consumptions: { batch: StockBatch; qty: number }[] = []
-
-      for (const batch of batches as StockBatch[]) {
-        if (remaining <= 0) break
-        const consume = Math.min(remaining, batch.qty_remaining)
-        totalCogs += consume * batch.base_price
-        consumptions.push({ batch, qty: consume })
-        remaining -= consume
+    if (isInitialTransformation) {
+      // Initial transformation: record revenue only, skip stock & COGS
+      for (const row of validItems) {
+        const productId = Number(row.product_id)
+        const qtyNeeded = parseInt(row.qty)
+        const discount = parseFloat(row.discount) || 0
+        const priceSold = (parseFloat(row.price_sold) || 0) * qtyNeeded - discount
+        const { error: txItemErr } = await supabase
+          .from('transaction_items')
+          .insert({ transaction_id: trx.id, product_id: productId, qty: qtyNeeded, price_sold: priceSold, cogs: 0, discount })
+        if (txItemErr) { setError(txItemErr.message); setSubmitting(false); return }
       }
+    } else {
+      // Normal flow: FIFO consumption per item
+      for (const row of validItems) {
+        const productId = Number(row.product_id)
+        const qtyNeeded = parseInt(row.qty)
+        const discount = parseFloat(row.discount) || 0
+        const priceSold = (parseFloat(row.price_sold) || 0) * qtyNeeded - discount
 
-      // Insert transaction_item
-      const { data: txItem, error: txItemErr } = await supabase
-        .from('transaction_items')
-        .insert({ transaction_id: trx.id, product_id: productId, qty: qtyNeeded, price_sold: priceSold, cogs: totalCogs, discount })
-        .select('id').single()
-
-      if (txItemErr || !txItem) { setError(txItemErr?.message ?? 'Gagal menyimpan item.'); setSubmitting(false); return }
-
-      // Insert consumptions + decrement batch qty
-      for (const c of consumptions) {
-        const { error: consErr } = await supabase.from('stock_batch_consumption').insert({
-          transaction_item_id: txItem.id,
-          stock_batch_id: c.batch.id,
-          qty_consumed: c.qty,
-        })
-        if (consErr) { setError(consErr.message); setSubmitting(false); return }
-
-        const { error: batchUpdateErr } = await supabase
+        const { data: batches, error: batchErr } = await supabase
           .from('stock_batches')
-          .update({ qty_remaining: c.batch.qty_remaining - c.qty })
-          .eq('id', c.batch.id)
-        if (batchUpdateErr) { setError(batchUpdateErr.message); setSubmitting(false); return }
-      }
+          .select('id, qty_remaining, base_price')
+          .eq('product_id', productId)
+          .eq('is_available', true)
+          .gt('qty_remaining', 0)
+          .order('received_at', { ascending: true })
+          .order('id', { ascending: true })
 
-      // stock is now tracked via stock_batches.qty_remaining only
+        if (batchErr || !batches) { setError(batchErr?.message ?? 'Gagal membaca stok.'); setSubmitting(false); return }
+
+        let totalCogs = 0
+        let remaining = qtyNeeded
+        const consumptions: { batch: StockBatch; qty: number }[] = []
+
+        for (const batch of batches as StockBatch[]) {
+          if (remaining <= 0) break
+          const consume = Math.min(remaining, batch.qty_remaining)
+          totalCogs += consume * batch.base_price
+          consumptions.push({ batch, qty: consume })
+          remaining -= consume
+        }
+
+        const { data: txItem, error: txItemErr } = await supabase
+          .from('transaction_items')
+          .insert({ transaction_id: trx.id, product_id: productId, qty: qtyNeeded, price_sold: priceSold, cogs: totalCogs, discount })
+          .select('id').single()
+
+        if (txItemErr || !txItem) { setError(txItemErr?.message ?? 'Gagal menyimpan item.'); setSubmitting(false); return }
+
+        for (const c of consumptions) {
+          const { error: consErr } = await supabase.from('stock_batch_consumption').insert({
+            transaction_item_id: txItem.id,
+            stock_batch_id: c.batch.id,
+            qty_consumed: c.qty,
+          })
+          if (consErr) { setError(consErr.message); setSubmitting(false); return }
+
+          const { error: batchUpdateErr } = await supabase
+            .from('stock_batches')
+            .update({ qty_remaining: c.batch.qty_remaining - c.qty })
+            .eq('id', c.batch.id)
+          if (batchUpdateErr) { setError(batchUpdateErr.message); setSubmitting(false); return }
+        }
+      }
     }
 
     setSubmitting(false)
@@ -287,6 +298,20 @@ export default function BuatTransaksiPage() {
                 placeholder="Opsional"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
               />
+            </div>
+
+            <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 border transition ${isInitialTransformation ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200'}`}>
+              <div>
+                <p className="text-xs font-semibold text-gray-700">Initial Transformation</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Catat penjualan tanpa COGS & stok. Backfill nanti.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsInitialTransformation(v => !v)}
+                className={`relative w-10 h-6 rounded-full transition-colors ${isInitialTransformation ? 'bg-amber-400' : 'bg-gray-300'}`}
+              >
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${isInitialTransformation ? 'translate-x-5' : 'translate-x-1'}`} />
+              </button>
             </div>
           </div>
 

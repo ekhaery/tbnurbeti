@@ -2,14 +2,17 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-
-const tabs = [
-  { label: 'Buat Transaksi', href: '/transaksi/buat' },
-  { label: 'Riwayat', href: '/transaksi/riwayat' },
-]
+import { useAuth } from '@/context/AuthContext'
 
 export default function TransaksiTabs() {
   const pathname = usePathname()
+  const { appUser } = useAuth()
+
+  const tabs = [
+    { label: 'Buat Transaksi', href: '/transaksi/buat' },
+    { label: 'Riwayat', href: '/transaksi/riwayat' },
+    ...(appUser?.role === 'admin' ? [{ label: 'Setting', href: '/transaksi/setting' }] : []),
+  ]
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1">
