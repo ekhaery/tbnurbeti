@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCalendarDays, faXmark, faChevronLeft, faChevronRight, faArrowUpAZ } from '@fortawesome/free-solid-svg-icons'
 import { localDateStr } from '@/lib/date'
+import DateRangeFilter from '@/components/DateRangeFilter'
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -195,19 +196,11 @@ export default function LaporanTagihanHutangPage() {
           {loadingSupplierCheck ? 'Memuat...' : 'Check Supplier dengan tagihan dagang & giro'}
         </button>
 
-        <div className="rounded-2xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
-          <p className="text-xs font-semibold text-[#121358]">Rentang Tanggal:</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[10px] font-semibold text-[#121358] mb-1">Dari</label>
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ fontSize: '11px' }} className="w-full bg-white border border-gray-200 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-[#121358] mb-1">Sampai</label>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ fontSize: '11px' }} className="w-full bg-white border border-gray-200 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
-            </div>
-          </div>
-        </div>
+        <DateRangeFilter
+          dateFrom={dateFrom} dateTo={dateTo}
+          onFromChange={setDateFrom}
+          onToChange={setDateTo}
+        />
 
         {/* Legend */}
         <div className="flex items-center gap-4 px-1">
