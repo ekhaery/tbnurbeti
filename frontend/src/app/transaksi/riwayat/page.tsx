@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import TransaksiTabs from '@/lib/TransaksiTabs'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faChevronDown, faChevronUp, faChevronLeft, faChevronRight, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faChevronDown, faChevronUp, faChevronLeft, faChevronRight, faXmark, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import DateRangeFilter from '@/components/DateRangeFilter'
 
@@ -14,11 +14,12 @@ type TransactionItem = {
   price_sold: number
   cogs: number
   profit: number
+  discount: number
   products: { name: string } | null
 }
 
-type EditItem = { id: number; product_name: string; qty: number; price_sold: number }
-type NewEditItem = { product_id: number; product_name: string; qty: number; price_sold: number }
+type EditItem = { id: number; product_name: string; qty: number; unitPrice: number; price_sold: number; discount: number }
+type NewEditItem = { product_id: number; product_name: string; qty: number; unitPrice: number; price_sold: number; discount: number }
 type Product = { id: number; name: string; price: number }
 
 type Transaction = {
@@ -66,6 +67,12 @@ export default function RiwayatTransaksiPage() {
   const [newEditItems, setNewEditItems] = useState<NewEditItem[]>([])
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [showEditConfirm, setShowEditConfirm] = useState(false)
+  // Delete state
+  const [showDelete, setShowDelete] = useState(false)
+  const [pendingDeleteTrx, setPendingDeleteTrx] = useState<Transaction | null>(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
   // Product search for adding new items
   const [products, setProducts] = useState<Product[]>([])
   const [loadingProducts, setLoadingProducts] = useState(false)
@@ -95,7 +102,7 @@ export default function RiwayatTransaksiPage() {
 
       const { data } = await supabase
         .from('transactions')
-        .select('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, qty, price_sold, cogs, profit, products(name))')
+        .select('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, qty, price_sold, cogs, profit, discount, products(name))')
         .in('id', trxIds)
         .gte('date', from)
         .lte('date', to)
@@ -119,7 +126,7 @@ export default function RiwayatTransaksiPage() {
         .lte('date', to),
       supabase
         .from('transactions')
-        .select('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, qty, price_sold, cogs, profit, products(name))')
+        .select('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, qty, price_sold, cogs, profit, discount, products(name))')
         .gte('date', from)
         .lte('date', to)
         .order('date', { ascending: false })
@@ -173,12 +180,17 @@ export default function RiwayatTransaksiPage() {
   const openEdit = (trx: Transaction) => {
     setEditingTrx(trx)
     setEditDate(trx.date)
-    setEditItems(trx.transaction_items.map(i => ({
-      id: i.id,
-      product_name: i.products?.name ?? '-',
-      qty: i.qty,
-      price_sold: i.price_sold,
-    })))
+    setEditItems(trx.transaction_items.map(i => {
+      const unitPrice = i.qty > 0 ? i.price_sold / i.qty : i.price_sold
+      return {
+        id: i.id,
+        product_name: i.products?.name ?? '-',
+        qty: i.qty,
+        unitPrice,
+        price_sold: i.price_sold,
+        discount: i.discount ?? 0,
+      }
+    }))
     setNewEditItems([])
     setNewItemQuery('')
     setEditError(null)
@@ -205,7 +217,7 @@ export default function RiwayatTransaksiPage() {
     for (const item of editItems) {
       const { error: itemErr } = await supabase
         .from('transaction_items')
-        .update({ qty: item.qty, price_sold: item.price_sold })
+        .update({ qty: item.qty, price_sold: item.price_sold, discount: item.discount })
         .eq('id', item.id)
       if (itemErr) { setEditError(itemErr.message); setSaving(false); return }
     }
@@ -213,12 +225,58 @@ export default function RiwayatTransaksiPage() {
     for (const item of newEditItems) {
       const { error: itemErr } = await supabase
         .from('transaction_items')
-        .insert({ transaction_id: editingTrx.id, product_id: item.product_id, qty: item.qty, price_sold: item.price_sold, cogs: 0, discount: 0 })
+        .insert({ transaction_id: editingTrx.id, product_id: item.product_id, qty: item.qty, price_sold: item.price_sold, cogs: 0, discount: item.discount })
       if (itemErr) { setEditError(itemErr.message); setSaving(false); return }
     }
 
     setSaving(false)
+    setShowEditConfirm(false)
     setEditingTrx(null)
+    fetchData(page, dateFrom, dateTo, productFilter)
+  }
+
+  const handleDelete = async () => {
+    if (!pendingDeleteTrx) return
+    setDeleting(true)
+
+    const itemIds = pendingDeleteTrx.transaction_items.map(i => i.id)
+
+    if (!pendingDeleteTrx.is_initial_transformation && itemIds.length > 0) {
+      const { data: consumptions } = await supabase
+        .from('stock_batch_consumption')
+        .select('stock_batch_id, qty_consumed')
+        .in('transaction_item_id', itemIds)
+
+      if (consumptions && consumptions.length > 0) {
+        const batchMap: Record<number, number> = {}
+        for (const c of consumptions as { stock_batch_id: number; qty_consumed: number }[]) {
+          batchMap[c.stock_batch_id] = (batchMap[c.stock_batch_id] ?? 0) + c.qty_consumed
+        }
+        for (const [batchId, qtyToRestore] of Object.entries(batchMap)) {
+          const { data: batch } = await supabase
+            .from('stock_batches')
+            .select('qty_remaining')
+            .eq('id', Number(batchId))
+            .single()
+          if (batch) {
+            await supabase
+              .from('stock_batches')
+              .update({ qty_remaining: (batch as { qty_remaining: number }).qty_remaining + qtyToRestore })
+              .eq('id', Number(batchId))
+          }
+        }
+        await supabase.from('stock_batch_consumption').delete().in('transaction_item_id', itemIds)
+      }
+    }
+
+    if (itemIds.length > 0) {
+      await supabase.from('transaction_items').delete().in('id', itemIds)
+    }
+    await supabase.from('transactions').delete().eq('id', pendingDeleteTrx.id)
+
+    setDeleting(false)
+    setShowDelete(false)
+    setPendingDeleteTrx(null)
     fetchData(page, dateFrom, dateTo, productFilter)
   }
 
@@ -318,7 +376,11 @@ export default function RiwayatTransaksiPage() {
                             </div>
                           ))}
                         </div>
-                        <div className="px-4 py-2.5 border-t border-gray-100 flex justify-end">
+                        <div className="px-4 py-2.5 border-t border-gray-100 flex justify-end gap-2">
+                          <button onClick={() => { setPendingDeleteTrx(trx); setDeleteConfirmText(''); setShowDelete(true) }}
+                            className="text-xs font-semibold text-red-500 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-full transition">
+                            <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                          </button>
                           <button onClick={() => { setPendingEditTrx(trx); setEditReason(''); setShowReason(true) }}
                             className="text-xs font-semibold text-[#121358] bg-[#B5BAFF] hover:bg-[#9FA1FF] px-3 py-1 rounded-full transition">
                             Edit
@@ -358,6 +420,44 @@ export default function RiwayatTransaksiPage() {
           </>
         )}
       </div>
+
+      {showDelete && pendingDeleteTrx && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowDelete(false)} />
+          <div className="fixed inset-x-4 top-1/3 z-50 bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="text-sm font-bold text-red-600">Hapus Transaksi</p>
+              <p className="text-[10px] font-mono text-gray-400 mt-0.5">{pendingDeleteTrx.code}</p>
+            </div>
+            <div className="px-4 py-4 space-y-3">
+              <p className="text-xs text-gray-600">
+                Tindakan ini akan menghapus transaksi dan mengembalikan stok produk.{' '}
+                Ketik <span className="font-bold text-red-500">delete</span> untuk melanjutkan.
+              </p>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder="Ketik delete..."
+                autoFocus
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+              />
+            </div>
+            <div className="flex gap-2 px-4 pb-4">
+              <button onClick={() => setShowDelete(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">
+                Batal
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteConfirmText !== 'delete' || deleting}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 disabled:opacity-40 text-white text-sm font-semibold hover:bg-red-600 transition">
+                {deleting ? 'Menghapus...' : 'Hapus'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {showReason && pendingEditTrx && (
         <>
@@ -423,55 +523,85 @@ export default function RiwayatTransaksiPage() {
               {/* Existing items */}
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Item</p>
-                {editItems.map((item, i) => (
-                  <div key={item.id} className="bg-gray-50 rounded-xl p-3 space-y-2">
-                    <p className="text-xs font-semibold text-gray-700">{item.product_name}</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] text-gray-400 mb-1">Qty</label>
-                        <input type="number" min="1" value={item.qty}
-                          onChange={e => setEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, qty: parseInt(e.target.value) || 1 } : x))}
-                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                {editItems.map((item, i) => {
+                  const subtotal = item.price_sold - (item.discount ?? 0)
+                  return (
+                    <div key={item.id} className="bg-gray-50 rounded-xl p-3 space-y-2">
+                      <p className="text-xs font-semibold text-gray-700">{item.product_name}</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-[10px] text-gray-400 mb-1">Qty</label>
+                          <input type="number" min="1" value={item.qty}
+                            onChange={e => {
+                              const q = parseInt(e.target.value) || 1
+                              setEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, qty: q, price_sold: q * x.unitPrice } : x))
+                            }}
+                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-400 mb-1">Harga Jual</label>
+                          <input type="number" value={item.unitPrice} disabled
+                            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-100 text-gray-500 cursor-not-allowed" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-400 mb-1">Diskon</label>
+                          <input type="number" min="0" value={item.discount}
+                            onChange={e => setEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, discount: parseFloat(e.target.value) || 0 } : x))}
+                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-[10px] text-gray-400 mb-1">Harga Jual</label>
-                        <input type="number" min="0" value={item.price_sold}
-                          onChange={e => setEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, price_sold: parseFloat(e.target.value) || 0 } : x))}
-                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                      <div className="text-right">
+                        <p className="text-[10px] text-gray-400">Subtotal</p>
+                        <p className="text-sm font-semibold text-[#121358]">Rp {fmt(subtotal)}</p>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               {/* New items */}
               {newEditItems.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Produk Baru</p>
-                  {newEditItems.map((item, i) => (
-                    <div key={i} className="bg-blue-50 rounded-xl p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold text-gray-700">{item.product_name}</p>
-                        <button type="button" onClick={() => setNewEditItems(prev => prev.filter((_, idx) => idx !== i))}>
-                          <FontAwesomeIcon icon={faXmark} className="w-3 h-3 text-gray-400 hover:text-red-400" />
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[10px] text-gray-400 mb-1">Qty</label>
-                          <input type="number" min="1" value={item.qty}
-                            onChange={e => setNewEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, qty: parseInt(e.target.value) || 1 } : x))}
-                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                  {newEditItems.map((item, i) => {
+                    const subtotal = item.price_sold - (item.discount ?? 0)
+                    return (
+                      <div key={i} className="bg-blue-50 rounded-xl p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-semibold text-gray-700">{item.product_name}</p>
+                          <button type="button" onClick={() => setNewEditItems(prev => prev.filter((_, idx) => idx !== i))}>
+                            <FontAwesomeIcon icon={faXmark} className="w-3 h-3 text-gray-400 hover:text-red-400" />
+                          </button>
                         </div>
-                        <div>
-                          <label className="block text-[10px] text-gray-400 mb-1">Harga Jual</label>
-                          <input type="number" min="0" value={item.price_sold}
-                            onChange={e => setNewEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, price_sold: parseFloat(e.target.value) || 0 } : x))}
-                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[10px] text-gray-400 mb-1">Qty</label>
+                            <input type="number" min="1" value={item.qty}
+                              onChange={e => {
+                                const q = parseInt(e.target.value) || 1
+                                setNewEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, qty: q, price_sold: q * x.unitPrice } : x))
+                              }}
+                              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-400 mb-1">Harga Jual</label>
+                            <input type="number" value={item.price_sold} disabled
+                              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-blue-100 text-gray-500 cursor-not-allowed" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-400 mb-1">Diskon</label>
+                            <input type="number" min="0" value={item.discount}
+                              onChange={e => setNewEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, discount: parseFloat(e.target.value) || 0 } : x))}
+                              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] text-gray-400">Subtotal</p>
+                          <p className="text-sm font-semibold text-[#121358]">Rp {fmt(subtotal)}</p>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
 
@@ -496,7 +626,7 @@ export default function RiwayatTransaksiPage() {
                       .map(p => (
                         <button key={p.id} type="button"
                           onMouseDown={() => {
-                            setNewEditItems(prev => [...prev, { product_id: p.id, product_name: p.name, qty: 1, price_sold: p.price }])
+                            setNewEditItems(prev => [...prev, { product_id: p.id, product_name: p.name, qty: 1, unitPrice: p.price, price_sold: p.price, discount: 0 }])
                             setNewItemQuery('')
                             setNewItemDropdown(false)
                           }}
@@ -519,14 +649,64 @@ export default function RiwayatTransaksiPage() {
                 className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">
                 Batal
               </button>
-              <button onClick={handleSave} disabled={saving}
-                className="flex-1 py-2.5 rounded-xl bg-[#121358] disabled:opacity-50 text-white text-sm font-semibold hover:bg-[#1a1c6e] transition">
-                {saving ? 'Menyimpan...' : 'Simpan'}
+              <button onClick={() => setShowEditConfirm(true)}
+                className="flex-1 py-2.5 rounded-xl bg-[#121358] text-white text-sm font-semibold hover:bg-[#1a1c6e] transition">
+                Simpan
               </button>
             </div>
           </div>
         </>
       )}
+
+      {showEditConfirm && editingTrx && (() => {
+        const allItems = [
+          ...editItems.map(i => ({ name: i.product_name, qty: i.qty, price_sold: i.price_sold, discount: i.discount, isNew: false })),
+          ...newEditItems.map(i => ({ name: i.product_name, qty: i.qty, price_sold: i.price_sold, discount: i.discount, isNew: true })),
+        ]
+        const grandTotal = allItems.reduce((s, i) => s + i.price_sold - i.discount, 0)
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/50 z-[60]" onClick={() => setShowEditConfirm(false)} />
+            <div className="fixed inset-x-4 top-20 z-[60] bg-white rounded-2xl shadow-2xl overflow-hidden" style={{ maxHeight: '75vh' }}>
+              <div className="px-4 py-3 border-b border-gray-100">
+                <p className="text-sm font-bold text-gray-800">Konfirmasi Perubahan</p>
+                <p className="text-[10px] font-mono text-gray-400 mt-0.5">{editingTrx.code} · {editDate}</p>
+              </div>
+              <div className="overflow-y-auto px-4 py-3 space-y-2" style={{ maxHeight: 'calc(75vh - 120px)' }}>
+                {allItems.map((item, i) => (
+                  <div key={i} className={`rounded-xl px-3 py-2.5 ${item.isNew ? 'bg-blue-50' : 'bg-gray-50'}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-semibold text-gray-700 flex-1">{item.name}</p>
+                      {item.isNew && <span className="text-[9px] font-bold bg-blue-200 text-blue-700 px-1.5 py-0.5 rounded-full shrink-0">BARU</span>}
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-[10px] text-gray-400">
+                        qty {item.qty} · Rp {fmt(Math.round(item.price_sold / item.qty))}
+                        {item.discount > 0 && <span className="text-red-400"> − diskon Rp {fmt(item.discount)}</span>}
+                      </p>
+                      <p className="text-xs font-semibold text-[#121358]">Rp {fmt(item.price_sold - item.discount)}</p>
+                    </div>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between border-t border-gray-100 pt-2 mt-2">
+                  <p className="text-sm font-bold text-gray-700">Total</p>
+                  <p className="text-sm font-bold text-[#121358]">Rp {fmt(grandTotal)}</p>
+                </div>
+              </div>
+              <div className="flex gap-2 px-4 py-3 border-t border-gray-100">
+                <button onClick={() => setShowEditConfirm(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">
+                  Batal
+                </button>
+                <button onClick={handleSave} disabled={saving}
+                  className="flex-1 py-2.5 rounded-xl bg-[#121358] disabled:opacity-50 text-white text-sm font-semibold hover:bg-[#1a1c6e] transition">
+                  {saving ? 'Menyimpan...' : 'Sudah Benar'}
+                </button>
+              </div>
+            </div>
+          </>
+        )
+      })()}
     </div>
   )
 }
