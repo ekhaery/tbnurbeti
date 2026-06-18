@@ -308,8 +308,11 @@ export default function RiwayatTransaksiPage() {
                 placeholder="Tulis alasan perubahan..."
                 rows={3}
                 autoFocus
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] resize-none"
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] resize-none ${editReason.trim().length > 0 && editReason.trim().length <= 3 ? 'border-red-400' : 'border-gray-300'}`}
               />
+              {editReason.trim().length > 0 && editReason.trim().length <= 3 && (
+                <p className="text-[10px] text-red-500 mt-1">Alasan minimal 4 karakter.</p>
+              )}
             </div>
             <div className="flex gap-2 px-4 pb-4">
               <button onClick={() => setShowReason(false)}
@@ -318,7 +321,7 @@ export default function RiwayatTransaksiPage() {
               </button>
               <button
                 onClick={() => { openEdit(pendingEditTrx); setShowReason(false) }}
-                disabled={!editReason.trim()}
+                disabled={editReason.trim().length <= 3}
                 className="flex-1 py-2.5 rounded-xl bg-[#121358] disabled:opacity-40 text-white text-sm font-semibold hover:bg-[#1a1c6e] transition">
                 OK
               </button>
@@ -420,7 +423,7 @@ export default function RiwayatTransaksiPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] disabled:bg-gray-50 disabled:text-gray-400"
                 />
                 {newItemDropdown && newItemQuery.trim() && (
-                  <div className="absolute top-full left-0 right-0 z-10 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto mt-1">
+                  <div className="absolute bottom-full left-0 right-0 z-10 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto mb-1">
                     {products
                       .filter(p => p.name.toLowerCase().includes(newItemQuery.toLowerCase()))
                       .slice(0, 20)
