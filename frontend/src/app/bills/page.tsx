@@ -36,6 +36,18 @@ type PurchasingRow = {
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
 
+function computeDistribution(bills: Bill[], totalAmount: number) {
+  let remaining = totalAmount
+  return bills.map(b => {
+    if (b.is_paid) return { id: b.id, allocation: 0, newPaidAmount: b.paid_amount, willBePaid: true, owed: 0 }
+    const owed = b.installment - b.paid_amount
+    const allocation = Math.min(owed, Math.max(0, remaining))
+    remaining = Math.max(0, remaining - allocation)
+    const newPaidAmount = b.paid_amount + allocation
+    return { id: b.id, allocation, newPaidAmount, willBePaid: newPaidAmount >= b.installment, owed }
+  })
+}
+
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 
 // Sort: month → supplier name → bill_no → installment_due_date
@@ -113,10 +125,14 @@ export default function BillsPage() {
   const [fetchingPBills, setFetchingPBills] = useState(false)
   const [selectedBillIds, setSelectedBillIds] = useState<Set<number>>(new Set())
   const [markingLunas, setMarkingLunas] = useState(false)
+  const [showManualInput, setShowManualInput] = useState(false)
+  const [manualAmount, setManualAmount] = useState('')
 
   const openPurchasingDetail = async (p: PurchasingRow) => {
     setSelectedPurchasing(p)
     setSelectedBillIds(new Set())
+    setShowManualInput(false)
+    setManualAmount('')
     setFetchingPBills(true)
     const { data } = await supabase.from('bills')
       .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date)')
@@ -127,6 +143,7 @@ export default function BillsPage() {
   }
 
   const toggleBillId = (id: number) => {
+    setManualAmount('')
     setSelectedBillIds(prev => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
@@ -153,6 +170,32 @@ export default function BillsPage() {
       .order('installment_due_date', { ascending: true })
     setPurchasingBills((data as Bill[]) ?? [])
     setSelectedBillIds(new Set())
+    setMarkingLunas(false)
+    fetchData()
+  }
+
+  const handleManualSave = async () => {
+    if (!selectedPurchasing) return
+    const amount = parseFloat(manualAmount) || 0
+    if (amount <= 0) return
+    setMarkingLunas(true)
+    const dist = computeDistribution(purchasingBills, amount)
+    for (const d of dist) {
+      if (d.allocation === 0) continue
+      await supabase.from('bills').update({
+        paid_amount: d.newPaidAmount,
+        is_paid: d.willBePaid,
+        ...(d.willBePaid ? { payment_date: localDateStr() } : {}),
+      }).eq('id', d.id)
+    }
+    const { data } = await supabase.from('bills')
+      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date)')
+      .eq('purchasing_id', selectedPurchasing.id)
+      .order('installment_due_date', { ascending: true })
+    setPurchasingBills((data as Bill[]) ?? [])
+    setSelectedBillIds(new Set())
+    setManualAmount('')
+    setShowManualInput(false)
     setMarkingLunas(false)
     fetchData()
   }
@@ -1038,49 +1081,102 @@ export default function BillsPage() {
                 <p className="text-center text-sm text-gray-400 py-10">Memuat...</p>
               ) : purchasingBills.length === 0 ? (
                 <p className="text-center text-sm text-gray-400 py-10">Tidak ada tagihan.</p>
-              ) : purchasingBills.map(b => {
-                const amount = b.paid_amount > 0 ? b.installment - b.paid_amount : b.installment
-                const isChecked = selectedBillIds.has(b.id)
-                return (
-                  <div key={b.id}
-                    onClick={() => !b.is_paid && toggleBillId(b.id)}
-                    className={`flex items-center gap-3 px-5 py-3 transition ${b.is_paid ? 'opacity-50' : 'cursor-pointer hover:bg-gray-50'} ${isChecked ? 'bg-blue-50' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={b.is_paid || isChecked}
-                      disabled={b.is_paid}
-                      onChange={() => !b.is_paid && toggleBillId(b.id)}
-                      onClick={e => e.stopPropagation()}
-                      className="w-4 h-4 accent-[#121358] shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500">
-                        {b.installment_due_date ? fmtDate(b.installment_due_date) : '-'}
+              ) : (() => {
+                const manualActive = showManualInput && parseFloat(manualAmount) > 0
+                const distribution = manualActive ? computeDistribution(purchasingBills, parseFloat(manualAmount)) : null
+                return purchasingBills.map(b => {
+                  const d = distribution?.find(x => x.id === b.id)
+                  const isManualFull = manualActive && !!d && d.willBePaid && !b.is_paid
+                  const isManualPartial = manualActive && !!d && d.allocation > 0 && !d.willBePaid && !b.is_paid
+                  const isChecked = selectedBillIds.has(b.id)
+                  const owed = b.installment - b.paid_amount
+                  return (
+                    <div key={b.id}
+                      onClick={() => !b.is_paid && !manualActive && toggleBillId(b.id)}
+                      className={`flex items-center gap-3 px-5 py-3 transition
+                        ${b.is_paid ? 'opacity-50' : (!manualActive ? 'cursor-pointer hover:bg-gray-50' : '')}
+                        ${isManualFull ? 'bg-green-50' : isManualPartial ? 'bg-amber-50' : isChecked ? 'bg-blue-50' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={b.is_paid || isChecked || isManualFull}
+                        disabled={b.is_paid || manualActive}
+                        onChange={() => !b.is_paid && !manualActive && toggleBillId(b.id)}
+                        onClick={e => e.stopPropagation()}
+                        className="w-4 h-4 accent-[#121358] shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500">
+                          {b.installment_due_date ? fmtDate(b.installment_due_date) : '-'}
+                        </p>
+                        {(b.is_paid || isManualFull) && (
+                          <span className="text-[10px] font-semibold text-green-600">Lunas</span>
+                        )}
+                        {isManualPartial && (
+                          <span className="text-[10px] font-semibold text-amber-600">
+                            Bayar Rp {fmt(d!.allocation)} · Sisa Rp {fmt(owed - d!.allocation)}
+                          </span>
+                        )}
+                      </div>
+                      <p className={`text-sm font-semibold shrink-0 ${
+                        b.is_paid || isManualFull ? 'text-green-600' :
+                        isManualPartial ? 'text-amber-600' : 'text-[#121358]'
+                      }`}>
+                        Rp {fmt(owed > 0 ? owed : b.installment)}
                       </p>
-                      {b.is_paid && (
-                        <span className="text-[10px] font-semibold text-green-600">Lunas</span>
-                      )}
                     </div>
-                    <p className={`text-sm font-semibold shrink-0 ${b.is_paid ? 'text-green-600' : 'text-[#121358]'}`}>
-                      Rp {fmt(amount)}
-                    </p>
-                  </div>
-                )
-              })}
+                  )
+                })
+              })()}
             </div>
 
             {/* Footer buttons */}
-            <div className="flex gap-2 px-5 py-4 border-t border-gray-100 shrink-0">
-              <button onClick={() => setSelectedPurchasing(null)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">
-                Batal
-              </button>
-              <button
-                onClick={handleLunas}
-                disabled={markingLunas || selectedBillIds.size === 0}
-                className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
-                {markingLunas ? 'Menyimpan...' : `Lunas (${selectedBillIds.size})`}
-              </button>
+            <div className="px-5 pt-4 border-t border-gray-100 shrink-0 space-y-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setShowManualInput(true); setManualAmount(''); setSelectedBillIds(new Set()) }}
+                  className={`shrink-0 py-2.5 rounded-xl text-[#121358] text-sm font-semibold transition px-4 ${showManualInput ? 'bg-[#9FA1FF]' : 'bg-[#B5BAFF] hover:bg-[#9FA1FF]'}`}>
+                  Input Manual
+                </button>
+                {showManualInput && (() => {
+                  const maxManual = purchasingBills.filter(b => !b.is_paid).reduce((s, b) => s + (b.installment - b.paid_amount), 0)
+                  const exceeded = parseFloat(manualAmount) > maxManual
+                  return (
+                    <div className="flex-1 space-y-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max={maxManual}
+                        value={manualAmount}
+                        onChange={e => setManualAmount(e.target.value)}
+                        placeholder={`Maks Rp ${fmt(maxManual)}`}
+                        autoFocus
+                        disabled={selectedBillIds.size > 0}
+                        className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed ${exceeded ? 'border-red-400 focus:ring-red-400' : 'border-gray-300 focus:ring-[#121358]'}`}
+                      />
+                      {exceeded && <p className="text-[10px] text-red-500">Melebihi sisa tagihan (maks Rp {fmt(maxManual)})</p>}
+                    </div>
+                  )
+                })()}
+              </div>
+              <div className="flex gap-2 pb-4">
+                <button onClick={() => setSelectedPurchasing(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">
+                  Batal
+                </button>
+                {showManualInput && parseFloat(manualAmount) > 0 && parseFloat(manualAmount) <= purchasingBills.filter(b => !b.is_paid).reduce((s, b) => s + (b.installment - b.paid_amount), 0) ? (
+                  <button onClick={handleManualSave} disabled={markingLunas}
+                    className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
+                    {markingLunas ? 'Menyimpan...' : 'Simpan Manual'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleLunas}
+                    disabled={markingLunas || selectedBillIds.size === 0}
+                    className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
+                    {markingLunas ? 'Menyimpan...' : `Lunas (${selectedBillIds.size})`}
+                  </button>
+                )}
+              </div>
             </div>
 
           </div>
