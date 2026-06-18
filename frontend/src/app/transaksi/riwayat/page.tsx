@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faChevronDown, faChevronUp, faChevronLeft, faChevronRight, faXmark, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import DateRangeFilter from '@/components/DateRangeFilter'
+import DeleteConfirmPopup from '@/components/DeleteConfirmPopup'
 
 type TransactionItem = {
   id: number
@@ -422,41 +423,16 @@ export default function RiwayatTransaksiPage() {
       </div>
 
       {showDelete && pendingDeleteTrx && (
-        <>
-          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowDelete(false)} />
-          <div className="fixed inset-x-4 top-1/3 z-50 bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <p className="text-sm font-bold text-red-600">Hapus Transaksi</p>
-              <p className="text-[10px] font-mono text-gray-400 mt-0.5">{pendingDeleteTrx.code}</p>
-            </div>
-            <div className="px-4 py-4 space-y-3">
-              <p className="text-xs text-gray-600">
-                Tindakan ini akan menghapus transaksi dan mengembalikan stok produk.{' '}
-                Ketik <span className="font-bold text-red-500">delete</span> untuk melanjutkan.
-              </p>
-              <input
-                type="text"
-                value={deleteConfirmText}
-                onChange={e => setDeleteConfirmText(e.target.value)}
-                placeholder="Ketik delete..."
-                autoFocus
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
-              />
-            </div>
-            <div className="flex gap-2 px-4 pb-4">
-              <button onClick={() => setShowDelete(false)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">
-                Batal
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleteConfirmText !== 'delete' || deleting}
-                className="flex-1 py-2.5 rounded-xl bg-red-500 disabled:opacity-40 text-white text-sm font-semibold hover:bg-red-600 transition">
-                {deleting ? 'Menghapus...' : 'Hapus'}
-              </button>
-            </div>
-          </div>
-        </>
+        <DeleteConfirmPopup
+          title="Hapus Transaksi"
+          subLabel={pendingDeleteTrx.code}
+          description="Tindakan ini akan menghapus transaksi dan mengembalikan stok produk."
+          confirmText={deleteConfirmText}
+          onConfirmTextChange={setDeleteConfirmText}
+          onConfirm={handleDelete}
+          onCancel={() => { setShowDelete(false); setDeleteConfirmText('') }}
+          loading={deleting}
+        />
       )}
 
       {showReason && pendingEditTrx && (

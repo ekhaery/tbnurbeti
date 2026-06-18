@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus, faPenToSquare, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
+import DeleteConfirmPopup from '@/components/DeleteConfirmPopup'
 
 type BankDetail = { bank?: string; no_rek?: string; rek_name?: string }
 type SupplierDetail = { product_categories?: number[]; products?: number[] }
@@ -422,34 +423,16 @@ export default function SuppliersPage() {
         </div>
       )}
 
-      {/* Delete confirmation popup */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
-            <div className="px-5 py-4 bg-red-600 flex items-center justify-between">
-              <p className="text-sm font-bold text-white">Hapus Supplier</p>
-              <button onClick={() => setDeleteTarget(null)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition">
-                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
-              </button>
-            </div>
-            <div className="px-5 py-4 space-y-3">
-              <p className="text-sm text-gray-700">Anda akan menghapus <span className="font-semibold">{deleteTarget.name}</span> secara permanen.</p>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1.5">Tulis <span className="font-semibold text-red-500">&quot;delete&quot;</span> untuk mengkonfirmasi</label>
-                <input type="text" value={deleteInput} onChange={e => setDeleteInput(e.target.value)}
-                  placeholder="delete" autoFocus
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
-              </div>
-            </div>
-            <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">Batal</button>
-              <button onClick={handleDelete} disabled={deleteInput !== 'delete' || confirmingDelete}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-sm font-semibold transition">
-                {confirmingDelete ? 'Menghapus...' : 'Hapus'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeleteConfirmPopup
+          title="Hapus Supplier"
+          description={`Anda akan menghapus ${deleteTarget.name} secara permanen.`}
+          confirmText={deleteInput}
+          onConfirmTextChange={setDeleteInput}
+          onConfirm={handleDelete}
+          onCancel={() => { setDeleteTarget(null); setDeleteInput('') }}
+          loading={confirmingDelete}
+        />
       )}
 
       {/* Add Supplier Modal */}
