@@ -483,8 +483,8 @@ export default function RiwayatTransaksiPage() {
 
       {editingTrx && (
         <>
-          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setEditingTrx(null)} />
-          <div className="fixed inset-x-4 top-16 z-50 bg-white rounded-2xl shadow-xl overflow-hidden" style={{ maxHeight: '80vh' }}>
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4" onClick={() => setEditingTrx(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" style={{ maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <div>
                 <p className="text-sm font-bold text-gray-800">Edit Transaksi</p>
@@ -640,6 +640,7 @@ export default function RiwayatTransaksiPage() {
               </button>
             </div>
           </div>
+          </div>
         </>
       )}
 
@@ -651,8 +652,8 @@ export default function RiwayatTransaksiPage() {
         const grandTotal = allItems.reduce((s, i) => s + i.price_sold - i.discount, 0)
         return (
           <>
-            <div className="fixed inset-0 bg-black/50 z-[60]" onClick={() => setShowEditConfirm(false)} />
-            <div className="fixed inset-x-4 top-20 z-[60] bg-white rounded-2xl shadow-2xl overflow-hidden" style={{ maxHeight: '75vh' }}>
+            <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center px-4" onClick={() => setShowEditConfirm(false)}>
+            <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden" style={{ maxHeight: '75vh' }} onClick={e => e.stopPropagation()}>
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-sm font-bold text-gray-800">Konfirmasi Perubahan</p>
                 <p className="text-[10px] font-mono text-gray-400 mt-0.5">{editingTrx.code} · {editDate}</p>
@@ -688,6 +689,7 @@ export default function RiwayatTransaksiPage() {
                   {saving ? 'Menyimpan...' : 'Sudah Benar'}
                 </button>
               </div>
+            </div>
             </div>
           </>
         )
