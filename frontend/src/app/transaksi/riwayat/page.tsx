@@ -26,6 +26,7 @@ type Transaction = {
   code: string
   date: string
   notes: string | null
+  reason_to_edit: string | null
   is_initial_transformation: boolean
   users: { name: string } | null
   transaction_items: TransactionItem[]
@@ -85,7 +86,7 @@ export default function RiwayatTransaksiPage() {
         .lte('date', to),
       supabase
         .from('transactions')
-        .select('id, code, date, notes, is_initial_transformation, users(name), transaction_items(id, qty, price_sold, cogs, profit, products(name))')
+        .select('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, qty, price_sold, cogs, profit, products(name))')
         .gte('date', from)
         .lte('date', to)
         .order('date', { ascending: false })
@@ -148,14 +149,14 @@ export default function RiwayatTransaksiPage() {
     setSaving(true)
     setEditError(null)
 
-    const existingNotes = editingTrx.notes ?? ''
-    const appendedNotes = existingNotes
-      ? `${existingNotes}\n${editReason.trim()}`
+    const existingReason = editingTrx.reason_to_edit ?? ''
+    const appendedReason = existingReason
+      ? `${existingReason}\n${editReason.trim()}`
       : editReason.trim()
 
     const { error: trxErr } = await supabase
       .from('transactions')
-      .update({ date: editDate, notes: appendedNotes, updated_at: new Date().toISOString() })
+      .update({ date: editDate, reason_to_edit: appendedReason, updated_at: new Date().toISOString() })
       .eq('id', editingTrx.id)
 
     if (trxErr) { setEditError(trxErr.message); setSaving(false); return }
