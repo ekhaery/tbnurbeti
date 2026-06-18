@@ -570,7 +570,7 @@ export default function RiwayatTransaksiPage() {
                           </div>
                           <div>
                             <label className="block text-[10px] text-gray-400 mb-1">Harga Jual</label>
-                            <input type="number" value={item.price_sold} disabled
+                            <input type="number" value={item.unitPrice} disabled
                               className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-blue-100 text-gray-500 cursor-not-allowed" />
                           </div>
                           <div>
