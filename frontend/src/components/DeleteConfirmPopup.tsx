@@ -12,9 +12,10 @@ type Props = {
   onConfirm: () => void
   onCancel: () => void
   loading?: boolean
+  error?: string
 }
 
-export default function DeleteConfirmPopup({ title, description, subLabel, confirmText, onConfirmTextChange, onConfirm, onCancel, loading }: Props) {
+export default function DeleteConfirmPopup({ title, description, subLabel, confirmText, onConfirmTextChange, onConfirm, onCancel, loading, error }: Props) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
       <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
@@ -41,6 +42,7 @@ export default function DeleteConfirmPopup({ title, description, subLabel, confi
             />
           </div>
         </div>
+        {error && <p className="mx-5 mb-3 text-xs font-semibold text-red-600 bg-red-50 rounded-xl px-3 py-2">⚠ {error}</p>}
         <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
           <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">
             Batal

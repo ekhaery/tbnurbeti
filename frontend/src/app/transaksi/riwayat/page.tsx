@@ -28,7 +28,7 @@ type Transaction = {
   code: string
   date: string
   notes: string | null
-  reason_to_edit: string | null
+  reason_to_edit: { date: string; reason: string }[] | null
   is_initial_transformation: boolean
   users: { name: string } | null
   transaction_items: TransactionItem[]
@@ -74,6 +74,7 @@ export default function RiwayatTransaksiPage() {
   const [pendingDeleteTrx, setPendingDeleteTrx] = useState<Transaction | null>(null)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   // Product search for adding new items
   const [products, setProducts] = useState<Product[]>([])
   const [loadingProducts, setLoadingProducts] = useState(false)
@@ -203,14 +204,12 @@ export default function RiwayatTransaksiPage() {
     setSaving(true)
     setEditError(null)
 
-    const existingReason = editingTrx.reason_to_edit ?? ''
-    const appendedReason = existingReason
-      ? `${existingReason}\n${editReason.trim()}`
-      : editReason.trim()
+    const existingReasons = editingTrx.reason_to_edit ?? []
+    const newReasons = [...existingReasons, { date: new Date().toISOString(), reason: editReason.trim() }]
 
     const { error: trxErr } = await supabase
       .from('transactions')
-      .update({ date: editDate, reason_to_edit: appendedReason, updated_at: new Date().toISOString() })
+      .update({ date: editDate, reason_to_edit: newReasons, updated_at: new Date().toISOString() })
       .eq('id', editingTrx.id)
 
     if (trxErr) { setEditError(trxErr.message); setSaving(false); return }
@@ -239,6 +238,7 @@ export default function RiwayatTransaksiPage() {
   const handleDelete = async () => {
     if (!pendingDeleteTrx) return
     setDeleting(true)
+    setDeleteError(null)
 
     const itemIds = pendingDeleteTrx.transaction_items.map(i => i.id)
 
@@ -260,23 +260,29 @@ export default function RiwayatTransaksiPage() {
             .eq('id', Number(batchId))
             .single()
           if (batch) {
-            await supabase
+            const { error: batchErr } = await supabase
               .from('stock_batches')
               .update({ qty_remaining: (batch as { qty_remaining: number }).qty_remaining + qtyToRestore })
               .eq('id', Number(batchId))
+            if (batchErr) { setDeleteError(batchErr.message); setDeleting(false); return }
           }
         }
-        await supabase.from('stock_batch_consumption').delete().in('transaction_item_id', itemIds)
+        const { error: consErr } = await supabase.from('stock_batch_consumption').delete().in('transaction_item_id', itemIds)
+        if (consErr) { setDeleteError(consErr.message); setDeleting(false); return }
       }
     }
 
     if (itemIds.length > 0) {
-      await supabase.from('transaction_items').delete().in('id', itemIds)
+      const { error: itemsErr } = await supabase.from('transaction_items').delete().in('id', itemIds)
+      if (itemsErr) { setDeleteError(itemsErr.message); setDeleting(false); return }
     }
-    await supabase.from('transactions').delete().eq('id', pendingDeleteTrx.id)
+
+    const { error: trxErr } = await supabase.from('transactions').delete().eq('id', pendingDeleteTrx.id)
+    if (trxErr) { setDeleteError(trxErr.message); setDeleting(false); return }
 
     setDeleting(false)
     setShowDelete(false)
+    setDeleteConfirmText('')
     setPendingDeleteTrx(null)
     fetchData(page, dateFrom, dateTo, productFilter)
   }
@@ -430,15 +436,16 @@ export default function RiwayatTransaksiPage() {
           confirmText={deleteConfirmText}
           onConfirmTextChange={setDeleteConfirmText}
           onConfirm={handleDelete}
-          onCancel={() => { setShowDelete(false); setDeleteConfirmText('') }}
+          onCancel={() => { setShowDelete(false); setDeleteConfirmText(''); setDeleteError(null) }}
           loading={deleting}
+          error={deleteError ?? undefined}
         />
       )}
 
       {showReason && pendingEditTrx && (
         <>
-          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowReason(false)} />
-          <div className="fixed inset-x-4 top-1/3 z-50 bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4" onClick={() => setShowReason(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-4 py-3 border-b border-gray-100">
               <p className="text-sm font-bold text-gray-800">Alasan mengubah transaksi</p>
               <p className="text-[10px] font-mono text-gray-400 mt-0.5">{pendingEditTrx.code}</p>
@@ -468,6 +475,7 @@ export default function RiwayatTransaksiPage() {
                 OK
               </button>
             </div>
+          </div>
           </div>
         </>
       )}

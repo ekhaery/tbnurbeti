@@ -469,8 +469,8 @@ export default function BuatTransaksiPage() {
 
         {showConfirm && (
           <>
-            <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowConfirm(false)} />
-            <div className="fixed inset-x-4 top-16 z-50 bg-white rounded-2xl shadow-xl overflow-hidden" style={{ maxHeight: '80vh' }}>
+            <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4" onClick={() => setShowConfirm(false)}>
+            <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" style={{ maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-sm font-bold text-gray-800">Konfirmasi Transaksi</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">Periksa kembali sebelum menyimpan.</p>
@@ -514,6 +514,7 @@ export default function BuatTransaksiPage() {
                   Sudah Benar
                 </button>
               </div>
+            </div>
             </div>
           </>
         )}
