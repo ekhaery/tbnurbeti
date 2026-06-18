@@ -1166,7 +1166,7 @@ export default function BillsPage() {
                 {showManualInput && parseFloat(manualAmount) > 0 && parseFloat(manualAmount) <= purchasingBills.filter(b => !b.is_paid).reduce((s, b) => s + (b.installment - b.paid_amount), 0) ? (
                   <button onClick={handleManualSave} disabled={markingLunas}
                     className="flex-1 py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold transition">
-                    {markingLunas ? 'Menyimpan...' : 'Simpan Manual'}
+                    {markingLunas ? 'Menyimpan...' : 'Bayar'}
                   </button>
                 ) : (
                   <button
