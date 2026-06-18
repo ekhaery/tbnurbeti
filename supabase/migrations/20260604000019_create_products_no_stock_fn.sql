@@ -8,7 +8,8 @@ as $$
   where not exists (
     select 1 from stock_batches sb where sb.product_id = p.id
   )
-  and p.base_price = 0
+  and p.base_price > 1
+  and p.price > 1
   and p.is_deleted = false
   and p.name not ilike '%Vinilex%'
   and p.name not ilike '%Pastel%'

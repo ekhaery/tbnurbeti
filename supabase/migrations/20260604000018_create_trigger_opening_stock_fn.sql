@@ -22,7 +22,8 @@ begin
   select array_agg(p.name order by p.name) into added_names
   from products p
   join purchasing pur on pur.code = 'OPENING-BALANCE'
-  where p.base_price > 0
+  where p.base_price > 1
+    and p.price > 1
     and not exists (
       select 1 from stock_batches sb
       join purchasing_items pi on pi.id = sb.purchasing_item_id
@@ -38,7 +39,8 @@ begin
     p.base_price
   from products p
   join purchasing pur on pur.code = 'OPENING-BALANCE'
-  where p.base_price > 0
+  where p.base_price > 1
+    and p.price > 1
     and not exists (
       select 1 from stock_batches sb
       join purchasing_items pi on pi.id = sb.purchasing_item_id

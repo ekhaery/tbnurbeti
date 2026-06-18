@@ -47,6 +47,8 @@ export default function RiwayatTransaksiPage() {
 
   const [dateFrom, setDateFrom] = useState(defaultFrom)
   const [dateTo, setDateTo] = useState(defaultTo)
+  const [productFilterInput, setProductFilterInput] = useState('')
+  const [productFilter, setProductFilter] = useState('')
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [list, setList] = useState<Transaction[]>([])
@@ -72,9 +74,40 @@ export default function RiwayatTransaksiPage() {
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
-  const fetchData = async (p: number, from: string, to: string) => {
+  const fetchData = async (p: number, from: string, to: string, pFilter: string) => {
     setFetching(true)
     setExpanded(null)
+
+    if (pFilter.trim()) {
+      const { data: itemData } = await supabase
+        .from('transaction_items')
+        .select('transaction_id, products!inner(name)')
+        .ilike('products.name', `%${pFilter.trim()}%`)
+
+      const trxIds = [...new Set(((itemData ?? []) as { transaction_id: number }[]).map(i => i.transaction_id))]
+
+      if (trxIds.length === 0) {
+        setTotalCount(0)
+        setList([])
+        setFetching(false)
+        return
+      }
+
+      const { data } = await supabase
+        .from('transactions')
+        .select('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, qty, price_sold, cogs, profit, products(name))')
+        .in('id', trxIds)
+        .gte('date', from)
+        .lte('date', to)
+        .order('date', { ascending: false })
+        .order('id', { ascending: false })
+
+      setTotalCount((data ?? []).length)
+      setList((data as Transaction[]) ?? [])
+      setFetching(false)
+      return
+    }
+
     const rangeFrom = (p - 1) * PAGE_SIZE
     const rangeTo = rangeFrom + PAGE_SIZE - 1
 
@@ -99,7 +132,15 @@ export default function RiwayatTransaksiPage() {
     setFetching(false)
   }
 
-  useEffect(() => { fetchData(page, dateFrom, dateTo) }, [page, dateFrom, dateTo])
+  useEffect(() => { fetchData(page, dateFrom, dateTo, productFilter) }, [page, dateFrom, dateTo, productFilter])
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setPage(1)
+      setProductFilter(productFilterInput)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [productFilterInput])
 
   const handleDateChange = (from: string, to: string) => {
     setPage(1)
@@ -178,7 +219,7 @@ export default function RiwayatTransaksiPage() {
 
     setSaving(false)
     setEditingTrx(null)
-    fetchData(page, dateFrom, dateTo)
+    fetchData(page, dateFrom, dateTo, productFilter)
   }
 
   return (
@@ -196,6 +237,27 @@ export default function RiwayatTransaksiPage() {
           onFromChange={v => handleDateChange(v, dateTo)}
           onToChange={v => handleDateChange(dateFrom, v)}
         />
+
+        <div className="rounded-2xl shadow-sm px-4 py-4" style={{ backgroundColor: '#B5BAFF' }}>
+          <p className="text-xs font-semibold text-[#121358] mb-2">Nama Produk:</p>
+          <div className="relative">
+            <input
+              type="text"
+              value={productFilterInput}
+              onChange={e => setProductFilterInput(e.target.value)}
+              placeholder="Cari nama produk..."
+              className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] pr-8"
+            />
+            {productFilterInput && (
+              <button
+                onClick={() => setProductFilterInput('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
 
         {fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
@@ -270,7 +332,10 @@ export default function RiwayatTransaksiPage() {
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between px-1">
+            {productFilter && (
+              <p className="text-xs text-gray-400 px-1">{totalCount} transaksi ditemukan</p>
+            )}
+            <div className={`flex items-center justify-between px-1 ${productFilter ? 'hidden' : ''}`}>
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
