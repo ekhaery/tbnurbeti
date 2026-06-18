@@ -10,7 +10,7 @@ import { getArrivalStatus, ARRIVAL_STATUS } from '@/lib/arrivalStatus'
 import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
 import { useAuth } from '@/context/AuthContext'
 import { PURCHASING_STATUS } from '@/lib/purchasingStatus'
-import { localDateStr } from '@/lib/date'
+import { localDateStr, nowWIB } from '@/lib/date'
 
 type StockBatch = { id: number; is_available: boolean }
 
@@ -267,7 +267,7 @@ export default function RiwayatPurchasingPage() {
       for (const pi of items) {
         if (pi.base_price > 0) {
           await supabase.from('products')
-            .update({ base_price: pi.base_price, updated_at: new Date().toISOString() })
+            .update({ base_price: pi.base_price, updated_at: nowWIB() })
             .eq('id', pi.product_id)
         }
       }

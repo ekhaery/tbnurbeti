@@ -10,3 +10,11 @@ export function localDateStr(date: Date = new Date()): string {
     `${String(date.getDate()).padStart(2, '0')}`
   )
 }
+
+/**
+ * Returns current timestamp as ISO string in WIB (UTC+7).
+ * Use this instead of new Date().toISOString() for all stored timestamps.
+ */
+export function nowWIB(): string {
+  return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().replace('Z', '+07:00')
+}

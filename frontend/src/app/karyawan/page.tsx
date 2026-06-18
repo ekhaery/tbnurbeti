@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus, faXmark, faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { SALARY_PERIOD_OPTIONS, salaryPeriodLabel } from '@/lib/employeeOptions'
+import { nowWIB } from '@/lib/date'
 
 type SalaryRow = {
   id?: number
@@ -120,7 +121,7 @@ export default function KaryawanPage() {
       phone_number_1: editForm.phone_number_1.trim() || null,
       phone_number_2: editForm.phone_number_2.trim() || null,
       alamat: editForm.alamat.trim() || null,
-      updated_at: new Date().toISOString(),
+      updated_at: nowWIB(),
     }).eq('id', editing!.id)
 
     // Regenerate salaries

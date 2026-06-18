@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faChevronLeft } from '@fortawesome/free-solid-svg-icons'
 import { toTitleCase } from '@/lib/utils'
+import { nowWIB } from '@/lib/date'
 
 type Category = { id: number; name: string }
 
@@ -83,7 +84,7 @@ export default function EditProductPage() {
         base_price: parseFloat(form.base_price) || 0,
         price: parseFloat(form.price) || 0,
         is_discontinued: form.is_discontinued,
-        updated_at: new Date().toISOString(),
+        updated_at: nowWIB(),
       })
       .eq('id', id)
 

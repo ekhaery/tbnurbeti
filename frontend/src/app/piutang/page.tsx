@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus, faXmark, faPen, faTrash, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
 import { RECEIVABLES_STATUS_OPTIONS, receivablesStatusConfig } from '@/lib/receivablesOptions'
-import { localDateStr } from '@/lib/date'
+import { localDateStr, nowWIB } from '@/lib/date'
 
 type Customer = { id: number; name: string }
 
@@ -144,7 +144,7 @@ export default function PiutangPage() {
       total: parseFloat(editForm.total),
       remaining_amount: parseFloat(editForm.remaining_amount),
       status: editForm.status,
-      updated_at: new Date().toISOString(),
+      updated_at: nowWIB(),
     }).eq('id', editing!.id)
     setEditSaving(false)
     if (error) { setEditError(error.message); return }
@@ -177,7 +177,7 @@ export default function PiutangPage() {
     await supabase.from('customer_receivables').update({
       remaining_amount: newRemaining,
       status: newStatus,
-      updated_at: new Date().toISOString(),
+      updated_at: nowWIB(),
     }).eq('id', addingDetail!.id)
 
     setDetailSaving(false); setAddingDetail(null); setDetailForm(emptyDetail()); fetchData()

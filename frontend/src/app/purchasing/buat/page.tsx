@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation'
 import { toTitleCase } from '@/lib/utils'
 import type { PurchasingStatus } from '@/lib/purchasingStatus'
 import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
-import { localDateStr } from '@/lib/date'
+import { localDateStr, nowWIB } from '@/lib/date'
 
 type Supplier = { id: number; name: string }
 type Category = { id: number; name: string }
@@ -280,7 +280,7 @@ export default function BuatPurchasingPage() {
       for (const item of insertedItems as { id: number; product_id: number; qty: number; base_price: number }[]) {
         if (item.base_price > 0) {
           await supabase.from('products')
-            .update({ base_price: item.base_price, updated_at: new Date().toISOString() })
+            .update({ base_price: item.base_price, updated_at: nowWIB() })
             .eq('id', item.product_id)
         }
       }

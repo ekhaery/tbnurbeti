@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus, faXmark, faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { PAYMENT_DISCIPLINE_OPTIONS, disciplineConfig } from '@/lib/customerOptions'
+import { nowWIB } from '@/lib/date'
 
 type Customer = {
   id: number
@@ -96,7 +97,7 @@ export default function CustomersPage() {
       phone_number_2: editForm.phone_number_2.trim() || null,
       payment_discipline: editForm.payment_discipline || null,
       notes: editForm.notes.trim() || null,
-      updated_at: new Date().toISOString(),
+      updated_at: nowWIB(),
     }).eq('id', editing!.id)
     setEditSaving(false)
     if (error) { setEditError(error.message); return }

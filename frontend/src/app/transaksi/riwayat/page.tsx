@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faChevronDown, faChevronUp, faChevronLeft, faChevronRight, faXmark, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import DateRangeFilter from '@/components/DateRangeFilter'
+import { nowWIB } from '@/lib/date'
 import DeleteConfirmPopup from '@/components/DeleteConfirmPopup'
 
 type TransactionItem = {
@@ -205,11 +206,11 @@ export default function RiwayatTransaksiPage() {
     setEditError(null)
 
     const existingReasons = editingTrx.reason_to_edit ?? []
-    const newReasons = [...existingReasons, { date: new Date().toISOString(), reason: editReason.trim() }]
+    const newReasons = [...existingReasons, { date: nowWIB(), reason: editReason.trim() }]
 
     const { error: trxErr } = await supabase
       .from('transactions')
-      .update({ date: editDate, reason_to_edit: newReasons, updated_at: new Date().toISOString() })
+      .update({ date: editDate, reason_to_edit: newReasons, updated_at: nowWIB() })
       .eq('id', editingTrx.id)
 
     if (trxErr) { setEditError(trxErr.message); setSaving(false); return }
