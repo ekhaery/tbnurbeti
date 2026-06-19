@@ -486,6 +486,11 @@ export default function BillsPage() {
               <p className="text-xs font-semibold text-[#121358] mt-0.5">Rp {fmt(monthTotalTerbayar)}</p>
             </div>
           </div>
+          <div className="px-4 pb-2.5 border-t border-[#121358]/10">
+            <p className="text-[10px] text-[#1a2a5e] mt-1.5">
+              Total Rekomendasi Jumlah Pembayaran{monthFilter ? ` Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : ''} agar tidak ada tagihan overdue: <span className="font-semibold text-[#121358]">Rp {fmt(monthTotalTagihan)}</span>
+            </p>
+          </div>
         </div>
 
         {/* Tabs */}
