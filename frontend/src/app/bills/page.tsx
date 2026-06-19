@@ -747,9 +747,11 @@ export default function BillsPage() {
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
             <div className="px-5 py-4 flex items-center justify-between" style={{ backgroundColor: '#121358' }}>
               <p className="text-sm font-bold text-white">
-                {monthSisaTagihanJT > monthTotalTagihan
-                  ? 'Kenapa Sisa Tagihan JT bisa lebih besar dari Rekomendasi?'
-                  : 'Kenapa Sisa Tagihan JT bisa lebih kecil dari Rekomendasi?'}
+                {monthSisaTagihanJT > monthTotalTagihan ? (
+                  <>Kenapa Sisa Tagihan JT bisa <span style={{ color: '#F5C842' }}>lebih besar</span> dari Rekomendasi?</>
+                ) : (
+                  <>Kenapa Sisa Tagihan JT bisa <span style={{ color: '#F5C842' }}>lebih kecil</span> dari Rekomendasi?</>
+                )}
               </p>
               <button onClick={() => setShowSisaExplain(false)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
                 <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
