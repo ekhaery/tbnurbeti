@@ -498,10 +498,15 @@ export default function Navbar() {
                   {produkAlerts.map((p) => (
                     <div
                       key={p.id}
-                      onClick={() => { setEditingProduct(p); setEditBasePrice(''); setEditPrice('') }}
+                      onClick={() => { setEditingProduct(p); setEditBasePrice(String(p.base_price || '')); setEditPrice(String(p.price || '')) }}
                       className="flex items-center justify-between px-5 py-2.5 border-b border-gray-50 cursor-pointer hover:bg-blue-50 transition"
                     >
-                      <p className="text-sm text-gray-800">{p.name}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-800">{p.name}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          Modal: Rp {p.base_price.toLocaleString('id-ID')} · Jual: Rp {p.price.toLocaleString('id-ID')}
+                        </p>
+                      </div>
                       <span className="text-xs text-[#9FA1FF] shrink-0 ml-2">Isi harga →</span>
                     </div>
                   ))}
