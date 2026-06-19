@@ -119,6 +119,8 @@ export default function BillsPage() {
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const [showSisaExplain, setShowSisaExplain] = useState(false)
+
   // Kumpulan Nota detail popup
   const [selectedPurchasing, setSelectedPurchasing] = useState<PurchasingRow | null>(null)
   const [purchasingBills, setPurchasingBills] = useState<Bill[]>([])
@@ -516,7 +518,8 @@ export default function BillsPage() {
           </div>
           <div className="px-4 pb-2.5 border-t border-[#121358]/10" style={{ backgroundColor: '#F5C842' }}>
             <p className="text-[10px] text-[#1a2a5e] mt-1.5">
-              Total <strong>rekomendasi</strong> pembayaran{monthFilter ? ` Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : ''} agar tidak ada tagihan overdue: <span className="font-semibold text-[#121358]">Rp {fmt(monthTotalTagihan)}</span> (lihat tab cicilan) · Sudah terbayarkan <span className="font-semibold text-[#121358]">{monthTotalTagihan > 0 ? (monthTotalTerbayar / monthTotalTagihan * 100).toFixed(1) : '0.0'}%</span> · <span className="font-semibold text-[#121358]">Rp {fmt(monthTotalTerbayar)}</span> | <span className="font-semibold" style={{ color: '#B22222' }}>sisa: Rp {fmt(monthTotalTagihan - monthTotalTerbayar)}</span>
+              <strong>Rekomendasi</strong><br />
+              Total pembayaran{monthFilter ? ` Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : ''} agar tidak ada tagihan overdue: <span className="font-semibold text-[#121358]">Rp {fmt(monthTotalTagihan)}</span> (lihat tab cicilan) · Sudah terbayarkan <span className="font-semibold text-[#121358]">{monthTotalTagihan > 0 ? (monthTotalTerbayar / monthTotalTagihan * 100).toFixed(1) : '0.0'}%</span> · <span className="font-semibold text-[#121358]">Rp {fmt(monthTotalTerbayar)}</span> | <span className="font-semibold" style={{ color: '#B22222' }}>sisa: Rp {fmt(monthTotalTagihan - monthTotalTerbayar)}</span> <button onClick={() => setShowSisaExplain(true)} className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold text-white ml-0.5 align-middle" style={{ backgroundColor: '#121358' }}>Jelaskan lebih rinci</button>
             </p>
           </div>
         </div>
@@ -737,6 +740,26 @@ export default function BillsPage() {
           })
         ))}
       </div>
+
+      {/* Sisa Explain Modal */}
+      {showSisaExplain && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+            <div className="px-5 py-4 flex items-center justify-between" style={{ backgroundColor: '#121358' }}>
+              <p className="text-sm font-bold text-white">Kenapa Sisa Tagihan JT bisa lebih besar dari Rekomendasi?</p>
+              <button onClick={() => setShowSisaExplain(false)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3 text-xs text-gray-700 leading-relaxed">
+              <p>Setiap nota pembelian dipecah jadi <strong>cicilan bulanan</strong>. Misalnya nota 10 juta yang jatuh tempo Juli, dicicil 3 bulan: Mei 3 juta, Juni 3 juta, Juli 4 juta.</p>
+              <p><strong>Rekomendasi</strong> = total cicilan yang memang <strong>dijadwalkan bulan ini</strong> saja.</p>
+              <p><strong>Sisa JT</strong> = rekomendasi bulan ini <strong>ditambah</strong> cicilan bulan-bulan sebelumnya yang <strong>belum dibayar</strong> (tertunggak).</p>
+              <p style={{ color: '#B22222' }}>Selisihnya adalah tunggakan dari bulan lalu yang harus dilunasi sebelum nota-nota ini overdue.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Paid Bills Modal */}
       {showPaidModal && (() => {
