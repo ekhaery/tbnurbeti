@@ -7,6 +7,7 @@ import { faTriangleExclamation, faCircleCheck, faChevronDown, faChevronUp } from
 
 type Bill = {
   id: number
+  purchasing_id: number
   due_date: string
   installment_due_date: string | null
   installment: number
@@ -16,6 +17,7 @@ type Bill = {
     name: string
     bank_detail: { bank?: string; no_rek?: string; rek_name?: string } | null
   } | null
+  purchasing: { code: string; date: string; due_date: string | null } | null
 }
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
@@ -39,7 +41,7 @@ export default function BillsInsightPage() {
   useEffect(() => {
     supabase
       .from('bills')
-      .select('id, due_date, installment_due_date, installment, paid_amount, is_paid, suppliers(name, bank_detail)')
+      .select('id, purchasing_id, due_date, installment_due_date, installment, paid_amount, is_paid, suppliers(name, bank_detail), purchasing(code, date, due_date)')
       .then(({ data }) => {
         setBills((data as Bill[]) ?? [])
         setFetching(false)
@@ -50,24 +52,34 @@ export default function BillsInsightPage() {
   const overdueBills = bills.filter(b => !b.is_paid && b.due_date.slice(0, 7) < currentMonth)
   const overdueAmount = overdueBills.reduce((s, b) => s + (b.installment - b.paid_amount), 0)
 
-  // Group overdue by supplier
-  type OverdueSupplier = {
-    name: string
-    bank: string | null
-    bills: { id: number; due_date: string; sisa: number }[]
-    total: number
-  }
+  // Group overdue by supplier → purchasing (distinct by purchasing_id)
+  type OverduePurchasing = { purchasingId: number; code: string; date: string | null; dueDate: string | null; sisa: number }
+  type OverdueSupplier = { name: string; bank: string | null; purchasings: OverduePurchasing[]; total: number }
   const overdueBySupplier: Record<string, OverdueSupplier> = {}
+  const seenPurchasingIds: Record<string, Set<number>> = {}
+
   overdueBills.forEach(b => {
     const name = b.suppliers?.name ?? '-'
     if (!overdueBySupplier[name]) {
       const bd = b.suppliers?.bank_detail
       const parts = bd ? [bd.bank, bd.no_rek, bd.rek_name].filter(Boolean) : []
-      overdueBySupplier[name] = { name, bank: parts.length > 0 ? parts.join(' · ') : null, bills: [], total: 0 }
+      overdueBySupplier[name] = { name, bank: parts.length > 0 ? parts.join(' · ') : null, purchasings: [], total: 0 }
+      seenPurchasingIds[name] = new Set()
     }
     const sisa = b.installment - b.paid_amount
-    overdueBySupplier[name].bills.push({ id: b.id, due_date: b.due_date, sisa })
     overdueBySupplier[name].total += sisa
+    if (!seenPurchasingIds[name].has(b.purchasing_id)) {
+      seenPurchasingIds[name].add(b.purchasing_id)
+      overdueBySupplier[name].purchasings.push({
+        purchasingId: b.purchasing_id,
+        code: b.purchasing?.code ?? '-',
+        date: b.purchasing?.date ?? null,
+        dueDate: b.purchasing?.due_date ?? null,
+        sisa: 0,
+      })
+    }
+    const p = overdueBySupplier[name].purchasings.find(x => x.purchasingId === b.purchasing_id)
+    if (p) p.sisa += sisa
   })
   const overdueSupplierList = Object.values(overdueBySupplier).sort((a, b) => b.total - a.total)
 
@@ -153,25 +165,29 @@ export default function BillsInsightPage() {
               <div className="divide-y divide-red-200">
                 {overdueSupplierList.map(sup => (
                   <div key={sup.name} className="px-4 py-3 bg-white">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div>
                         <p className="text-sm font-semibold text-gray-800">{sup.name}</p>
-                        {sup.bank && (
-                          <p className="text-xs text-gray-500 mt-0.5">{sup.bank}</p>
-                        )}
-                        <div className="mt-1.5 space-y-1">
-                          {sup.bills.map(b => (
-                            <div key={b.id} className="flex justify-between text-xs text-gray-500">
-                              <span>JT: {fmtDate(b.due_date)}</span>
-                              <span className="font-semibold text-red-600">Rp {fmt(b.sisa)}</span>
-                            </div>
-                          ))}
-                        </div>
+                        {sup.bank && <p className="text-xs text-gray-400 mt-0.5">{sup.bank}</p>}
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-sm font-bold text-red-600">Rp {fmt(sup.total)}</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">total sisa</p>
+                        <p className="text-[10px] text-gray-400">total sisa</p>
                       </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      {sup.purchasings.map(p => (
+                        <div key={p.purchasingId} className="bg-red-50 rounded-lg px-3 py-2">
+                          <p className="text-xs font-mono text-gray-500">{p.code}</p>
+                          <div className="flex justify-between items-center mt-1">
+                            <div className="text-[11px] text-gray-500 space-y-0.5">
+                              {p.date && <p>Tgl nota: {fmtDate(p.date)}</p>}
+                              {p.dueDate && <p>Jatuh tempo: {fmtDate(p.dueDate)}</p>}
+                            </div>
+                            <p className="text-xs font-semibold text-red-600 shrink-0 ml-2">Rp {fmt(p.sisa)}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
