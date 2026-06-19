@@ -285,6 +285,15 @@ export default function BillsPage() {
   const monthTotalTerbayar = monthBills.reduce((s, b) => s + b.paid_amount, 0)
   const monthSisaTagihan = monthBills.reduce((s, b) => s + (b.installment - b.paid_amount), 0)
 
+  // Sisa Tagihan JT: sum(installment - paid_amount) filtered by bills.due_date month and supplier
+  const monthSisaTagihanJT = bills
+    .filter(b => {
+      if (monthFilter && b.due_date?.slice(0, 7) !== monthFilter) return false
+      if (supplierFilter && b.suppliers?.name !== supplierFilter) return false
+      return true
+    })
+    .reduce((s, b) => s + (b.installment - b.paid_amount), 0)
+
   // Total Terbayar JT: sum paid_amount filtered by bills.due_date month and supplier
   const monthTotalTerbayarJT = bills
     .filter(b => {
@@ -493,7 +502,7 @@ export default function BillsPage() {
         <div className="rounded-xl overflow-hidden">
           <div className="px-4 pt-2.5 pb-1 text-center" style={{ backgroundColor: '#121358' }}>
             <p className="text-xs font-semibold" style={{ color: '#F5C842' }}>{monthFilter ? `Sisa Tagihan JT: Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : 'Sisa Tagihan Tahunan'}</p>
-            <p className="text-sm font-bold mt-0.5" style={{ color: '#F5C842' }}>Rp {fmt(monthSisaTagihan)}</p>
+            <p className="text-sm font-bold mt-0.5" style={{ color: '#F5C842' }}>Rp {fmt(monthSisaTagihanJT)}</p>
           </div>
           <div className="px-4 pb-2.5 pt-1 grid grid-cols-2 gap-2 mt-1" style={{ backgroundColor: '#BDD8E9' }}>
             <div>
