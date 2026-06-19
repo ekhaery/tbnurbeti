@@ -19,7 +19,7 @@ type Bill = {
   payment_date: string | null
   updated_at: string
   suppliers: { name: string } | null
-  purchasing: { code: string; total: number; date: string } | null
+  purchasing: { code: string; total: number; date: string; due_date: string | null } | null
 }
 
 type FilterStatus = 'all' | 'unpaid' | 'paid'
@@ -135,7 +135,7 @@ export default function BillsPage() {
     setManualAmount('')
     setFetchingPBills(true)
     const { data } = await supabase.from('bills')
-      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date)')
+      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date, due_date)')
       .eq('purchasing_id', p.id)
       .order('installment_due_date', { ascending: true })
     setPurchasingBills((data as Bill[]) ?? [])
@@ -165,7 +165,7 @@ export default function BillsPage() {
       }).eq('id', id)
     }
     const { data } = await supabase.from('bills')
-      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date)')
+      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date, due_date)')
       .eq('purchasing_id', selectedPurchasing.id)
       .order('installment_due_date', { ascending: true })
     setPurchasingBills((data as Bill[]) ?? [])
@@ -189,7 +189,7 @@ export default function BillsPage() {
       }).eq('id', d.id)
     }
     const { data } = await supabase.from('bills')
-      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date)')
+      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date, due_date)')
       .eq('purchasing_id', selectedPurchasing.id)
       .order('installment_due_date', { ascending: true })
     setPurchasingBills((data as Bill[]) ?? [])
@@ -203,7 +203,7 @@ export default function BillsPage() {
   const fetchData = async () => {
     const { data } = await supabase
       .from('bills')
-      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date)')
+      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date, due_date)')
     setBills((data as Bill[]) ?? [])
     setFetching(false)
   }
@@ -284,6 +284,16 @@ export default function BillsPage() {
   const monthTotalTagihan = monthBills.reduce((s, b) => s + b.installment, 0)
   const monthTotalTerbayar = monthBills.reduce((s, b) => s + b.paid_amount, 0)
   const monthSisaTagihan = monthBills.reduce((s, b) => s + (b.installment - b.paid_amount), 0)
+
+  // Total Tagihan JT: sum purchasing.total deduplicated by purchasing_id, filtered by purchasing.due_date month and supplier
+  const monthTotalTagihanJT = bills.reduce<{ seen: Set<number>; total: number }>((acc, b) => {
+    if (acc.seen.has(b.purchasing_id)) return acc
+    if (supplierFilter && b.suppliers?.name !== supplierFilter) return acc
+    const pDueDate = b.purchasing?.due_date
+    if (monthFilter && (!pDueDate || pDueDate.slice(0, 7) !== monthFilter)) return acc
+    acc.seen.add(b.purchasing_id)
+    return { seen: acc.seen, total: acc.total + (b.purchasing?.total ?? 0) }
+  }, { seen: new Set(), total: 0 }).total
 
   const openPay = (bill: Bill) => {
     setPayingBill(bill)
@@ -478,8 +488,8 @@ export default function BillsPage() {
           </div>
           <div className="px-4 pb-2.5 pt-1 grid grid-cols-2 gap-2 border-t border-[#121358]/10 mt-1">
             <div>
-              <p className="text-[10px] text-[#1a2a5e]">{monthFilter ? `Total Tagihan Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : 'Total Tagihan Tahunan'}</p>
-              <p className="text-xs font-semibold text-[#121358] mt-0.5">Rp {fmt(monthTotalTagihan)}</p>
+              <p className="text-[10px] text-[#1a2a5e]">{monthFilter ? `Total Tagihan JT: Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : 'Total Tagihan Tahunan'}</p>
+              <p className="text-xs font-semibold text-[#121358] mt-0.5">Rp {fmt(monthTotalTagihanJT)}</p>
             </div>
             <div className="text-right">
               <p className="text-[10px] text-[#1a2a5e]">Total Terbayar</p>
