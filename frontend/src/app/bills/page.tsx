@@ -490,12 +490,12 @@ export default function BillsPage() {
         </div>
 
         {/* Card 2: Tagihan Bulanan/Tahunan */}
-        <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#8FB3E2' }}>
-          <div className="px-4 pt-2.5 pb-1 text-center">
-            <p className="text-xs font-semibold text-[#121358]">{monthFilter ? `Sisa Tagihan JT: Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : 'Sisa Tagihan Tahunan'}</p>
-            <p className="text-sm font-bold text-[#121358] mt-0.5">Rp {fmt(monthSisaTagihan)}</p>
+        <div className="rounded-xl overflow-hidden">
+          <div className="px-4 pt-2.5 pb-1 text-center" style={{ backgroundColor: '#121358' }}>
+            <p className="text-xs font-semibold" style={{ color: '#F5C842' }}>{monthFilter ? `Sisa Tagihan JT: Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : 'Sisa Tagihan Tahunan'}</p>
+            <p className="text-sm font-bold mt-0.5" style={{ color: '#F5C842' }}>Rp {fmt(monthSisaTagihan)}</p>
           </div>
-          <div className="px-4 pb-2.5 pt-1 grid grid-cols-2 gap-2 border-t border-[#121358]/10 mt-1">
+          <div className="px-4 pb-2.5 pt-1 grid grid-cols-2 gap-2 mt-1" style={{ backgroundColor: '#BDD8E9' }}>
             <div>
               <p className="text-[10px] text-[#1a2a5e]">{monthFilter ? `Total Tagihan JT: Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : 'Total Tagihan Tahunan'}</p>
               <p className="text-xs font-semibold text-[#121358] mt-0.5">Rp {fmt(monthTotalTagihanJT)}</p>
@@ -507,10 +507,7 @@ export default function BillsPage() {
           </div>
           <div className="px-4 pb-2.5 border-t border-[#121358]/10" style={{ backgroundColor: '#F5C842' }}>
             <p className="text-[10px] text-[#1a2a5e] mt-1.5">
-              Total <strong>rekomendasi</strong> pembayaran{monthFilter ? ` Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : ''} agar tidak ada tagihan overdue: <span className="font-semibold text-[#121358]">Rp {fmt(monthTotalTagihan)}</span> (lihat tab cicilan)
-            </p>
-            <p className="text-[10px] text-[#1a2a5e] mt-0.5">
-              Sudah terbayarkan <span className="font-semibold text-[#121358]">{monthTotalTagihan > 0 ? (monthTotalTerbayar / monthTotalTagihan * 100).toFixed(1) : '0.0'}%</span> · <span className="font-semibold text-[#121358]">Rp {fmt(monthTotalTerbayar)}</span> | <span className="font-semibold" style={{ color: '#B22222' }}>sisa: Rp {fmt(monthTotalTagihan - monthTotalTerbayar)}</span>
+              Total <strong>rekomendasi</strong> pembayaran{monthFilter ? ` Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : ''} agar tidak ada tagihan overdue: <span className="font-semibold text-[#121358]">Rp {fmt(monthTotalTagihan)}</span> (lihat tab cicilan) · Sudah terbayarkan <span className="font-semibold text-[#121358]">{monthTotalTagihan > 0 ? (monthTotalTerbayar / monthTotalTagihan * 100).toFixed(1) : '0.0'}%</span> · <span className="font-semibold text-[#121358]">Rp {fmt(monthTotalTerbayar)}</span> | <span className="font-semibold" style={{ color: '#B22222' }}>sisa: Rp {fmt(monthTotalTagihan - monthTotalTerbayar)}</span>
             </p>
           </div>
         </div>
