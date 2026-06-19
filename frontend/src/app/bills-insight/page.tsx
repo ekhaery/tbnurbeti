@@ -51,6 +51,13 @@ export default function BillsInsightPage() {
   const [fetching, setFetching] = useState(true)
   const [overdueExpanded, setOverdueExpanded] = useState(false)
 
+  const [expandedSuppliers, setExpandedSuppliers] = useState<Set<string>>(new Set())
+  const toggleSupplier = (name: string) => setExpandedSuppliers(prev => {
+    const next = new Set(prev)
+    if (next.has(name)) next.delete(name); else next.add(name)
+    return next
+  })
+
   const [payingSupplier, setPayingSupplier] = useState<OverdueSupplier | null>(null)
   const [payAmount, setPayAmount] = useState('')
   const [paying, setPaying] = useState(false)
@@ -140,22 +147,31 @@ export default function BillsInsightPage() {
   const thisMonthPct = thisMonthTotal > 0 ? thisMonthPaid / thisMonthTotal * 100 : 0
 
   // Per supplier: bills where due_date is current month
-  const supplierMap: Record<string, { sisa: number; dueDate: string; allPaid: boolean; pastDue: boolean; urgent: boolean }> = {}
+  const supplierMap: Record<string, { sisa: number; dueDate: string; allPaid: boolean; pastDue: boolean; urgent: boolean; purchasings: OverduePurchasing[] }> = {}
+  const seenThisMonthPurchasingIds: Record<string, Set<number>> = {}
   bills
     .filter(b => b.due_date.slice(0, 7) === currentMonth)
     .forEach(b => {
       const name = b.suppliers?.name ?? '-'
       if (!supplierMap[name]) {
-        supplierMap[name] = { sisa: 0, dueDate: b.due_date, allPaid: true, pastDue: false, urgent: false }
+        supplierMap[name] = { sisa: 0, dueDate: b.due_date, allPaid: true, pastDue: false, urgent: false, purchasings: [] }
+        seenThisMonthPurchasingIds[name] = new Set()
       }
       const e = supplierMap[name]
-      e.sisa += Math.max(0, b.installment - b.paid_amount)
+      const sisa = Math.max(0, b.installment - b.paid_amount)
+      e.sisa += sisa
       if (b.due_date < e.dueDate) e.dueDate = b.due_date
       if (!b.is_paid) {
         e.allPaid = false
         if (b.due_date < todayStr) e.pastDue = true
         else if (b.due_date <= in7DaysStr) e.urgent = true
       }
+      if (!seenThisMonthPurchasingIds[name].has(b.purchasing_id)) {
+        seenThisMonthPurchasingIds[name].add(b.purchasing_id)
+        e.purchasings.push({ purchasingId: b.purchasing_id, code: b.purchasing?.code ?? '-', date: b.purchasing?.date ?? null, dueDate: b.purchasing?.due_date ?? null, sisa: 0 })
+      }
+      const p = e.purchasings.find(x => x.purchasingId === b.purchasing_id)
+      if (p) p.sisa += sisa
     })
   const supplierList = Object.entries(supplierMap).sort((a, b) => a[1].dueDate.localeCompare(b[1].dueDate))
 
@@ -275,25 +291,63 @@ export default function BillsInsightPage() {
               Hutang per supplier bulan ini
             </p>
             <div className="space-y-2">
-              {supplierList.map(([name, data]) => (
-                <div key={name} className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">{name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Jatuh tempo: {fmtDate(data.dueDate)}</p>
+              {supplierList.map(([name, data]) => {
+                const isExpanded = expandedSuppliers.has(name)
+                return (
+                  <div key={name} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                    {/* Header row — clickable */}
+                    <div
+                      className="p-4 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition"
+                      onClick={() => toggleSupplier(name)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{name}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Jatuh tempo: {fmtDate(data.dueDate)}</p>
+                      </div>
+                      <div className="text-right shrink-0 flex items-center gap-2">
+                        <p className="text-sm font-bold text-[#121358]">Rp {fmt(data.sisa)}</p>
+                        <FontAwesomeIcon icon={isExpanded ? faChevronUp : faChevronDown} className="w-3 h-3 text-gray-400 shrink-0" />
+                      </div>
+                    </div>
+
+                    {/* Expanded: per-purchasing detail */}
+                    {isExpanded && (
+                      <div className="border-t border-gray-100 divide-y divide-gray-100 bg-gray-50">
+                        {data.purchasings.map(p => {
+                          const pDueDate = p.dueDate ?? ''
+                          const pPastDue = pDueDate && pDueDate < todayStr
+                          const pUrgent = pDueDate && !pPastDue && pDueDate <= in7DaysStr
+                          const pAllPaid = p.sisa === 0
+                          return (
+                            <div key={p.purchasingId} className={`px-4 py-3 ${pAllPaid ? 'bg-green-50' : ''}`}>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-mono text-gray-500">{p.code}</p>
+                                  <div className="text-[11px] text-gray-500 mt-0.5 space-y-0.5">
+                                    {p.date && <p>Tgl nota: {fmtDate(p.date)}</p>}
+                                    {p.dueDate && <p>Jatuh tempo: {fmtDate(p.dueDate)}</p>}
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  {!pAllPaid && <p className="text-xs font-semibold text-red-500">Sisa: Rp {fmt(p.sisa)}</p>}
+                                  <span className={`inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                    pAllPaid ? 'bg-green-100 text-green-700'
+                                      : pPastDue ? 'bg-red-100 text-red-700'
+                                      : pUrgent ? 'bg-orange-100 text-orange-700'
+                                      : 'bg-amber-100 text-amber-700'
+                                  }`}>
+                                    {pAllPaid ? 'Sudah lunas' : pPastDue ? 'Sudah lewat!' : pUrgent ? 'Bayar segera' : 'Belum lunas'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-[#121358]">Rp {fmt(data.sisa)}</p>
-                    <span className={`inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                      data.allPaid ? 'bg-green-100 text-green-700'
-                        : data.pastDue ? 'bg-red-100 text-red-700'
-                        : data.urgent ? 'bg-orange-100 text-orange-700'
-                        : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {data.allPaid ? 'Sudah lunas' : data.pastDue ? 'Sudah lewat!' : data.urgent ? 'Bayar segera' : 'Belum lunas'}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
