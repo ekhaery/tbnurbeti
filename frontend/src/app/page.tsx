@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faHandshake, faTag, faReceipt, faUserCheck } from '@fortawesome/free-solid-svg-icons'
+import { faHandshake, faTag, faReceipt, faUserCheck, faLightbulb } from '@fortawesome/free-solid-svg-icons'
 
 const cards = [
   {
@@ -36,6 +36,14 @@ const cards = [
     bg: '#8FB3E2',
     text: '#121358',
     sub: 'Rekap kehadiran karyawan',
+  },
+  {
+    label: 'Tagihan Dagang Insight',
+    icon: faLightbulb,
+    href: '/bills-insight',
+    bg: '#800000',
+    text: 'white',
+    sub: 'Ringkasan & situasi hutang dagang',
   },
 ]
 
