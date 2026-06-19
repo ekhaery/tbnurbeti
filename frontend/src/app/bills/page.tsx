@@ -74,7 +74,7 @@ export default function BillsPage() {
 
   const [bills, setBills] = useState<Bill[]>([])
   const [fetching, setFetching] = useState(true)
-  const [filter, setFilter] = useState<FilterStatus>('unpaid')
+  const [filter, setFilter] = useState<FilterStatus>('all')
   const [expandedBill, setExpandedBill] = useState<number | null>(null)
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set())
   const toggleWeek = (week: string) => setExpandedWeeks(prev => {
