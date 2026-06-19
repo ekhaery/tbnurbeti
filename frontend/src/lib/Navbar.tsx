@@ -23,6 +23,14 @@ export default function Navbar() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const [activityCount, setActivityCount] = useState(0)
+  const [showProdukAlert, setShowProdukAlert] = useState(false)
+  const [produkAlerts, setProdukAlerts] = useState<{ id: number; name: string; base_price: number; price: number }[]>([])
+  const [loadingAlerts, setLoadingAlerts] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<{ id: number; name: string; base_price: number; price: number } | null>(null)
+  const [editBasePrice, setEditBasePrice] = useState('')
+  const [editPrice, setEditPrice] = useState('')
+  const [savingProduct, setSavingProduct] = useState(false)
+  const [saveCounter, setSaveCounter] = useState(0)
   const isAdmin = appUser?.role === 'admin'
   const supabase = createClient()
 
@@ -69,6 +77,94 @@ export default function Navbar() {
     }
   }, [drawerOpen, isDesktop])
 
+  const handleTutup = async () => {
+    setShowProdukAlert(false)
+    try {
+      const today = localDateStr()
+
+      // 1. Ensure 'Opening Stock' supplier exists
+      let { data: supplier } = await supabase.from('suppliers').select('id').eq('name', 'Opening Stock').maybeSingle()
+      if (!supplier) {
+        const { data: ns } = await supabase.from('suppliers').insert({ name: 'Opening Stock' }).select('id').single()
+        supplier = ns
+      }
+      if (!supplier) return
+
+      // 2. Ensure 'OPENING-BALANCE' purchasing exists
+      let { data: purch } = await supabase.from('purchasing').select('id').eq('code', 'OPENING-BALANCE').maybeSingle()
+      if (!purch) {
+        const { data: np } = await supabase.from('purchasing').insert({
+          code: 'OPENING-BALANCE', supplier_id: supplier.id, date: today,
+          notes: 'Saldo awal stok', total: 0, status: 'completed'
+        }).select('id').single()
+        purch = np
+      }
+      if (!purch) return
+
+      // 3. Get product_ids already in stock_batches (via purchasing_items)
+      const { data: sbRows } = await supabase.from('stock_batches').select('purchasing_item_id')
+      const piIds = [...new Set((sbRows ?? []).map((r: { purchasing_item_id: number }) => r.purchasing_item_id).filter(Boolean))]
+      let stockedProductIds: number[] = []
+      if (piIds.length > 0) {
+        const { data: piRows } = await supabase.from('purchasing_items').select('product_id').in('id', piIds)
+        stockedProductIds = Array.from(new Set((piRows ?? []).map((r: { product_id: number }) => r.product_id)))
+      }
+
+      // 4. Get eligible products (base_price > 0, not yet in stock_batches)
+      let pq = supabase.from('products').select('id, base_price').gt('base_price', 0)
+      if (stockedProductIds.length > 0) pq = pq.not('id', 'in', `(${stockedProductIds.join(',')})`)
+      const { data: eligibleProducts } = await pq
+      if (!eligibleProducts || eligibleProducts.length === 0) return
+
+      // 5. Insert purchasing_items
+      const { data: newPis } = await supabase.from('purchasing_items')
+        .insert(eligibleProducts.map((p: { id: number; base_price: number }) => ({
+          purchasing_id: purch!.id, product_id: p.id, qty: 200, base_price: p.base_price,
+        })))
+        .select('id, product_id, qty, base_price')
+      if (!newPis || newPis.length === 0) return
+
+      // 6. Insert stock_batches
+      await supabase.from('stock_batches').insert(
+        newPis.map((pi: { id: number; product_id: number; qty: number; base_price: number }) => ({
+          purchasing_item_id: pi.id, product_id: pi.product_id,
+          qty_remaining: pi.qty, base_price: pi.base_price,
+          received_at: today, is_available: true,
+        }))
+      )
+    } catch (_) { /* silent */ }
+  }
+
+  const handleSaveProduct = async () => {
+    if (!editingProduct) return
+    const bp = parseFloat(editBasePrice)
+    const pr = parseFloat(editPrice)
+    if (!bp || bp <= 0 || !pr || pr <= 0) return
+    setSavingProduct(true)
+    await supabase.from('products').update({ base_price: bp, price: pr }).eq('id', editingProduct.id)
+    setProdukAlerts(prev => prev.filter(p => p.id !== editingProduct.id))
+    setSaveCounter(c => c + 1)
+    setSavingProduct(false)
+    setEditingProduct(null)
+  }
+
+  const openProdukAlert = async () => {
+    setShowProdukAlert(true)
+    router.push('/products/list')
+    if (produkAlerts.length > 0) return
+    setLoadingAlerts(true)
+    const { data: sbData } = await supabase.from('stock_batches').select('product_id')
+    const sbIds = [...new Set((sbData ?? []).map((r: { product_id: number }) => r.product_id))]
+    const exclusions = ['%Vinilex%', '%Pastel%', '%Tint%', '%Deep%', '%Accent%', '%Elastex%', '%Spot Less%', '%Satin Glo%', '%Catylac Interior Base%', '%Cat Dasar%', '%Glow Base%', '%Easy Clean Base%', '%Weathershield Base%', '%Pentalite Base%']
+    let q = supabase.from('products').select('id, name, base_price, price').eq('base_price', 0).eq('is_deleted', false)
+    for (const p of exclusions) q = q.not('name', 'ilike', p)
+    q = q.not('name', 'ilike', 'Init%')
+    if (sbIds.length > 0) q = q.not('id', 'in', `(${sbIds.join(',')})`)
+    const { data } = await q.limit(10000).order('name', { ascending: true })
+    setProdukAlerts((data ?? []) as { id: number; name: string; base_price: number; price: number }[])
+    setLoadingAlerts(false)
+  }
+
   const linkClass = (active: boolean) =>
     `px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
       active ? 'bg-white/20 text-white' : 'text-white/90 hover:bg-white/10 hover:text-white'
@@ -98,9 +194,15 @@ export default function Navbar() {
           {/* Nav links — right aligned */}
           <div className="flex flex-1 items-center justify-end gap-1">
             {/* Produk link */}
-            <Link href="/products/list" className={linkClass(isProdukActive)}>
-              Produk
-            </Link>
+            {isAdmin ? (
+              <button onClick={openProdukAlert} className={linkClass(isProdukActive)}>
+                Produk
+              </button>
+            ) : (
+              <Link href="/products/list" className={linkClass(isProdukActive)}>
+                Produk
+              </Link>
+            )}
 
             {/* Transaksi link */}
             <Link href="/transaksi" className={linkClass(pathname.startsWith('/transaksi'))}>
@@ -362,6 +464,112 @@ export default function Navbar() {
           </button>
         </div>
       </div>
+      {/* Produk alert popup — admin only */}
+      {showProdukAlert && isAdmin && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="flex items-start justify-between gap-3 px-5 py-4 shrink-0" style={{ backgroundColor: '#800000' }}>
+              <div>
+                <p className="text-sm font-bold text-white leading-snug">200++ transaksi tidak bisa masuk ke stok karena harga belum diisi. Lengkapi sekarang.</p>
+                {!loadingAlerts && produkAlerts.length > 0 && (
+                  <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.65)' }}>{produkAlerts.length} produk belum ada harga</p>
+                )}
+              </div>
+              <button
+                onClick={() => setShowProdukAlert(false)}
+                className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition"
+              >
+                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {loadingAlerts ? (
+                <div className="py-10 text-center text-sm text-gray-400">Memuat...</div>
+              ) : produkAlerts.length === 0 ? (
+                <div className="py-10 text-center text-sm text-gray-400">Semua produk sudah memiliki harga.</div>
+              ) : (
+                <>
+                  <div className="px-5 py-3 border-b border-gray-100 bg-amber-50 flex items-center justify-between gap-3">
+                    <p className="text-xs text-amber-700">Lengkapi setidaknya 2 data untuk menutup halaman ini.</p>
+                    <span className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded-full ${saveCounter >= 2 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {saveCounter}/2
+                    </span>
+                  </div>
+                  {produkAlerts.map((p) => (
+                    <div
+                      key={p.id}
+                      onClick={() => { setEditingProduct(p); setEditBasePrice(''); setEditPrice('') }}
+                      className="flex items-center justify-between px-5 py-2.5 border-b border-gray-50 cursor-pointer hover:bg-blue-50 transition"
+                    >
+                      <p className="text-sm text-gray-800">{p.name}</p>
+                      <span className="text-xs text-[#9FA1FF] shrink-0 ml-2">Isi harga →</span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+            <div className="shrink-0 px-5 py-3 border-t border-gray-100">
+              <button
+                onClick={handleTutup}
+                disabled={saveCounter < 2}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ backgroundColor: '#800000' }}
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit product price sub-popup */}
+      {editingProduct && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ backgroundColor: '#121358' }}>
+              <p className="text-sm font-bold text-white leading-snug pr-2">{editingProduct.name}</p>
+              <button onClick={() => setEditingProduct(null)} className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Harga Modal (base_price)</label>
+                <input
+                  type="number"
+                  value={editBasePrice}
+                  onChange={e => setEditBasePrice(e.target.value)}
+                  placeholder="Rp 0"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Harga Jual (price)</label>
+                <input
+                  type="number"
+                  value={editPrice}
+                  onChange={e => setEditPrice(e.target.value)}
+                  placeholder="Rp 0"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
+              <button onClick={() => setEditingProduct(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">
+                Batal
+              </button>
+              <button
+                onClick={handleSaveProduct}
+                disabled={savingProduct || !editBasePrice || !editPrice || parseFloat(editBasePrice) <= 0 || parseFloat(editPrice) <= 0}
+                className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition disabled:opacity-40"
+                style={{ backgroundColor: '#121358' }}
+              >
+                {savingProduct ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

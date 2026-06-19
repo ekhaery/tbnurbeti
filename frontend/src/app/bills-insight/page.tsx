@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faTriangleExclamation, faCircleCheck, faChevronDown, faChevronUp, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faTriangleExclamation, faCircleCheck, faChevronDown, faChevronUp, faXmark, faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 import { localDateStr } from '@/lib/date'
 
 type Bill = {
@@ -227,9 +228,14 @@ export default function BillsInsightPage() {
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
 
         {/* Header */}
-        <div>
-          <h2 className="text-lg font-bold text-gray-800">Tagihan Dagang Insight</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Situasi hutang {monthLabel(currentMonth)}</p>
+        <div className="flex items-center gap-3">
+          <Link href="/" className="w-8 h-8 flex items-center justify-center rounded-full bg-white shadow-sm text-gray-500 hover:text-gray-800 transition shrink-0">
+            <FontAwesomeIcon icon={faArrowLeft} className="w-3.5 h-3.5" />
+          </Link>
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">Tagihan Dagang Insight</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Situasi hutang {monthLabel(currentMonth)}</p>
+          </div>
         </div>
 
         {/* Overdue alert */}

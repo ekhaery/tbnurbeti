@@ -30,20 +30,20 @@ const cards = [
     sub: 'Buat & lihat riwayat transaksi',
   },
   {
-    label: 'Absen Karyawan',
-    icon: faUserCheck,
-    href: '#',
-    bg: '#8FB3E2',
-    text: '#121358',
-    sub: 'Rekap kehadiran karyawan',
-  },
-  {
     label: 'Tagihan Dagang Insight',
     icon: faLightbulb,
     href: '/bills-insight',
     bg: '#800000',
     text: 'white',
     sub: 'Ringkasan & situasi hutang dagang',
+  },
+  {
+    label: 'Absen Karyawan',
+    icon: faUserCheck,
+    href: '#',
+    bg: '#8FB3E2',
+    text: '#121358',
+    sub: 'Rekap kehadiran karyawan',
   },
 ]
 
