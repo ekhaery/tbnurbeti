@@ -56,14 +56,13 @@ export default function Navbar() {
     return () => mq.removeEventListener('change', handler)
   }, [])
 
-  // Auto-show produk alert when admin lands on /products
+  // Listen for openProdukAlert event (dispatched by home card and navbar button)
   useEffect(() => {
-    if (!appUser || appUser.role !== 'admin') return
-    if (!pathname.startsWith('/products')) return
-    setShowProdukAlert(true)
-    fetchProdukData()
+    const handler = () => { setShowProdukAlert(true); fetchProdukData() }
+    window.addEventListener('openProdukAlert', handler)
+    return () => window.removeEventListener('openProdukAlert', handler)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, appUser?.role])
+  }, [])
 
   // Close drawer on route change — mobile only
   useEffect(() => {
@@ -178,9 +177,8 @@ export default function Navbar() {
   }
 
   const openProdukAlert = () => {
-    setShowProdukAlert(true)
+    window.dispatchEvent(new CustomEvent('openProdukAlert'))
     router.push('/products/list')
-    fetchProdukData()
   }
 
   const linkClass = (active: boolean) =>
