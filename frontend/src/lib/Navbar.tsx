@@ -31,7 +31,10 @@ export default function Navbar() {
   const [editPrice, setEditPrice] = useState('')
   const [savingProduct, setSavingProduct] = useState(false)
   const [saveCounter, setSaveCounter] = useState(0)
+  const [priceError, setPriceError] = useState<string | null>(null)
+  const ADMIN_PRICING = 'ibu'
   const isAdmin = appUser?.role === 'admin'
+  const requiresPricingCounter = appUser?.name === ADMIN_PRICING
   const supabase = createClient()
 
   useEffect(() => {
@@ -52,6 +55,15 @@ export default function Navbar() {
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
+
+  // Auto-show produk alert when admin lands on /products
+  useEffect(() => {
+    if (!appUser || appUser.role !== 'admin') return
+    if (!pathname.startsWith('/products')) return
+    setShowProdukAlert(true)
+    fetchProdukData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, appUser?.role])
 
   // Close drawer on route change — mobile only
   useEffect(() => {
@@ -140,6 +152,8 @@ export default function Navbar() {
     const bp = parseFloat(editBasePrice)
     const pr = parseFloat(editPrice)
     if (!bp || bp <= 0 || !pr || pr <= 0) return
+    if (bp >= pr) { setPriceError('Harga modal harus lebih kecil dari harga jual.'); return }
+    setPriceError(null)
     setSavingProduct(true)
     await supabase.from('products').update({ base_price: bp, price: pr }).eq('id', editingProduct.id)
     setProdukAlerts(prev => prev.filter(p => p.id !== editingProduct.id))
@@ -148,9 +162,7 @@ export default function Navbar() {
     setEditingProduct(null)
   }
 
-  const openProdukAlert = async () => {
-    setShowProdukAlert(true)
-    router.push('/products/list')
+  const fetchProdukData = async () => {
     if (produkAlerts.length > 0) return
     setLoadingAlerts(true)
     const { data: sbData } = await supabase.from('stock_batches').select('product_id')
@@ -163,6 +175,12 @@ export default function Navbar() {
     const { data } = await q.limit(10000).order('name', { ascending: true })
     setProdukAlerts((data ?? []) as { id: number; name: string; base_price: number; price: number }[])
     setLoadingAlerts(false)
+  }
+
+  const openProdukAlert = () => {
+    setShowProdukAlert(true)
+    router.push('/products/list')
+    fetchProdukData()
   }
 
   const linkClass = (active: boolean) =>
@@ -477,7 +495,8 @@ export default function Navbar() {
               </div>
               <button
                 onClick={() => setShowProdukAlert(false)}
-                className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition"
+                disabled={requiresPricingCounter && saveCounter < 1}
+                className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
               </button>
@@ -490,9 +509,9 @@ export default function Navbar() {
               ) : (
                 <>
                   <div className="px-5 py-3 border-b border-gray-100 bg-amber-50 flex items-center justify-between gap-3">
-                    <p className="text-xs text-amber-700">Lengkapi setidaknya 2 data untuk menutup halaman ini.</p>
-                    <span className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded-full ${saveCounter >= 2 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                      {saveCounter}/2
+                    <p className="text-xs text-amber-700">Lengkapi setidaknya 1 data untuk menutup halaman ini.</p>
+                    <span className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded-full ${saveCounter >= 1 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {saveCounter}/1
                     </span>
                   </div>
                   {produkAlerts.map((p) => (
@@ -513,14 +532,20 @@ export default function Navbar() {
                 </>
               )}
             </div>
-            <div className="shrink-0 px-5 py-3 border-t border-gray-100">
+            <div className="shrink-0 px-5 pt-3 pb-4 border-t border-gray-100 space-y-2">
               <button
                 onClick={handleTutup}
-                disabled={saveCounter < 2}
+                disabled={requiresPricingCounter && saveCounter < 1}
                 className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ backgroundColor: '#800000' }}
               >
                 Tutup
+              </button>
+              <button
+                onClick={async () => { setShowProdukAlert(false); await signOut(); router.push('/login') }}
+                className="w-full py-2.5 rounded-xl text-sm font-medium text-red-500 border border-red-200 hover:bg-red-50 transition"
+              >
+                Logout
               </button>
             </div>
           </div>
@@ -543,7 +568,7 @@ export default function Navbar() {
                 <input
                   type="number"
                   value={editBasePrice}
-                  onChange={e => setEditBasePrice(e.target.value)}
+                  onChange={e => { setEditBasePrice(e.target.value); setPriceError(null) }}
                   placeholder="Rp 0"
                   className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
                 />
@@ -553,14 +578,15 @@ export default function Navbar() {
                 <input
                   type="number"
                   value={editPrice}
-                  onChange={e => setEditPrice(e.target.value)}
+                  onChange={e => { setEditPrice(e.target.value); setPriceError(null) }}
                   placeholder="Rp 0"
                   className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
                 />
               </div>
+              {priceError && <p className="text-xs text-red-500">{priceError}</p>}
             </div>
             <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
-              <button onClick={() => setEditingProduct(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">
+              <button onClick={() => { setEditingProduct(null); setPriceError(null) }} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">
                 Batal
               </button>
               <button
