@@ -504,7 +504,7 @@ export default function BillsPage() {
             <p className="text-xs font-semibold" style={{ color: '#F5C842' }}>{monthFilter ? `Sisa Tagihan JT: Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : 'Sisa Tagihan Tahunan'}</p>
             <p className="text-sm font-bold mt-0.5" style={{ color: '#F5C842' }}>Rp {fmt(monthSisaTagihanJT)}</p>
           </div>
-          <div className="px-4 pb-2.5 pt-1 grid grid-cols-2 gap-2 mt-1" style={{ backgroundColor: '#BDD8E9' }}>
+          <div className="px-4 pb-2.5 pt-1 grid grid-cols-2 gap-2 mt-1" style={{ backgroundColor: '#D9E1F1' }}>
             <div>
               <p className="text-[10px] text-[#1a2a5e]">{monthFilter ? `Total Tagihan JT: Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : 'Total Tagihan Tahunan'}</p>
               <p className="text-xs font-semibold text-[#121358] mt-0.5">Rp {fmt(monthTotalTagihanJT)}</p>
