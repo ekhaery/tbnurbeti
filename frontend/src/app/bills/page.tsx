@@ -83,7 +83,7 @@ export default function BillsPage() {
     return next
   })
   const [purchasingItems, setPurchasingItems] = useState<Record<number, { id: number; qty: number; base_price: number; products: { name: string } | null }[]>>({})
-  const [billsTab, setBillsTab] = useState<'cicilan' | 'jatuh_tempo'>('cicilan')
+  const [billsTab, setBillsTab] = useState<'cicilan' | 'jatuh_tempo'>('jatuh_tempo')
   const [showPaidModal, setShowPaidModal] = useState(false)
   const [paidPage, setPaidPage] = useState(1)
   const PAID_PAGE_SIZE = 50
@@ -285,6 +285,15 @@ export default function BillsPage() {
   const monthTotalTerbayar = monthBills.reduce((s, b) => s + b.paid_amount, 0)
   const monthSisaTagihan = monthBills.reduce((s, b) => s + (b.installment - b.paid_amount), 0)
 
+  // Total Terbayar JT: sum paid_amount filtered by bills.due_date month and supplier
+  const monthTotalTerbayarJT = bills
+    .filter(b => {
+      if (monthFilter && b.due_date?.slice(0, 7) !== monthFilter) return false
+      if (supplierFilter && b.suppliers?.name !== supplierFilter) return false
+      return true
+    })
+    .reduce((s, b) => s + b.paid_amount, 0)
+
   // Total Tagihan JT: sum purchasing.total deduplicated by purchasing_id, filtered by purchasing.due_date month and supplier
   const monthTotalTagihanJT = bills.reduce<{ seen: Set<number>; total: number }>((acc, b) => {
     if (acc.seen.has(b.purchasing_id)) return acc
@@ -483,7 +492,7 @@ export default function BillsPage() {
         {/* Card 2: Tagihan Bulanan/Tahunan */}
         <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#8FB3E2' }}>
           <div className="px-4 pt-2.5 pb-1 text-center">
-            <p className="text-xs font-semibold text-[#121358]">{monthFilter ? `Sisa Tagihan Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : 'Sisa Tagihan Tahunan'}</p>
+            <p className="text-xs font-semibold text-[#121358]">{monthFilter ? `Sisa Tagihan JT: Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : 'Sisa Tagihan Tahunan'}</p>
             <p className="text-sm font-bold text-[#121358] mt-0.5">Rp {fmt(monthSisaTagihan)}</p>
           </div>
           <div className="px-4 pb-2.5 pt-1 grid grid-cols-2 gap-2 border-t border-[#121358]/10 mt-1">
@@ -492,13 +501,16 @@ export default function BillsPage() {
               <p className="text-xs font-semibold text-[#121358] mt-0.5">Rp {fmt(monthTotalTagihanJT)}</p>
             </div>
             <div className="text-right">
-              <p className="text-[10px] text-[#1a2a5e]">Total Terbayar</p>
-              <p className="text-xs font-semibold text-[#121358] mt-0.5">Rp {fmt(monthTotalTerbayar)}</p>
+              <p className="text-[10px] text-[#1a2a5e]">{monthFilter ? `Total Terbayar JT: Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : 'Total Terbayar Tahunan'}</p>
+              <p className="text-xs font-semibold text-[#121358] mt-0.5">Rp {fmt(monthTotalTerbayarJT)}</p>
             </div>
           </div>
-          <div className="px-4 pb-2.5 border-t border-[#121358]/10">
+          <div className="px-4 pb-2.5 border-t border-[#121358]/10" style={{ backgroundColor: '#F5C842' }}>
             <p className="text-[10px] text-[#1a2a5e] mt-1.5">
-              Total Rekomendasi Jumlah Pembayaran{monthFilter ? ` Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : ''} agar tidak ada tagihan overdue: <span className="font-semibold text-[#121358]">Rp {fmt(monthTotalTagihan)}</span>
+              Total <strong>rekomendasi</strong> pembayaran{monthFilter ? ` Bulan ${new Date(monthFilter + '-01').toLocaleDateString('id-ID', { month: 'long' })}` : ''} agar tidak ada tagihan overdue: <span className="font-semibold text-[#121358]">Rp {fmt(monthTotalTagihan)}</span> (lihat tab cicilan)
+            </p>
+            <p className="text-[10px] text-[#1a2a5e] mt-0.5">
+              Sudah terbayarkan <span className="font-semibold text-[#121358]">{monthTotalTagihan > 0 ? (monthTotalTerbayar / monthTotalTagihan * 100).toFixed(1) : '0.0'}%</span> · <span className="font-semibold text-[#121358]">Rp {fmt(monthTotalTerbayar)}</span> | <span className="font-semibold" style={{ color: '#B22222' }}>sisa: Rp {fmt(monthTotalTagihan - monthTotalTerbayar)}</span>
             </p>
           </div>
         </div>
