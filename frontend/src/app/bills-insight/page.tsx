@@ -21,12 +21,13 @@ type Bill = {
   purchasing: { code: string; date: string; due_date: string | null } | null
 }
 
-type OverduePurchasing = { purchasingId: number; code: string; date: string | null; dueDate: string | null; sisa: number }
+type RawBill = { id: number; installment: number; paid_amount: number; due_date: string }
+type OverduePurchasing = { purchasingId: number; code: string; date: string | null; dueDate: string | null; sisa: number; rawBills: RawBill[] }
 type OverdueSupplier = {
   name: string
   bank: string | null
   purchasings: OverduePurchasing[]
-  rawBills: { id: number; installment: number; paid_amount: number; due_date: string }[]
+  rawBills: RawBill[]
   total: number
 }
 
@@ -59,10 +60,12 @@ export default function BillsInsightPage() {
   })
 
   const [payingSupplier, setPayingSupplier] = useState<OverdueSupplier | null>(null)
+  const [payingPurchasing, setPayingPurchasing] = useState<(OverduePurchasing & { supplierName: string }) | null>(null)
   const [payAmount, setPayAmount] = useState('')
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
   const payInputRef = useRef<HTMLInputElement>(null)
+  const payPurchasingInputRef = useRef<HTMLInputElement>(null)
 
   const now = new Date()
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -82,6 +85,7 @@ export default function BillsInsightPage() {
 
   useEffect(() => { fetchData() }, [])
   useEffect(() => { if (payingSupplier) setTimeout(() => payInputRef.current?.focus(), 100) }, [payingSupplier])
+  useEffect(() => { if (payingPurchasing) setTimeout(() => payPurchasingInputRef.current?.focus(), 100) }, [payingPurchasing])
 
   const handlePay = async () => {
     if (!payingSupplier) return
@@ -105,6 +109,30 @@ export default function BillsInsightPage() {
     setPayError(null)
     await fetchData()
   }
+
+  const handlePayPurchasing = async () => {
+    if (!payingPurchasing) return
+    const amount = parseFloat(payAmount)
+    if (!amount || amount <= 0) { setPayError('Masukkan jumlah pembayaran.'); return }
+    if (amount > payingPurchasing.sisa) { setPayError(`Melebihi sisa hutang (maks Rp ${fmt(payingPurchasing.sisa)})`); return }
+    setPaying(true)
+    const sorted = [...payingPurchasing.rawBills].sort((a, b) => a.due_date.localeCompare(b.due_date))
+    const dist = computeDistribution(sorted, amount)
+    for (const d of dist) {
+      if (d.allocation === 0) continue
+      await supabase.from('bills').update({
+        paid_amount: d.newPaidAmount,
+        is_paid: d.willBePaid,
+        ...(d.willBePaid ? { payment_date: localDateStr() } : {}),
+      }).eq('id', d.id)
+    }
+    setPaying(false)
+    setPayingPurchasing(null)
+    setPayAmount('')
+    setPayError(null)
+    await fetchData()
+  }
+
 
   // Overdue: due_date from previous months, not fully paid
   const overdueBills = bills.filter(b => !b.is_paid && b.due_date.slice(0, 7) < currentMonth)
@@ -132,6 +160,7 @@ export default function BillsInsightPage() {
         date: b.purchasing?.date ?? null,
         dueDate: b.purchasing?.due_date ?? null,
         sisa: 0,
+        rawBills: [],
       })
     }
     const p = overdueBySupplier[name].purchasings.find(x => x.purchasingId === b.purchasing_id)
@@ -168,10 +197,13 @@ export default function BillsInsightPage() {
       }
       if (!seenThisMonthPurchasingIds[name].has(b.purchasing_id)) {
         seenThisMonthPurchasingIds[name].add(b.purchasing_id)
-        e.purchasings.push({ purchasingId: b.purchasing_id, code: b.purchasing?.code ?? '-', date: b.purchasing?.date ?? null, dueDate: b.purchasing?.due_date ?? null, sisa: 0 })
+        e.purchasings.push({ purchasingId: b.purchasing_id, code: b.purchasing?.code ?? '-', date: b.purchasing?.date ?? null, dueDate: b.purchasing?.due_date ?? null, sisa: 0, rawBills: [] })
       }
       const p = e.purchasings.find(x => x.purchasingId === b.purchasing_id)
-      if (p) p.sisa += sisa
+      if (p) {
+        p.sisa += sisa
+        if (!b.is_paid) p.rawBills.push({ id: b.id, installment: b.installment, paid_amount: b.paid_amount, due_date: b.due_date })
+      }
     })
   const supplierList = Object.entries(supplierMap).sort((a, b) => a[1].dueDate.localeCompare(b[1].dueDate))
 
@@ -313,7 +345,7 @@ export default function BillsInsightPage() {
                     {/* Expanded: per-purchasing detail */}
                     {isExpanded && (
                       <div className="border-t border-gray-100 divide-y divide-gray-100 bg-gray-50">
-                        {data.purchasings.map(p => {
+                        {[...data.purchasings].sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? '')).map(p => {
                           const pDueDate = p.dueDate ?? ''
                           const pPastDue = pDueDate && pDueDate < todayStr
                           const pUrgent = pDueDate && !pPastDue && pDueDate <= in7DaysStr
@@ -322,22 +354,34 @@ export default function BillsInsightPage() {
                             <div key={p.purchasingId} className={`px-4 py-3 ${pAllPaid ? 'bg-green-50' : ''}`}>
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-mono text-gray-500">{p.code}</p>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className="text-xs font-mono text-gray-500">{p.code}</p>
+                                    {!pAllPaid && (
+                                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                        pPastDue ? 'bg-red-100 text-red-700'
+                                          : pUrgent ? 'bg-orange-100 text-orange-700'
+                                          : 'bg-amber-100 text-amber-700'
+                                      }`}>
+                                        {pPastDue ? 'Sudah lewat!' : pUrgent ? 'Bayar segera' : 'Belum lunas'}
+                                      </span>
+                                    )}
+                                  </div>
                                   <div className="text-[11px] text-gray-500 mt-0.5 space-y-0.5">
                                     {p.date && <p>Tgl nota: {fmtDate(p.date)}</p>}
                                     {p.dueDate && <p>Jatuh tempo: {fmtDate(p.dueDate)}</p>}
                                   </div>
                                 </div>
-                                <div className="text-right shrink-0">
+                                <div className="text-right shrink-0 flex flex-col items-end gap-1">
                                   {!pAllPaid && <p className="text-xs font-semibold text-red-500">Sisa: Rp {fmt(p.sisa)}</p>}
-                                  <span className={`inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                    pAllPaid ? 'bg-green-100 text-green-700'
-                                      : pPastDue ? 'bg-red-100 text-red-700'
-                                      : pUrgent ? 'bg-orange-100 text-orange-700'
-                                      : 'bg-amber-100 text-amber-700'
-                                  }`}>
-                                    {pAllPaid ? 'Sudah lunas' : pPastDue ? 'Sudah lewat!' : pUrgent ? 'Bayar segera' : 'Belum lunas'}
-                                  </span>
+                                  {!pAllPaid && (
+                                    <button
+                                      onClick={e => { e.stopPropagation(); setPayingPurchasing({ ...p, supplierName: name }); setPayAmount(''); setPayError(null) }}
+                                      className="text-xs font-semibold px-3 py-1 rounded-lg text-white"
+                                      style={{ backgroundColor: '#121358' }}
+                                    >
+                                      Bayar
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -456,6 +500,55 @@ export default function BillsInsightPage() {
               <button onClick={handlePay} disabled={paying || !payAmount || parseFloat(payAmount) <= 0}
                 className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition disabled:opacity-40"
                 style={{ backgroundColor: '#800000' }}>
+                {paying ? 'Menyimpan...' : 'Konfirmasi'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pay per purchasing popup */}
+      {payingPurchasing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 flex items-center justify-between" style={{ backgroundColor: '#121358' }}>
+              <div>
+                <p className="text-sm font-bold text-white">{payingPurchasing.supplierName}</p>
+                <p className="text-xs font-mono mt-0.5" style={{ color: '#B5BAFF' }}>{payingPurchasing.code}</p>
+              </div>
+              <button onClick={() => setPayingPurchasing(null)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Sisa hutang nota ini</span>
+                <span className="font-semibold text-gray-800">Rp {fmt(payingPurchasing.sisa)}</span>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1.5">Jumlah yang akan dibayar</label>
+                <input
+                  ref={payPurchasingInputRef}
+                  type="number"
+                  value={payAmount}
+                  onChange={e => { setPayAmount(e.target.value); setPayError(null) }}
+                  min="0"
+                  max={payingPurchasing.sisa}
+                  placeholder={`Maks Rp ${fmt(payingPurchasing.sisa)}`}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2"
+                  style={{ ['--tw-ring-color' as string]: '#121358' }}
+                />
+                {payError && <p className="text-xs text-red-500 mt-1">{payError}</p>}
+              </div>
+            </div>
+            <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
+              <button onClick={() => setPayingPurchasing(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">
+                Batal
+              </button>
+              <button onClick={handlePayPurchasing} disabled={paying || !payAmount || parseFloat(payAmount) <= 0}
+                className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition disabled:opacity-40"
+                style={{ backgroundColor: '#121358' }}>
                 {paying ? 'Menyimpan...' : 'Konfirmasi'}
               </button>
             </div>
