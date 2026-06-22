@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faHandshake, faTag, faReceipt, faUserCheck, faLightbulb } from '@fortawesome/free-solid-svg-icons'
+import { faHandshake, faTag, faReceipt, faUserCheck, faLightbulb, faSackDollar } from '@fortawesome/free-solid-svg-icons'
 
 const cards = [
   {
@@ -37,6 +37,14 @@ const cards = [
     bg: '#800000',
     text: 'white',
     sub: 'Ringkasan & situasi hutang dagang',
+  },
+  {
+    label: 'Ringkasan Hutang',
+    icon: faSackDollar,
+    href: '/ringkasan-hutang',
+    bg: '#0F4C75',
+    text: 'white',
+    sub: 'Total hutang dagang & giro',
   },
   {
     label: 'Absen Karyawan',
