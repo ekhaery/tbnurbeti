@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faHandshake, faTag, faReceipt, faUserCheck, faLightbulb, faSackDollar } from '@fortawesome/free-solid-svg-icons'
+import { faHandshake, faTag, faReceipt, faUserCheck, faLightbulb, faSackDollar, faBuildingColumns } from '@fortawesome/free-solid-svg-icons'
 
 const cards = [
   {
@@ -45,6 +45,14 @@ const cards = [
     bg: '#0F4C75',
     text: 'white',
     sub: 'Total hutang dagang & giro',
+  },
+  {
+    label: 'Tagihan Giro Insight',
+    icon: faBuildingColumns,
+    href: '/tagihan-giro-insight',
+    bg: '#3730A3',
+    text: 'white',
+    sub: 'Situasi & cicilan hutang giro',
   },
   {
     label: 'Absen Karyawan',
