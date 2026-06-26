@@ -73,6 +73,16 @@ export default function TransaksiSettingPage() {
       let trxOk = true
 
       for (const item of items as TrxItem[]) {
+        const { count: existingCount } = await supabase
+          .from('stock_batch_consumption')
+          .select('id', { count: 'exact', head: true })
+          .eq('transaction_item_id', item.id)
+
+        if ((existingCount ?? 0) > 0) {
+          addLog(`  → Product #${item.product_id}: sudah diproses sebelumnya, dilewati.`)
+          continue
+        }
+
         const { data: batches } = await supabase
           .from('stock_batches')
           .select('id, qty_remaining, base_price')
