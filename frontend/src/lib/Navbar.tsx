@@ -151,7 +151,9 @@ export default function Navbar() {
     const bp = parseFloat(editBasePrice)
     const pr = parseFloat(editPrice)
     if (!bp || bp <= 0 || !pr || pr <= 0) return
+    if (bp >= 1 && bp <= 9) { setPriceError('Harga modal tidak valid. Harus 0 atau minimal Rp 10.'); return }
     if (bp >= pr) { setPriceError('Harga modal harus lebih kecil dari harga jual.'); return }
+    if (bp > pr * 0.99) { setPriceError(`Harga modal terlalu tinggi. Maksimal Rp ${Math.floor(pr * 0.99).toLocaleString('id-ID')} (99% dari harga jual).`); return }
     setPriceError(null)
     setSavingProduct(true)
     await supabase.from('products').update({ base_price: bp, price: pr }).eq('id', editingProduct.id)

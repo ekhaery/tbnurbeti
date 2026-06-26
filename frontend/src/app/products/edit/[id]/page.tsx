@@ -62,6 +62,19 @@ export default function EditProductPage() {
     setSuccess(false)
     setSaving(true)
 
+    const bp = parseFloat(form.base_price) || 0
+    const pr = parseFloat(form.price) || 0
+    if (bp >= 1 && bp <= 9) {
+      setError('Harga modal tidak valid. Harus 0 atau minimal Rp 10.')
+      setSaving(false)
+      return
+    }
+    if (bp > 0 && pr > 0 && bp > pr * 0.99) {
+      setError(`Harga modal terlalu tinggi. Maksimal Rp ${Math.floor(pr * 0.99).toLocaleString('id-ID')} (99% dari harga jual).`)
+      setSaving(false)
+      return
+    }
+
     // Check name uniqueness (exclude self)
     const { data: existing } = await supabase
       .from('products')

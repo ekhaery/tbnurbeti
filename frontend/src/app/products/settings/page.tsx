@@ -46,6 +46,16 @@ export default function ProductSettingsPage() {
 
   const handleSaveEdit = async () => {
     if (!editProduct) return
+    const bp = parseFloat(editBasePrice) || 0
+    const pr = parseFloat(editPrice) || 0
+    if (bp >= 1 && bp <= 9) {
+      setSaveError('Harga modal tidak valid. Harus 0 atau minimal Rp 10.')
+      return
+    }
+    if (bp > 0 && pr > 0 && bp > pr * 0.99) {
+      setSaveError(`Harga modal terlalu tinggi. Maksimal Rp ${Math.floor(pr * 0.99).toLocaleString('id-ID')} (99% dari harga jual).`)
+      return
+    }
     setSaving(true); setSaveError(null)
     const { error } = await supabase.from('products').update({
       base_price: parseFloat(editBasePrice) || 0,
