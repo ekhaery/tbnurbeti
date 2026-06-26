@@ -11,7 +11,7 @@ import TransaksiTabs from '@/lib/TransaksiTabs'
 const fmt = (n: number) => n.toLocaleString('id-ID')
 
 type PendingTrx = { id: number; code: string; date: string }
-type TrxItem = { id: number; product_id: number; qty: number; cogs: number }
+type TrxItem = { id: number; product_id: number; qty: number; cogs: number; price_sold: number }
 type StockBatch = { id: number; qty_remaining: number; base_price: number }
 
 export default function TransaksiSettingPage() {
@@ -61,7 +61,7 @@ export default function TransaksiSettingPage() {
 
       const { data: items } = await supabase
         .from('transaction_items')
-        .select('id, product_id, qty, cogs')
+        .select('id, product_id, qty, cogs, price_sold')
         .eq('transaction_id', trx.id)
 
       if (!items || items.length === 0) {
@@ -80,6 +80,12 @@ export default function TransaksiSettingPage() {
 
         if ((existingCount ?? 0) > 0) {
           addLog(`  → Product #${item.product_id}: sudah diproses sebelumnya, dilewati.`)
+          continue
+        }
+
+        if (item.price_sold <= 10) {
+          addLog(`  → Product #${item.product_id}: harga jual Rp ${item.price_sold} terlalu rendah, item dilewati.`)
+          trxOk = false
           continue
         }
 
