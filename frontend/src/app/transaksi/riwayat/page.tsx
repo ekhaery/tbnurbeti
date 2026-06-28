@@ -325,6 +325,36 @@ export default function RiwayatTransaksiPage() {
           </div>
         </div>
 
+        {isAdmin && !fetching && list.length > 0 && (() => {
+          const validList = list.filter(trx => !trx.is_initial_transformation)
+          const totalRev = validList.reduce((s, trx) => s + trx.transaction_items.reduce((si, i) => si + i.price_sold, 0), 0)
+          const totalProfit = validList.reduce((s, trx) => s + trx.transaction_items.reduce((si, i) => si + i.profit, 0), 0)
+          const margin = totalRev > 0 ? (totalProfit / totalRev) * 100 : 0
+          return (
+            <div className="rounded-2xl px-4 py-4 space-y-2" style={{ backgroundColor: '#121358' }}>
+              <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>
+                Profit · {validList.length} transaksi{productFilter ? ` · "${productFilter}"` : ''}
+              </p>
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Total Penjualan</p>
+                  <p className="text-sm font-bold text-white">Rp {fmt(totalRev)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Total Profit</p>
+                  <p className={`text-xl font-bold ${totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    Rp {fmt(totalProfit)}
+                  </p>
+                </div>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
+                <div className="h-full rounded-full bg-green-400" style={{ width: `${Math.min(100, Math.max(0, margin))}%` }} />
+              </div>
+              <p className="text-[10px] text-right" style={{ color: '#B5BAFF' }}>Margin {margin.toFixed(1)}%</p>
+            </div>
+          )
+        })()}
+
         {fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
         ) : list.length === 0 ? (
