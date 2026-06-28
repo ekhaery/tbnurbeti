@@ -35,28 +35,31 @@ type Transaction = {
   transaction_items: TransactionItem[]
 }
 
+type ProfitRow = { date: string; is_initial_transformation: boolean; transaction_items: { price_sold: number; profit: number }[] }
+
 const fmt = (n: number) => n.toLocaleString('id-ID')
 const PAGE_SIZE = 10
 
 const now = new Date()
-const defaultFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-const defaultTo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
 export default function RiwayatTransaksiPage() {
   const supabase = createClient()
   const { appUser } = useAuth()
   const isAdmin = appUser?.role === 'admin'
 
-  const [dateFrom, setDateFrom] = useState(defaultFrom)
-  const [dateTo, setDateTo] = useState(defaultTo)
+  const [dateFrom, setDateFrom] = useState(todayStr)
+  const [dateTo, setDateTo] = useState(todayStr)
   const [productFilterInput, setProductFilterInput] = useState('')
   const [productFilter, setProductFilter] = useState('')
+  const [initFilter, setInitFilter] = useState<'all' | 'normal' | 'init'>('all')
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [list, setList] = useState<Transaction[]>([])
   const [fetching, setFetching] = useState(true)
   const [expanded, setExpanded] = useState<number | null>(null)
+  const [profitRows, setProfitRows] = useState<ProfitRow[]>([])
+  const [isDefaultRange, setIsDefaultRange] = useState(true)
 
   // Reason modal
   const [showReason, setShowReason] = useState(false)
@@ -84,34 +87,41 @@ export default function RiwayatTransaksiPage() {
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
-  const fetchData = async (p: number, from: string, to: string, pFilter: string) => {
+  const buildQ = (select: string, opts?: { count?: 'exact'; head?: boolean }) => {
+    return (opts
+      ? supabase.from('transactions').select(select, { count: opts.count, head: opts.head })
+      : supabase.from('transactions').select(select)) as any
+  }
+
+  const applyFilters = (q: any, from: string, to: string, iFilter: 'all' | 'normal' | 'init', trxIds?: number[]) => {
+    if (from) q = q.gte('date', from)
+    if (to) q = q.lte('date', to)
+    if (iFilter === 'normal') q = q.eq('is_initial_transformation', false)
+    if (iFilter === 'init') q = q.eq('is_initial_transformation', true)
+    if (trxIds) q = q.in('id', trxIds)
+    return q
+  }
+
+  const fetchData = async (p: number, from: string, to: string, pFilter: string, iFilter: 'all' | 'normal' | 'init') => {
     setFetching(true)
     setExpanded(null)
 
+    let trxIds: number[] | null = null
     if (pFilter.trim()) {
       const { data: itemData } = await supabase
         .from('transaction_items')
         .select('transaction_id, products!inner(name)')
         .ilike('products.name', `%${pFilter.trim()}%`)
+      trxIds = [...new Set(((itemData ?? []) as { transaction_id: number }[]).map(i => i.transaction_id))]
+      if (trxIds.length === 0) { setTotalCount(0); setList([]); setFetching(false); return }
+    }
 
-      const trxIds = [...new Set(((itemData ?? []) as { transaction_id: number }[]).map(i => i.transaction_id))]
-
-      if (trxIds.length === 0) {
-        setTotalCount(0)
-        setList([])
-        setFetching(false)
-        return
-      }
-
-      const { data } = await supabase
-        .from('transactions')
-        .select('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, qty, price_sold, cogs, profit, discount, products(name))')
-        .in('id', trxIds)
-        .gte('date', from)
-        .lte('date', to)
-        .order('date', { ascending: false })
-        .order('id', { ascending: false })
-
+    if (pFilter.trim()) {
+      const { data } = await applyFilters(
+        buildQ('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, qty, price_sold, cogs, profit, discount, products(name))')
+          .order('date', { ascending: false }).order('id', { ascending: false }),
+        from, to, iFilter, trxIds!
+      )
       setTotalCount((data ?? []).length)
       setList((data as Transaction[]) ?? [])
       setFetching(false)
@@ -122,19 +132,12 @@ export default function RiwayatTransaksiPage() {
     const rangeTo = rangeFrom + PAGE_SIZE - 1
 
     const [{ count }, { data }] = await Promise.all([
-      supabase
-        .from('transactions')
-        .select('id', { count: 'exact', head: true })
-        .gte('date', from)
-        .lte('date', to),
-      supabase
-        .from('transactions')
-        .select('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, qty, price_sold, cogs, profit, discount, products(name))')
-        .gte('date', from)
-        .lte('date', to)
-        .order('date', { ascending: false })
-        .order('id', { ascending: false })
-        .range(rangeFrom, rangeTo),
+      applyFilters(buildQ('id', { count: 'exact', head: true }), from, to, iFilter),
+      applyFilters(
+        buildQ('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, qty, price_sold, cogs, profit, discount, products(name))')
+          .order('date', { ascending: false }).order('id', { ascending: false }).range(rangeFrom, rangeTo),
+        from, to, iFilter
+      ),
     ])
 
     setTotalCount(count ?? 0)
@@ -142,7 +145,33 @@ export default function RiwayatTransaksiPage() {
     setFetching(false)
   }
 
-  useEffect(() => { fetchData(page, dateFrom, dateTo, productFilter) }, [page, dateFrom, dateTo, productFilter])
+  const fetchProfit = async (from: string, to: string, pFilter: string) => {
+    let trxIds: number[] | null = null
+    if (pFilter.trim()) {
+      const { data: itemData } = await supabase
+        .from('transaction_items')
+        .select('transaction_id, products!inner(name)')
+        .ilike('products.name', `%${pFilter.trim()}%`)
+      trxIds = [...new Set(((itemData ?? []) as { transaction_id: number }[]).map(i => i.transaction_id))]
+      if (trxIds.length === 0) { setProfitRows([]); return }
+    }
+
+    let q = supabase.from('transactions').select('date, is_initial_transformation, transaction_items(price_sold, profit)') as any
+    if (from) q = q.gte('date', from)
+    if (to) q = q.lte('date', to)
+    if (trxIds) q = q.in('id', trxIds)
+    q = q.order('date', { ascending: false })
+
+    const { data } = await q
+    setProfitRows((data ?? []) as ProfitRow[])
+  }
+
+  useEffect(() => { fetchData(page, dateFrom, dateTo, productFilter, initFilter) }, [page, dateFrom, dateTo, productFilter, initFilter])
+  useEffect(() => {
+    const from = isDefaultRange ? todayStr : dateFrom
+    const to = isDefaultRange ? todayStr : dateTo
+    fetchProfit(from, to, productFilter)
+  }, [dateFrom, dateTo, productFilter, isDefaultRange])
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -156,6 +185,12 @@ export default function RiwayatTransaksiPage() {
     setPage(1)
     setDateFrom(from)
     setDateTo(to)
+    setIsDefaultRange(false)
+  }
+
+  const handleInitFilter = (val: 'all' | 'normal' | 'init') => {
+    setPage(1)
+    setInitFilter(val)
   }
 
   const fetchProducts = async () => {
@@ -325,15 +360,55 @@ export default function RiwayatTransaksiPage() {
           </div>
         </div>
 
-        {isAdmin && !fetching && list.length > 0 && (() => {
-          const validList = list.filter(trx => !trx.is_initial_transformation)
-          const totalRev = validList.reduce((s, trx) => s + trx.transaction_items.reduce((si, i) => si + i.price_sold, 0), 0)
-          const totalProfit = validList.reduce((s, trx) => s + trx.transaction_items.reduce((si, i) => si + i.profit, 0), 0)
+        {/* Initial transformation filter */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold text-gray-500 shrink-0">Tipe:</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {([['all', 'Semua'], ['normal', 'Transaksi'], ['init', 'Initial']] as const).map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => handleInitFilter(val)}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-full transition ${
+                    initFilter === val
+                      ? 'bg-[#121358] text-white'
+                      : 'bg-white text-gray-500 border border-gray-200 hover:border-[#121358] hover:text-[#121358]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {initFilter !== 'all' && !fetching && (
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-xs text-gray-500">Total</span>
+              <span className="text-xs font-bold text-[#121358] bg-[#B5BAFF] px-2.5 py-0.5 rounded-full">
+                {totalCount} transaksi
+              </span>
+            </div>
+          )}
+        </div>
+
+        {isAdmin && (() => {
+          const validRows = profitRows.filter(t => !t.is_initial_transformation)
+          if (validRows.length === 0) return null
+
+          const dateLabel = isDefaultRange
+            ? 'Hari ini'
+            : (() => {
+                const fmtShort = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+                return `${fmtShort(dateFrom)} – ${fmtShort(dateTo)}`
+              })()
+
+          const totalRev = validRows.reduce((s, t) => s + t.transaction_items.reduce((si, i) => si + i.price_sold, 0), 0)
+          const totalProfit = validRows.reduce((s, t) => s + t.transaction_items.reduce((si, i) => si + i.profit, 0), 0)
           const margin = totalRev > 0 ? (totalProfit / totalRev) * 100 : 0
+
           return (
             <div className="rounded-2xl px-4 py-4 space-y-2" style={{ backgroundColor: '#121358' }}>
               <p className="text-xs font-semibold" style={{ color: '#B5BAFF' }}>
-                Profit · {validList.length} transaksi{productFilter ? ` · "${productFilter}"` : ''}
+                Profit · {validRows.length} transaksi · {dateLabel}{productFilter ? ` · "${productFilter}"` : ''}
               </p>
               <div className="flex items-end justify-between gap-3">
                 <div>
@@ -354,6 +429,7 @@ export default function RiwayatTransaksiPage() {
             </div>
           )
         })()}
+
 
         {fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
