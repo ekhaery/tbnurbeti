@@ -268,7 +268,7 @@ export default function RiwayatTransaksiPage() {
     setSaving(false)
     setShowEditConfirm(false)
     setEditingTrx(null)
-    fetchData(page, dateFrom, dateTo, productFilter)
+    fetchData(page, dateFrom, dateTo, productFilter, initFilter)
   }
 
   const handleDelete = async () => {
@@ -320,7 +320,7 @@ export default function RiwayatTransaksiPage() {
     setShowDelete(false)
     setDeleteConfirmText('')
     setPendingDeleteTrx(null)
-    fetchData(page, dateFrom, dateTo, productFilter)
+    fetchData(page, dateFrom, dateTo, productFilter, initFilter)
   }
 
   return (
