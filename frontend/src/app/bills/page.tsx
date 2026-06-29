@@ -157,15 +157,17 @@ export default function BillsPage() {
     if (!selectedPurchasing || selectedBillIds.size === 0) return
     setMarkingLunas(true)
     const ids = Array.from(selectedBillIds)
-    for (const id of ids) {
+    const totalPaid = ids.reduce((sum, id) => {
       const bill = purchasingBills.find(b => b.id === id)
-      if (!bill) continue
-      await supabase.from('bills').update({
-        is_paid: true,
-        paid_amount: bill.installment,
-        payment_date: localDateStr()
-      }).eq('id', id)
-    }
+      return sum + (bill?.installment ?? 0)
+    }, 0)
+    const { error } = await supabase.rpc('pay_bills_lunas', {
+      p_bill_ids: ids,
+      p_purchasing_id: selectedPurchasing.id,
+      p_total_amount: totalPaid,
+      p_payment_date: localDateStr(),
+    })
+if (error) { setError(error.message); setMarkingLunas(false); return }
     const { data } = await supabase.from('bills')
       .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date, due_date)')
       .eq('purchasing_id', selectedPurchasing.id)
@@ -190,6 +192,12 @@ export default function BillsPage() {
         ...(d.willBePaid ? { payment_date: localDateStr() } : {}),
       }).eq('id', d.id)
     }
+    await supabase.from('outflow').insert({
+      date: localDateStr(),
+      category: 'supplier',
+      purchasing_id: selectedPurchasing.id,
+      amount,
+    })
     const { data } = await supabase.from('bills')
       .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date, due_date)')
       .eq('purchasing_id', selectedPurchasing.id)
