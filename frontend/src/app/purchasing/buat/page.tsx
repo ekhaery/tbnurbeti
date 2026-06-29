@@ -243,8 +243,12 @@ export default function BuatPurchasingPage() {
 
     const status: PurchasingStatus = transformationPhase ? 'init' : barangReady ? 'completed' : 'created'
 
+    const dueTolerance = jatuhTempo
+      ? localDateStr(new Date(new Date(jatuhTempo).getTime() + 21 * 24 * 60 * 60 * 1000))
+      : null
+
     const { data: pur, error: purErr } = await supabase.from('purchasing')
-      .insert({ code, supplier_id: supplierId, date, notes: notes.trim() || null, total: totalValue, created_by: appUser?.id, status, due_date: jatuhTempo || null })
+      .insert({ code, supplier_id: supplierId, date, notes: notes.trim() || null, total: totalValue, created_by: appUser?.id, status, due_date: jatuhTempo || null, due_tolerance: dueTolerance })
       .select('id').single()
 
     if (purErr || !pur) { setError(purErr?.message ?? 'Gagal menyimpan.'); setSubmitting(false); return }
@@ -286,25 +290,27 @@ export default function BuatPurchasingPage() {
       }
     }
 
-    // 4. Generate bills if period > 0 (period = weeks)
+    // 4. Generate bills if period > 0 (period = weeks), extended by 3 weeks via due_tolerance
     const periodVal = periodWeeks
-    if (periodVal > 0 && jatuhTempo) {
-      const installment = Math.round((totalValue / periodVal) * 100) / 100
+    if (periodVal > 0 && jatuhTempo && dueTolerance) {
+      const totalBills = periodVal + 3
+      const installment = Math.floor(totalValue / totalBills)
       const purchaseDate = new Date(date)
-      const finalDueDateStr = jatuhTempo
-      const finalMonth = new Date(jatuhTempo).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-      const bills = Array.from({ length: periodVal }, (_, i) => {
+      const finalMonth = new Date(dueTolerance).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      const bills = Array.from({ length: totalBills }, (_, i) => {
         const installmentDue = new Date(purchaseDate)
         installmentDue.setDate(installmentDue.getDate() + (i + 1) * 7)
+        const isLast = i === totalBills - 1
         return {
           purchasing_id: pur.id,
           supplier_id: Number(supplierId),
-          due_date: finalDueDateStr,
+          due_date: dueTolerance,
           installment_due_date: localDateStr(installmentDue),
           month: finalMonth,
-          installment,
+          // last bill absorbs rounding remainder
+          installment: isLast ? totalValue - installment * (totalBills - 1) : installment,
           paid_amount: 0,
-          bill_no: `BILL-${code}-${i + 1}/${periodVal}`,
+          bill_no: `BILL-${code}-${i + 1}/${totalBills}`,
         }
       })
 
