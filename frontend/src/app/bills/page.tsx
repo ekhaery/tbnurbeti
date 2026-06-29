@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faMoneyBillWave, faCheck, faXmark, faCalendarDays, faChevronDown, faChevronUp, faEye, faReceipt } from '@fortawesome/free-solid-svg-icons'
 import { localDateStr } from '@/lib/date'
+import { useAuth } from '@/context/AuthContext'
 
 type Bill = {
   id: number
@@ -71,6 +72,7 @@ function sortBills(bills: Bill[]): Bill[] {
 
 export default function BillsPage() {
   const supabase = createClient()
+  const { appUser } = useAuth()
 
   const [bills, setBills] = useState<Bill[]>([])
   const [fetching, setFetching] = useState(true)
@@ -166,6 +168,7 @@ export default function BillsPage() {
       p_purchasing_id: selectedPurchasing.id,
       p_total_amount: totalPaid,
       p_payment_date: localDateStr(),
+      p_paid_by: appUser?.id ?? null,
     })
 if (error) { setError(error.message); setMarkingLunas(false); return }
     const { data } = await supabase.from('bills')
@@ -183,21 +186,18 @@ if (error) { setError(error.message); setMarkingLunas(false); return }
     const amount = parseFloat(manualAmount) || 0
     if (amount <= 0) return
     setMarkingLunas(true)
-    const dist = computeDistribution(purchasingBills, amount)
-    for (const d of dist) {
-      if (d.allocation === 0) continue
-      await supabase.from('bills').update({
-        paid_amount: d.newPaidAmount,
-        is_paid: d.willBePaid,
-        ...(d.willBePaid ? { payment_date: localDateStr() } : {}),
-      }).eq('id', d.id)
-    }
-    await supabase.from('outflow').insert({
-      date: localDateStr(),
-      category: 'supplier',
-      purchasing_id: selectedPurchasing.id,
-      amount,
+    const today = localDateStr()
+    const dist = computeDistribution(purchasingBills, amount).filter(d => d.allocation > 0)
+    const { error } = await supabase.rpc('pay_bills_manual', {
+      p_bill_ids: dist.map(d => d.id),
+      p_new_paid_amounts: dist.map(d => d.newPaidAmount),
+      p_is_paids: dist.map(d => d.willBePaid),
+      p_purchasing_id: selectedPurchasing.id,
+      p_total_amount: amount,
+      p_payment_date: today,
+      p_paid_by: appUser?.id ?? null,
     })
+    if (error) { setError(error.message); setMarkingLunas(false); return }
     const { data } = await supabase.from('bills')
       .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date, due_date)')
       .eq('purchasing_id', selectedPurchasing.id)
