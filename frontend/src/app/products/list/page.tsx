@@ -537,7 +537,7 @@ export default function ProductListPage() {
                 {fetchingBatches ? (
                   <p className="text-xs text-gray-400">Memuat...</p>
                 ) : viewBatches.length === 0 ? (
-                  <p className="text-xs text-gray-400">Tidak ada stok.</p>
+                  <p className="text-xs text-center text-[#800000]">Tidak ada stok.</p>
                 ) : (
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     {viewBatches.map((b, bIdx) => {
