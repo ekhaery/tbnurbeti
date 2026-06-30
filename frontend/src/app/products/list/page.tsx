@@ -312,7 +312,7 @@ export default function ProductListPage() {
                           .from('stock_batches')
                           .select('id, qty_remaining, base_price, received_at, is_available, purchasing_items(purchasing(suppliers(name)))')
                           .eq('product_id', p.id)
-                          .order('received_at', { ascending: false })
+                          .order('received_at', { ascending: true })
                         setViewBatches((data ?? []).map((b: any) => ({
                           id: b.id,
                           qty_remaining: b.qty_remaining,
@@ -506,8 +506,8 @@ export default function ProductListPage() {
                 <p className="text-[10px] text-gray-400 uppercase tracking-wide">Kategori</p>
                 <p className="text-sm font-medium text-gray-800 mt-0.5">{viewProduct.categories?.name ?? '-'}</p>
               </div>
-              <div className={`grid gap-3 ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                {isAdmin && (
+              <div className={`grid gap-3 ${isAdmin && viewBatches.length === 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                {isAdmin && viewBatches.length === 0 && (
                   <div>
                     <p className="text-[10px] text-gray-400 uppercase tracking-wide">Harga Modal</p>
                     <p className="text-sm font-medium text-gray-800 mt-0.5">Rp {viewProduct.base_price.toLocaleString('id-ID')}</p>
