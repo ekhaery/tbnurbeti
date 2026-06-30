@@ -68,6 +68,15 @@ export default function ProductListPage() {
   const [deleteInput, setDeleteInput] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [viewProduct, setViewProduct] = useState<Product | null>(null)
+  const [viewBatches, setViewBatches] = useState<{
+    id: number
+    qty_remaining: number
+    base_price: number
+    received_at: string
+    is_available: boolean
+    supplier_name: string | null
+  }[]>([])
+  const [fetchingBatches, setFetchingBatches] = useState(false)
 
 
   const handleDelete = async () => {
@@ -288,7 +297,25 @@ export default function ProductListPage() {
                   </p>
                   <div className="flex items-center gap-1 mt-1">
                     <button
-                      onClick={() => setViewProduct(p)}
+                      onClick={async () => {
+                        setViewProduct(p)
+                        setViewBatches([])
+                        setFetchingBatches(true)
+                        const { data } = await supabase
+                          .from('stock_batches')
+                          .select('id, qty_remaining, base_price, received_at, is_available, purchasing_items(purchasing(suppliers(name)))')
+                          .eq('product_id', p.id)
+                          .order('received_at', { ascending: false })
+                        setViewBatches((data ?? []).map((b: any) => ({
+                          id: b.id,
+                          qty_remaining: b.qty_remaining,
+                          base_price: b.base_price,
+                          received_at: b.received_at,
+                          is_available: b.is_available,
+                          supplier_name: b.purchasing_items?.purchasing?.suppliers?.name ?? null,
+                        })))
+                        setFetchingBatches(false)
+                      }}
                       className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-[#121358]/10 text-gray-400 hover:text-[#121358] transition"
                       title="View produk"
                     >
@@ -397,7 +424,20 @@ export default function ProductListPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setViewProduct(null)}>
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 bg-[#121358] flex items-center justify-between">
-              <p className="text-sm font-bold text-white">Detail Produk</p>
+              <div>
+                <p className="text-sm font-bold text-white">Detail Produk</p>
+                <div className="flex gap-1.5 mt-1">
+                  {viewProduct.is_discontinued && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-400/30 text-red-200">Discontinued</span>
+                  )}
+                  {viewProduct.is_deleted && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white/20 text-white/60">Dihapus</span>
+                  )}
+                  {!viewProduct.is_discontinued && !viewProduct.is_deleted && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-400/30 text-green-200">Aktif</span>
+                  )}
+                </div>
+              </div>
               <button onClick={() => setViewProduct(null)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition">
                 <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
               </button>
@@ -426,26 +466,41 @@ export default function ProductListPage() {
                 )}
                 <div>
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide">Harga Jual</p>
-                  <p className="text-sm font-medium text-gray-800 mt-0.5">Rp {viewProduct.price.toLocaleString('id-ID')}</p>
+                  <p className="text-sm font-bold text-[#121358] mt-0.5">Rp {viewProduct.price.toLocaleString('id-ID')}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide">Stok</p>
                   <p className="text-sm font-medium text-gray-800 mt-0.5">{viewProduct.stock}</p>
                 </div>
               </div>
-              <div>
-                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Status</p>
-                <div className="flex gap-2 mt-1">
-                  {viewProduct.is_discontinued && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">Discontinued</span>
-                  )}
-                  {viewProduct.is_deleted && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Dihapus</span>
-                  )}
-                  {!viewProduct.is_discontinued && !viewProduct.is_deleted && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-600">Aktif</span>
-                  )}
-                </div>
+            </div>
+            <div className="border-t border-gray-100">
+              <div className="px-5 py-3">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2">Stock Batches</p>
+                {fetchingBatches ? (
+                  <p className="text-xs text-gray-400">Memuat...</p>
+                ) : viewBatches.length === 0 ? (
+                  <p className="text-xs text-gray-400">Tidak ada stok.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {viewBatches.map(b => (
+                      <div key={b.id} className="bg-gray-50 rounded-lg px-3 py-2 grid grid-cols-3 gap-2">
+                        <div>
+                          <p className="text-[10px] text-gray-400">Opening Stock</p>
+                          <p className="text-xs font-medium text-gray-800 mt-0.5">{new Date(b.received_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gray-400">Qty</p>
+                          <p className={`text-xs font-semibold mt-0.5 ${b.is_available ? 'text-green-600' : 'text-red-500'}`}>{b.qty_remaining}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gray-400">Harga Modal</p>
+                          <p className="text-xs font-semibold mt-0.5 text-gray-800">Rp {b.base_price.toLocaleString('id-ID')}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="px-5 py-3 border-t border-gray-100">
