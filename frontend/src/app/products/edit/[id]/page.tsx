@@ -32,6 +32,7 @@ export default function EditProductPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [hasBatches, setHasBatches] = useState(false)
 
   useEffect(() => {
     supabase.from('categories').select('id, name').order('name').then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
@@ -54,6 +55,12 @@ export default function EditProductPage() {
         }
         setFetching(false)
       })
+
+    supabase
+      .from('stock_batches')
+      .select('id', { count: 'exact', head: true })
+      .eq('product_id', id)
+      .then(({ count }: { count: number | null }) => setHasBatches((count ?? 0) > 0))
   }, [id])
 
   const handleSave = async (e: React.FormEvent) => {
@@ -185,8 +192,8 @@ export default function EditProductPage() {
           </div>
 
           {/* Price + Base Price + Stock */}
-          <div className={`grid gap-3 ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
-            {isAdmin && (
+          <div className={`grid gap-3 ${isAdmin && !hasBatches ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {isAdmin && !hasBatches && (
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Harga Modal</label>
                 <input

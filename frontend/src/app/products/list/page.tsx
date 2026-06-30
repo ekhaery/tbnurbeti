@@ -281,15 +281,38 @@ export default function ProductListPage() {
           <div className="text-center text-sm text-gray-400 py-10">Tidak ada produk.</div>
         ) : (
           <div className="space-y-2">
-            {paginated.map((p) => (
+            {paginated.map((p) => {
+              const openView = async () => {
+                setViewProduct(p)
+                setViewBatches([])
+                setFetchingBatches(true)
+                const { data } = await supabase
+                  .from('stock_batches')
+                  .select('id, qty_remaining, base_price, received_at, is_available, purchasing_items(purchasing(suppliers(name)))')
+                  .eq('product_id', p.id)
+                  .order('received_at', { ascending: true })
+                setViewBatches((data ?? []).map((b: any) => ({
+                  id: b.id,
+                  qty_remaining: b.qty_remaining,
+                  base_price: b.base_price,
+                  received_at: b.received_at,
+                  is_available: b.is_available,
+                  supplier_name: b.purchasing_items?.purchasing?.suppliers?.name ?? null,
+                })))
+                setFetchingBatches(false)
+              }
+              return (
               <div key={p.id} className="bg-white rounded-xl shadow-sm p-4 flex items-start justify-between gap-3 relative">
-                <div className="flex-1 min-w-0">
+                <button
+                  onClick={openView}
+                  className="flex-1 min-w-0 text-left"
+                >
                   <p className="text-sm font-semibold text-gray-800 truncate">{p.name}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{p.code}</p>
                   <span className="inline-block mt-1 text-[10px] font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
                     {p.categories?.name ?? '-'}
                   </span>
-                </div>
+                </button>
                 <div className="text-right shrink-0 space-y-1 flex flex-col items-end">
                   {isAdmin && (
                     <p className="text-[11px] text-gray-400">
@@ -304,25 +327,7 @@ export default function ProductListPage() {
                   </p>
                   <div className="flex items-center gap-1 mt-1">
                     <button
-                      onClick={async () => {
-                        setViewProduct(p)
-                        setViewBatches([])
-                        setFetchingBatches(true)
-                        const { data } = await supabase
-                          .from('stock_batches')
-                          .select('id, qty_remaining, base_price, received_at, is_available, purchasing_items(purchasing(suppliers(name)))')
-                          .eq('product_id', p.id)
-                          .order('received_at', { ascending: true })
-                        setViewBatches((data ?? []).map((b: any) => ({
-                          id: b.id,
-                          qty_remaining: b.qty_remaining,
-                          base_price: b.base_price,
-                          received_at: b.received_at,
-                          is_available: b.is_available,
-                          supplier_name: b.purchasing_items?.purchasing?.suppliers?.name ?? null,
-                        })))
-                        setFetchingBatches(false)
-                      }}
+                      onClick={openView}
                       className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-[#121358]/10 text-gray-400 hover:text-[#121358] transition"
                       title="View produk"
                     >
@@ -347,7 +352,8 @@ export default function ProductListPage() {
                   </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -526,7 +532,7 @@ export default function ProductListPage() {
             <div className="border-t border-gray-100">
               <div className="px-5 py-3">
                 <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2">
-                  Stock Batches {viewBatches.length > 0 && <span className="text-gray-500 font-semibold">| {viewBatches.length}</span>}
+                  Stock Batches {viewBatches.length > 0 && <span className="text-gray-500 font-semibold">| {viewBatches.length} data</span>}
                 </p>
                 {fetchingBatches ? (
                   <p className="text-xs text-gray-400">Memuat...</p>
@@ -539,13 +545,13 @@ export default function ProductListPage() {
                       return (
                         <div key={b.id} className="bg-gray-50 rounded-lg px-3 py-2 space-y-2">
                           {/* Row 1: Supplier name + date */}
-                          <p className="text-xs font-semibold text-[#121358]">
-                            {b.supplier_name ?? '-'}
-                            <span className="text-gray-400 font-normal ml-1">({new Date(b.received_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })})</span>
-                          </p>
+                          <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-[#121358]/10 text-[#121358]">
+                            <span className="font-semibold">{b.supplier_name ?? '-'}</span>
+                            <span className="font-normal"> | {new Date(b.received_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          </span>
                           {/* Row 2: Qty, Harga Modal, edit icon */}
-                          <div className="flex items-center gap-3 mt-1">
-                            <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-10 mt-1">
+                            <div className="flex items-center gap-3">
                               <span className="text-lg font-bold text-gray-300 leading-none">{bIdx + 1}</span>
                               <span className="text-gray-200 text-lg">|</span>
                               <div>
