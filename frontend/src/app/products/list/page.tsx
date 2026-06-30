@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 
 import Link from 'next/link'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPenToSquare, faArrowUpAZ, faTrash, faXmark, faChevronLeft, faEye } from '@fortawesome/free-solid-svg-icons'
+import { faPenToSquare, faArrowUpAZ, faTrash, faXmark, faChevronLeft, faEye, faCheck } from '@fortawesome/free-solid-svg-icons'
 import ProductTabs from '@/lib/ProductTabs'
 
 type Product = {
@@ -67,6 +67,9 @@ export default function ProductListPage() {
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
   const [deleteInput, setDeleteInput] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [deleteBatchTarget, setDeleteBatchTarget] = useState<number | null>(null)
+  const [deleteBatchInput, setDeleteBatchInput] = useState('')
+  const [deletingBatch, setDeletingBatch] = useState(false)
   const [viewProduct, setViewProduct] = useState<Product | null>(null)
   const [viewBatches, setViewBatches] = useState<{
     id: number
@@ -77,6 +80,10 @@ export default function ProductListPage() {
     supplier_name: string | null
   }[]>([])
   const [fetchingBatches, setFetchingBatches] = useState(false)
+  const [editingBatchId, setEditingBatchId] = useState<number | null>(null)
+  const [editBatchQty, setEditBatchQty] = useState('')
+  const [editBatchPrice, setEditBatchPrice] = useState('')
+  const [savingBatch, setSavingBatch] = useState(false)
 
 
   const handleDelete = async () => {
@@ -420,6 +427,48 @@ export default function ProductListPage() {
         </div>
       )}
 
+      {deleteBatchTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+            <div className="px-5 py-4 bg-red-600 flex items-center justify-between">
+              <p className="text-sm font-bold text-white">Hapus Stock Batch</p>
+              <button onClick={() => setDeleteBatchTarget(null)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition">
+                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm text-gray-700">Ketik <span className="font-semibold">delete</span> untuk menghapus batch ini.</p>
+              <input
+                type="text"
+                value={deleteBatchInput}
+                onChange={e => setDeleteBatchInput(e.target.value)}
+                placeholder="delete"
+                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+              />
+            </div>
+            <div className="flex gap-2 px-5 py-3 border-t border-gray-100">
+              <button onClick={() => setDeleteBatchTarget(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">
+                Batal
+              </button>
+              <button
+                disabled={deleteBatchInput !== 'delete' || deletingBatch}
+                onClick={async () => {
+                  setDeletingBatch(true)
+                  await supabase.from('stock_batches').delete().eq('id', deleteBatchTarget)
+                  setViewBatches(prev => prev.filter(x => x.id !== deleteBatchTarget))
+                  setDeleteBatchTarget(null)
+                  setDeleteBatchInput('')
+                  setDeletingBatch(false)
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-sm font-semibold transition">
+                {deletingBatch ? 'Menghapus...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {viewProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setViewProduct(null)}>
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -476,29 +525,83 @@ export default function ProductListPage() {
             </div>
             <div className="border-t border-gray-100">
               <div className="px-5 py-3">
-                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2">Stock Batches</p>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2">
+                  Stock Batches {viewBatches.length > 0 && <span className="text-gray-500 font-semibold">| {viewBatches.length}</span>}
+                </p>
                 {fetchingBatches ? (
                   <p className="text-xs text-gray-400">Memuat...</p>
                 ) : viewBatches.length === 0 ? (
                   <p className="text-xs text-gray-400">Tidak ada stok.</p>
                 ) : (
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                    {viewBatches.map(b => (
-                      <div key={b.id} className="bg-gray-50 rounded-lg px-3 py-2 grid grid-cols-3 gap-2">
-                        <div>
-                          <p className="text-[10px] text-gray-400">Opening Stock</p>
-                          <p className="text-xs font-medium text-gray-800 mt-0.5">{new Date(b.received_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {viewBatches.map((b, bIdx) => {
+                      const isEditing = editingBatchId === b.id
+                      return (
+                        <div key={b.id} className="bg-gray-50 rounded-lg px-3 py-2 space-y-2">
+                          {/* Row 1: Supplier name + date */}
+                          <p className="text-xs font-semibold text-[#121358]">
+                            {b.supplier_name ?? '-'}
+                            <span className="text-gray-400 font-normal ml-1">({new Date(b.received_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })})</span>
+                          </p>
+                          {/* Row 2: Qty, Harga Modal, edit icon */}
+                          <div className="flex items-center gap-3 mt-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-bold text-gray-300 leading-none">{bIdx + 1}</span>
+                              <span className="text-gray-200 text-lg">|</span>
+                              <div>
+                                <p className="text-[10px] text-gray-400">Qty</p>
+                                {isEditing ? (
+                                  <input type="number" min="0" value={editBatchQty} onChange={e => setEditBatchQty(e.target.value)}
+                                    className="w-16 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#121358] mt-0.5" />
+                                ) : (
+                                  <p className={`text-xs font-semibold mt-0.5 ${b.is_available ? 'text-green-600' : 'text-red-500'}`}>{b.qty_remaining}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-gray-400">Harga Modal</p>
+                              {isEditing ? (
+                                <input type="number" min="0" value={editBatchPrice} onChange={e => setEditBatchPrice(e.target.value)}
+                                  className="w-24 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#121358] mt-0.5" />
+                              ) : (
+                                <p className="text-xs font-semibold mt-0.5 text-gray-800">Rp {b.base_price.toLocaleString('id-ID')}</p>
+                              )}
+                            </div>
+                            <div className="ml-auto flex gap-1">
+                              {isEditing ? (
+                                <>
+                                  <button onClick={() => setEditingBatchId(null)} className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 hover:bg-gray-300 text-gray-500 transition">
+                                    <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+                                  </button>
+                                  <button disabled={savingBatch}
+                                    onClick={async () => {
+                                      setSavingBatch(true)
+                                      const { data: updated } = await supabase.from('stock_batches').update({ qty_remaining: parseInt(editBatchQty) || 0, base_price: parseFloat(editBatchPrice) || 0 }).eq('id', b.id).select('id, qty_remaining, base_price').single()
+                                      if (updated) setViewBatches(prev => prev.map(x => x.id === b.id ? { ...x, qty_remaining: (updated as any).qty_remaining, base_price: (updated as any).base_price } : x))
+                                      setEditingBatchId(null)
+                                      setSavingBatch(false)
+                                    }}
+                                    className="w-6 h-6 flex items-center justify-center rounded bg-[#121358] hover:bg-[#1a1c6e] text-white transition">
+                                    <FontAwesomeIcon icon={faCheck} className="w-3 h-3" />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button onClick={() => { setEditingBatchId(b.id); setEditBatchQty(String(b.qty_remaining)); setEditBatchPrice(String(b.base_price)) }}
+                                    className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 hover:bg-[#121358]/10 text-gray-400 hover:text-[#121358] transition">
+                                    <FontAwesomeIcon icon={faPenToSquare} className="w-3 h-3" />
+                                  </button>
+                                  <button onClick={() => { setDeleteBatchTarget(b.id); setDeleteBatchInput('') }}
+                                    className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 hover:bg-red-100 text-gray-400 hover:text-red-500 transition">
+                                    <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-[10px] text-gray-400">Qty</p>
-                          <p className={`text-xs font-semibold mt-0.5 ${b.is_available ? 'text-green-600' : 'text-red-500'}`}>{b.qty_remaining}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-gray-400">Harga Modal</p>
-                          <p className="text-xs font-semibold mt-0.5 text-gray-800">Rp {b.base_price.toLocaleString('id-ID')}</p>
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>
