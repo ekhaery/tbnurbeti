@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 
 import Link from 'next/link'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPenToSquare, faArrowUpAZ, faTrash, faXmark, faChevronLeft } from '@fortawesome/free-solid-svg-icons'
+import { faPenToSquare, faArrowUpAZ, faTrash, faXmark, faChevronLeft, faEye } from '@fortawesome/free-solid-svg-icons'
 import ProductTabs from '@/lib/ProductTabs'
 
 type Product = {
@@ -19,6 +19,7 @@ type Product = {
   stock: number
   updated_at: string
   is_deleted: boolean
+  is_discontinued: boolean
   categories: { name: string } | null
 }
 
@@ -66,6 +67,7 @@ export default function ProductListPage() {
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
   const [deleteInput, setDeleteInput] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [viewProduct, setViewProduct] = useState<Product | null>(null)
 
 
   const handleDelete = async () => {
@@ -95,7 +97,7 @@ export default function ProductListPage() {
       while (true) {
         const { data, error } = await supabase
           .from('products')
-          .select('id, code, name, base_price, price, updated_at, is_deleted, categories(name)')
+          .select('id, code, name, base_price, price, updated_at, is_deleted, is_discontinued, categories(name)')
           .eq('is_deleted', false)
           .range(from, from + chunkSize - 1)
         if (error || !data || data.length === 0) break
@@ -286,6 +288,13 @@ export default function ProductListPage() {
                   </p>
                   <div className="flex items-center gap-1 mt-1">
                     <button
+                      onClick={() => setViewProduct(p)}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-[#121358]/10 text-gray-400 hover:text-[#121358] transition"
+                      title="View produk"
+                    >
+                      <FontAwesomeIcon icon={faEye} className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={() => router.push(`/products/edit/${p.id}`)}
                       className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-[#121358]/10 text-gray-400 hover:text-[#121358] transition"
                       title="Edit produk"
@@ -378,6 +387,73 @@ export default function ProductListPage() {
                 className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-sm font-semibold transition"
               >
                 {deleting ? 'Menghapus...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setViewProduct(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 bg-[#121358] flex items-center justify-between">
+              <p className="text-sm font-bold text-white">Detail Produk</p>
+              <button onClick={() => setViewProduct(null)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition">
+                <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              {viewProduct.code && (
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">Kode Produk</p>
+                  <p className="text-sm font-medium text-gray-800 mt-0.5">{viewProduct.code}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Nama Produk</p>
+                <p className="text-sm font-medium text-gray-800 mt-0.5">{viewProduct.name}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Kategori</p>
+                <p className="text-sm font-medium text-gray-800 mt-0.5">{viewProduct.categories?.name ?? '-'}</p>
+              </div>
+              <div className={`grid gap-3 ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                {isAdmin && (
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wide">Harga Modal</p>
+                    <p className="text-sm font-medium text-gray-800 mt-0.5">Rp {viewProduct.base_price.toLocaleString('id-ID')}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">Harga Jual</p>
+                  <p className="text-sm font-medium text-gray-800 mt-0.5">Rp {viewProduct.price.toLocaleString('id-ID')}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">Stok</p>
+                  <p className="text-sm font-medium text-gray-800 mt-0.5">{viewProduct.stock}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Status</p>
+                <div className="flex gap-2 mt-1">
+                  {viewProduct.is_discontinued && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">Discontinued</span>
+                  )}
+                  {viewProduct.is_deleted && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Dihapus</span>
+                  )}
+                  {!viewProduct.is_discontinued && !viewProduct.is_deleted && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-600">Aktif</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100">
+              <button
+                onClick={() => { setViewProduct(null); router.push(`/products/edit/${viewProduct.id}`) }}
+                className="w-full py-2.5 rounded-xl bg-[#121358] text-white text-sm font-semibold hover:bg-[#1a1c6e] transition"
+              >
+                Edit Produk
               </button>
             </div>
           </div>

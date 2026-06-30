@@ -60,6 +60,13 @@ export default function BuatTransaksiPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [printData, setPrintData] = useState<{
+    code: string
+    date: string
+    items: { name: string; qty: number; price_sold: number; discount: number }[]
+    total: number
+    notes: string
+  } | null>(null)
 
   const fetchProducts = async () => {
     const chunkSize = 1000
@@ -247,6 +254,18 @@ export default function BuatTransaksiPage() {
 
     setSubmitting(false)
     setSuccess(`Transaksi ${code} berhasil disimpan.`)
+    setPrintData({
+      code,
+      date,
+      items: validItems.map(r => ({
+        name: products.find(p => p.id === Number(r.product_id))?.name ?? '-',
+        qty: parseInt(r.qty),
+        price_sold: parseFloat(r.price_sold) || 0,
+        discount: parseFloat(r.discount) || 0,
+      })),
+      total,
+      notes: notes.trim(),
+    })
     setNotes('')
     setItems([emptyItem()])
     setDate(localDateStr())
@@ -254,6 +273,7 @@ export default function BuatTransaksiPage() {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
         <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#121358] hover:opacity-70 transition">
@@ -457,6 +477,16 @@ export default function BuatTransaksiPage() {
             </div>
           )}
 
+          {printData && (
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="w-full border-2 border-[#121358] text-[#121358] font-semibold py-3 rounded-xl transition text-sm hover:bg-[#121358]/5"
+            >
+              🖨 Print Nota Terakhir
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => { if (validItems.length > 0) setShowConfirm(true) }}
@@ -520,5 +550,60 @@ export default function BuatTransaksiPage() {
         )}
       </div>
     </div>
+
+    {/* Hidden thermal receipt — only visible during print */}
+    {printData && (
+      <div id="thermal-receipt" style={{ visibility: 'hidden', position: 'absolute', top: 0, left: 0 }}>
+        <style>{`
+          @media print {
+            body * { visibility: hidden; }
+            #thermal-receipt, #thermal-receipt * { visibility: visible; }
+            #thermal-receipt {
+              position: fixed;
+              top: 0;
+              left: 0;
+            }
+            @page {
+              size: 80mm auto;
+              margin: 4mm;
+            }
+          }
+          #thermal-receipt {
+            width: 72mm;
+            font-family: monospace;
+            font-size: 11px;
+            color: #000;
+          }
+        `}</style>
+        <div style={{ textAlign: 'center', marginBottom: 8 }}>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>NOTA PENJUALAN</div>
+          <div>{printData.code}</div>
+          <div>{new Date(printData.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+        </div>
+        <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '6px 0', marginBottom: 6 }}>
+          {printData.items.map((item, i) => (
+            <div key={i} style={{ marginBottom: 4 }}>
+              <div style={{ fontWeight: 600 }}>{item.name}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>{item.qty} × Rp {(item.price_sold).toLocaleString('id-ID')}</span>
+                <span>Rp {(item.qty * item.price_sold - item.discount).toLocaleString('id-ID')}</span>
+              </div>
+              {item.discount > 0 && (
+                <div style={{ color: '#555' }}>Diskon: -Rp {item.discount.toLocaleString('id-ID')}</div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
+          <span>TOTAL</span>
+          <span>Rp {printData.total.toLocaleString('id-ID')}</span>
+        </div>
+        {printData.notes && (
+          <div style={{ fontSize: 10, color: '#555', marginBottom: 6 }}>Catatan: {printData.notes}</div>
+        )}
+        <div style={{ textAlign: 'center', fontSize: 10, marginTop: 8 }}>Terima kasih!</div>
+      </div>
+    )}
+    </>
   )
 }
