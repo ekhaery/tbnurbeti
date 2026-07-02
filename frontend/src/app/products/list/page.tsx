@@ -559,62 +559,65 @@ export default function ProductListPage() {
                             <span className="font-semibold">{b.supplier_name ?? '-'}</span>
                             <span className="font-normal"> | {new Date(b.received_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                           </span>
-                          {/* Row 2: Qty, Harga Modal, edit icon */}
+                          {/* Row 2: Qty, Harga Modal, action icons */}
+                          {isEditing ? (
+                            <div className="mt-1 space-y-2">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <p className="text-[10px] text-gray-400 mb-0.5">Qty</p>
+                                  <input type="number" min="0" value={editBatchQty} onChange={e => setEditBatchQty(e.target.value)}
+                                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#121358]" />
+                                </div>
+                                <div>
+                                  <p className="text-[10px] text-gray-400 mb-0.5">Harga Modal</p>
+                                  <input type="number" min="0" value={editBatchPrice} onChange={e => setEditBatchPrice(e.target.value)}
+                                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#121358]" />
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button onClick={() => setEditingBatchId(null)}
+                                  className="flex-1 py-1.5 rounded bg-gray-200 hover:bg-gray-300 text-gray-600 text-xs font-medium transition flex items-center justify-center gap-1">
+                                  <FontAwesomeIcon icon={faXmark} className="w-3 h-3" /> Batal
+                                </button>
+                                <button disabled={savingBatch}
+                                  onClick={async () => {
+                                    setSavingBatch(true)
+                                    const { data: updated } = await supabase.from('stock_batches').update({ qty_remaining: parseInt(editBatchQty) || 0, base_price: parseFloat(editBatchPrice) || 0 }).eq('id', b.id).select('id, qty_remaining, base_price').single()
+                                    if (updated) setViewBatches(prev => prev.map(x => x.id === b.id ? { ...x, qty_remaining: (updated as any).qty_remaining, base_price: (updated as any).base_price } : x))
+                                    setEditingBatchId(null)
+                                    setSavingBatch(false)
+                                  }}
+                                  className="flex-1 py-1.5 rounded bg-[#121358] hover:bg-[#1a1c6e] disabled:opacity-50 text-white text-xs font-medium transition flex items-center justify-center gap-1">
+                                  <FontAwesomeIcon icon={faCheck} className="w-3 h-3" /> {savingBatch ? 'Menyimpan...' : 'Simpan'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
                           <div className="flex items-center gap-10 mt-1">
                             <div className="flex items-center gap-3">
                               <span className="text-lg font-bold text-gray-300 leading-none">{bIdx + 1}</span>
                               <span className="text-gray-200 text-lg">|</span>
                               <div>
                                 <p className="text-[10px] text-gray-400">Qty</p>
-                                {isEditing ? (
-                                  <input type="number" min="0" value={editBatchQty} onChange={e => setEditBatchQty(e.target.value)}
-                                    className="w-16 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#121358] mt-0.5" />
-                                ) : (
-                                  <p className={`text-xs font-semibold mt-0.5 ${b.is_available ? 'text-green-600' : 'text-red-500'}`}>{b.qty_remaining}</p>
-                                )}
+                                <p className={`text-xs font-semibold mt-0.5 ${b.is_available ? 'text-green-600' : 'text-red-500'}`}>{b.qty_remaining}</p>
                               </div>
                             </div>
                             <div>
                               <p className="text-[10px] text-gray-400">Harga Modal</p>
-                              {isEditing ? (
-                                <input type="number" min="0" value={editBatchPrice} onChange={e => setEditBatchPrice(e.target.value)}
-                                  className="w-24 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#121358] mt-0.5" />
-                              ) : (
-                                <p className="text-xs font-semibold mt-0.5 text-gray-800">Rp {b.base_price.toLocaleString('id-ID')}</p>
-                              )}
+                              <p className="text-xs font-semibold mt-0.5 text-gray-800">Rp {b.base_price.toLocaleString('id-ID')}</p>
                             </div>
                             <div className="ml-auto flex gap-1">
-                              {isEditing ? (
-                                <>
-                                  <button onClick={() => setEditingBatchId(null)} className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 hover:bg-gray-300 text-gray-500 transition">
-                                    <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
-                                  </button>
-                                  <button disabled={savingBatch}
-                                    onClick={async () => {
-                                      setSavingBatch(true)
-                                      const { data: updated } = await supabase.from('stock_batches').update({ qty_remaining: parseInt(editBatchQty) || 0, base_price: parseFloat(editBatchPrice) || 0 }).eq('id', b.id).select('id, qty_remaining, base_price').single()
-                                      if (updated) setViewBatches(prev => prev.map(x => x.id === b.id ? { ...x, qty_remaining: (updated as any).qty_remaining, base_price: (updated as any).base_price } : x))
-                                      setEditingBatchId(null)
-                                      setSavingBatch(false)
-                                    }}
-                                    className="w-6 h-6 flex items-center justify-center rounded bg-[#121358] hover:bg-[#1a1c6e] text-white transition">
-                                    <FontAwesomeIcon icon={faCheck} className="w-3 h-3" />
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button onClick={() => { setEditingBatchId(b.id); setEditBatchQty(String(b.qty_remaining)); setEditBatchPrice(String(b.base_price)) }}
-                                    className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 hover:bg-[#121358]/10 text-gray-400 hover:text-[#121358] transition">
-                                    <FontAwesomeIcon icon={faPenToSquare} className="w-3 h-3" />
-                                  </button>
-                                  <button onClick={() => { setDeleteBatchTarget(b.id); setDeleteBatchInput('') }}
-                                    className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 hover:bg-red-100 text-gray-400 hover:text-red-500 transition">
-                                    <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                                  </button>
-                                </>
-                              )}
+                              <button onClick={() => { setEditingBatchId(b.id); setEditBatchQty(String(b.qty_remaining)); setEditBatchPrice(String(b.base_price)) }}
+                                className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 hover:bg-[#121358]/10 text-gray-400 hover:text-[#121358] transition">
+                                <FontAwesomeIcon icon={faPenToSquare} className="w-3 h-3" />
+                              </button>
+                              <button onClick={() => { setDeleteBatchTarget(b.id); setDeleteBatchInput('') }}
+                                className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 hover:bg-red-100 text-gray-400 hover:text-red-500 transition">
+                                <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                              </button>
                             </div>
                           </div>
+                          )}
                         </div>
                       )
                     })}
