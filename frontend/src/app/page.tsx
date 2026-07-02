@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faHandshake, faTag, faReceipt, faUserCheck, faLightbulb, faSackDollar, faBuildingColumns } from '@fortawesome/free-solid-svg-icons'
 
@@ -68,6 +70,17 @@ const cardClass = 'rounded-2xl p-5 flex flex-col gap-3 shadow-sm hover:shadow-md
 
 export default function HomePage() {
   const router = useRouter()
+  const { appUser, loading } = useAuth()
+
+  useEffect(() => {
+    if (!loading && appUser && appUser.role !== 'admin') {
+      router.replace('/products/list')
+    }
+  }, [loading, appUser])
+
+  if (loading || !appUser) return null
+
+  if (appUser.role !== 'admin') return null
 
   return (
     <div className="min-h-screen bg-gray-50">
