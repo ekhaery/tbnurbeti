@@ -122,25 +122,35 @@ export default function ProductListPage() {
         from += chunkSize
       }
 
-      // Fetch stock_batches and sum qty_remaining per product
+      // Fetch stock_batches: sum available qty + track latest base_price per product
       from = 0
       const stockMap: Record<number, number> = {}
+      const latestPriceMap: Record<number, { received_at: string; base_price: number }> = {}
       while (true) {
         const { data, error } = await supabase
           .from('stock_batches')
-          .select('product_id, qty_remaining')
-          .eq('is_available', true)
+          .select('product_id, qty_remaining, base_price, received_at, is_available')
           .range(from, from + chunkSize - 1)
         if (error || !data || data.length === 0) break
-        for (const row of data as { product_id: number; qty_remaining: number }[]) {
-          stockMap[row.product_id] = (stockMap[row.product_id] ?? 0) + row.qty_remaining
+        for (const row of data as { product_id: number; qty_remaining: number; base_price: number; received_at: string; is_available: boolean }[]) {
+          if (row.is_available) {
+            stockMap[row.product_id] = (stockMap[row.product_id] ?? 0) + row.qty_remaining
+          }
+          const existing = latestPriceMap[row.product_id]
+          if (!existing || row.received_at > existing.received_at) {
+            latestPriceMap[row.product_id] = { received_at: row.received_at, base_price: row.base_price }
+          }
         }
         if (data.length < chunkSize) break
         from += chunkSize
       }
 
-      // Override stock with sum from stock_batches
-      setProducts(allProducts.map(p => ({ ...p, stock: stockMap[p.id] ?? 0 })))
+      // Override stock; use latest batch base_price if batches exist, else keep product base_price
+      setProducts(allProducts.map(p => ({
+        ...p,
+        stock: stockMap[p.id] ?? 0,
+        base_price: latestPriceMap[p.id]?.base_price ?? p.base_price,
+      })))
       setFetching(false)
     }
     fetchAll()
