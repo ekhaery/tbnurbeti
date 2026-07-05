@@ -97,6 +97,7 @@ export default function RiwayatPurchasingPage() {
   }
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [productSearch, setProductSearch] = useState('')
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -311,6 +312,22 @@ export default function RiwayatPurchasingPage() {
             </div>
           </div>
 
+          {/* Product name search */}
+          <div className="relative">
+            <label className="block text-[10px] font-semibold text-[#121358] mb-1">Nama Produk</label>
+            <input
+              type="text"
+              value={productSearch}
+              onChange={e => setProductSearch(e.target.value)}
+              placeholder="Cari nama produk..."
+              className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
+            />
+            {productSearch && (
+              <button onClick={() => setProductSearch('')}
+                className="absolute right-3 top-[calc(50%+8px)] -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+            )}
+          </div>
+
           {/* Supplier autocomplete */}
           <div className="relative">
             <label className="block text-[10px] font-semibold text-[#121358] mb-1">Supplier</label>
@@ -377,6 +394,10 @@ export default function RiwayatPurchasingPage() {
               if (statusFilter !== 'all' && p.status !== statusFilter) return false
               if (dateFrom && p.date < dateFrom) return false
               if (dateTo && p.date > dateTo) return false
+              if (productSearch) {
+                if (p.suppliers?.name?.toLowerCase() === 'opening stock') return false
+                if (!p.purchasing_items.some(i => i.products?.name?.toLowerCase().includes(productSearch.toLowerCase()))) return false
+              }
               return true
             }).map(p => {
               const isInit = p.status === 'init'
