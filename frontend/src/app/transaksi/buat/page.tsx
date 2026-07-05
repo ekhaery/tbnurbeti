@@ -357,9 +357,9 @@ export default function BuatTransaksiPage() {
             const selectedProduct = products.find(p => p.id === Number(current.product_id))
             const sErr = currentStockError()
             return (
-              <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+              <div className="rounded-xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#121358' }}>
                 <div className="relative">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Tambahkan Produk</p>
+                  <p className="text-xs font-semibold text-white uppercase tracking-wide mb-3">Tambahkan Produk</p>
                   <input
                     type="text"
                     value={current.query}
@@ -378,7 +378,7 @@ export default function BuatTransaksiPage() {
                     }}
                     placeholder="Cari produk..."
                     autoComplete="off"
-                    className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${current.product_id ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-300'}`}
+                    className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white ${current.product_id ? 'border-[#121358]/40' : 'border-gray-300'}`}
                   />
                   {autocomplete.open && filteredProducts(current.query).length > 0 && (
                     <div className="absolute z-20 left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-[26rem] overflow-y-auto w-[124%]">
@@ -404,22 +404,22 @@ export default function BuatTransaksiPage() {
 
                 <div className="grid grid-cols-3 gap-3 mt-2">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Qty <span className="text-red-500">*</span></label>
+                    <label className="block text-xs text-white/80 mb-1">Qty <span className="text-red-300">*</span></label>
                     <input type="number" value={current.qty} onChange={e => updateCurrent('qty', e.target.value)}
                       placeholder="0" min="1"
-                      className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${sErr ? 'border-red-400' : 'border-gray-300'}`} />
+                      className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white ${sErr ? 'border-red-400' : 'border-gray-300'}`} />
                     {sErr && <p className="text-xs text-red-500 mt-1">{sErr}</p>}
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Harga Jual</label>
+                    <label className="block text-xs text-white/80 mb-1">Harga Jual</label>
                     <input type="number" value={current.price_sold} disabled placeholder="0"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 text-gray-400 cursor-not-allowed" />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white text-gray-400 cursor-not-allowed" />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Diskon</label>
+                    <label className="block text-xs text-white/80 mb-1">Diskon</label>
                     <input type="number" value={current.discount} onChange={e => updateCurrent('discount', e.target.value)}
                       placeholder="0" min="0"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white" />
                   </div>
                 </div>
 
@@ -429,12 +429,13 @@ export default function BuatTransaksiPage() {
                   </p>
                 )}
 
-                <div className="pt-1 border-t border-gray-100">
+                <div className="pt-1">
                   <button
                     type="button"
                     onClick={addItem}
                     disabled={!current.product_id || !current.qty}
-                    className="w-full border-2 border-dashed border-gray-200 rounded-xl py-2.5 text-sm text-[#121358] hover:border-[#121358]/30 hover:bg-[#121358]/5 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium"
+                    className="w-full rounded-xl py-[4.375rem] text-sm font-semibold text-[#121358] disabled:opacity-40 disabled:cursor-not-allowed transition hover:brightness-105"
+                    style={{ backgroundColor: '#ffc908' }}
                   >
                     + Tambah Produk
                   </button>
@@ -464,7 +465,7 @@ export default function BuatTransaksiPage() {
           <div className="col-span-12 md:col-span-5">
             <div className="rounded-2xl p-6 min-h-[400px] flex flex-col gap-4" style={{ backgroundColor: '#121358' }}>
               <div className="text-center">
-                <p className="text-xs text-white uppercase tracking-widest">
+                <p className="text-xs uppercase tracking-widest -mx-6 -mt-6 px-6 py-3 rounded-t-2xl font-semibold" style={{ backgroundColor: '#ffc908', color: '#121358' }}>
                   <span className="font-semibold">Ringkasan Transaksi</span>
                   {date ? <span className="font-normal"> | {new Date(date + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span> : ''}
                 </p>
@@ -510,9 +511,10 @@ export default function BuatTransaksiPage() {
                   type="button"
                   onClick={() => { if (validItems.length > 0) setShowConfirm(true) }}
                   disabled={submitting || validItems.length === 0}
-                  className="w-full py-3 rounded-xl bg-white text-[#121358] font-bold text-sm hover:bg-white/90 disabled:opacity-30 transition"
+                  className="w-full py-3 rounded-xl font-bold text-sm disabled:opacity-30 transition hover:brightness-105"
+                  style={{ backgroundColor: '#ffc908', color: '#121358' }}
                 >
-                  {submitting ? 'Menyimpan...' : 'Simpan Transaksi'}
+                  {submitting ? 'Menyimpan...' : 'Cetak Struk'}
                 </button>
                 {printData && (
                   <button
