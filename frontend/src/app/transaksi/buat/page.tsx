@@ -285,7 +285,6 @@ export default function BuatTransaksiPage() {
           </Link>
           <div>
             <h2 className="text-lg font-bold text-gray-800">Buat Transaksi</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Catat penjualan produk.</p>
           </div>
         </div>
 
@@ -296,57 +295,58 @@ export default function BuatTransaksiPage() {
           <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm mb-4">⚠️ {error}</div>
         )}
 
-        {/* Desktop 3-column grid: 2-5-5 */}
+        {/* Desktop grid: 7-5 top, then 2-5 under left column */}
         <div className="grid grid-cols-12 gap-4 items-start">
 
-          {/* Col 1 — product image placeholder (2/12) */}
-          <div className="col-span-12 md:col-span-2">
-            <div className="bg-white rounded-xl shadow-sm flex items-center justify-center text-gray-300 text-xs h-32 md:h-full md:min-h-[400px]">
-              <span className="text-center px-2">Gambar Produk<br/>(upcoming)</span>
-            </div>
-          </div>
+          {/* Left side: 7 cols */}
+          <div className="col-span-12 md:col-span-7 space-y-4">
 
-          {/* Col 2 — form (5/12) */}
-          <div className="col-span-12 md:col-span-5">
+            {/* Top row: Info Transaksi (3) + Produk card (4) */}
+            <div className="grid grid-cols-7 gap-4 items-start">
+
+              {/* Info Transaksi — 3/7 */}
+              <div className="col-span-7 md:col-span-3">
+                <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Info Transaksi</p>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Tanggal <span className="text-red-500">*</span></label>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={e => setDate(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Catatan</label>
+                    <input
+                      type="text"
+                      value={notes}
+                      onChange={e => setNotes(e.target.value)}
+                      placeholder="Opsional"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                    />
+                  </div>
+
+                  <div className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 border transition ${isInitialTransformation ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200'}`}>
+                    <p className="text-[10px] text-gray-500">Initial Transformation</p>
+                    <button
+                      type="button"
+                      onClick={() => setIsInitialTransformation(v => !v)}
+                      className={`relative w-8 h-4 rounded-full transition-colors shrink-0 ${isInitialTransformation ? 'bg-amber-400' : 'bg-gray-300'}`}
+                    >
+                      <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${isInitialTransformation ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
+                </div>
+              </div>{/* end Info Transaksi */}
+
+              {/* Produk entry form — 4/7 */}
+              <div className="col-span-7 md:col-span-4">
         <form onSubmit={e => e.preventDefault()} className="space-y-4">
-
-          {/* Header card */}
-          <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Info Transaksi</p>
-
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Tanggal <span className="text-red-500">*</span></label>
-              <input
-                type="date"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Catatan</label>
-              <input
-                type="text"
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder="Opsional"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
-              />
-            </div>
-
-            <div className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 border transition ${isInitialTransformation ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200'}`}>
-              <p className="text-[10px] text-gray-500">Initial Transformation</p>
-              <button
-                type="button"
-                onClick={() => setIsInitialTransformation(v => !v)}
-                className={`relative w-8 h-4 rounded-full transition-colors shrink-0 ${isInitialTransformation ? 'bg-amber-400' : 'bg-gray-300'}`}
-              >
-                <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${isInitialTransformation ? 'translate-x-4' : 'translate-x-0.5'}`} />
-              </button>
-            </div>
-          </div>
 
           {/* Product rows */}
           {/* Single product entry */}
@@ -442,9 +442,21 @@ export default function BuatTransaksiPage() {
 
         </form>
 
-          </div>{/* end form col */}
+              </div>{/* end Produk entry col (4/7) */}
+            </div>{/* end top row grid (3+4) */}
 
-          {/* Col 3 — dark navy summary card (5/12) */}
+            {/* Photo card — 3/7, below Info Transaksi */}
+            <div className="grid grid-cols-7 gap-4">
+              <div className="col-span-7 md:col-span-3">
+                <div className="bg-white rounded-xl shadow-sm flex items-center justify-center text-gray-300 text-xs h-32">
+                  <span className="text-center px-2">Gambar Produk<br/>(upcoming)</span>
+                </div>
+              </div>
+            </div>
+
+          </div>{/* end left 7-col */}
+
+          {/* Right side — dark navy summary card (5/12) */}
           <div className="col-span-12 md:col-span-5">
             <div className="rounded-2xl p-6 min-h-[400px] flex flex-col gap-4" style={{ backgroundColor: '#121358' }}>
               <p className="text-xs font-semibold text-white uppercase tracking-widest">Ringkasan Transaksi</p>
