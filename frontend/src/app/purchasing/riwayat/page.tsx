@@ -389,37 +389,56 @@ export default function RiwayatPurchasingPage() {
                     onClick={() => {
                       if (!isInit) openProductModal(p)
                     }}
-                    className={`w-full px-4 py-3 pr-12 flex items-center justify-between text-left transition ${isInit ? 'cursor-default' : 'hover:bg-gray-50'}`}
+                    className={`w-full px-4 py-3 pr-12 text-left transition ${isInit ? 'cursor-default' : 'hover:bg-gray-50'}`}
                   >
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800 font-mono">{p.code}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {p.suppliers?.name ?? '-'} · {new Date(p.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        {p.due_date && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600">
-                            JT: {new Date(p.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </span>
-                        )}
-                        {isInit || isCreated ? (
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PURCHASING_STATUS[p.status as 'init' | 'created'].className}`}>
-                            {PURCHASING_STATUS[p.status as 'init' | 'created'].label}
-                          </span>
-                        ) : p.status === 'completed' ? (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-600">
-                            ✓ Sudah Tiba
-                          </span>
-                        ) : (
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ARRIVAL_STATUS[status!].className}`}>
-                            {ARRIVAL_STATUS[status!].label}
-                          </span>
-                        )}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">{p.suppliers?.name ?? '-'}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {new Date(p.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold text-[#121358]">Rp {fmt(p.total)}</p>
+                        <p className="text-xs text-gray-400">{p.purchasing_items.length} produk</p>
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-[#121358]">Rp {fmt(p.total)}</p>
-                      <p className="text-xs text-gray-400">{p.purchasing_items.length} produk</p>
+
+                    {/* Code */}
+                    <div className="mt-1.5">
+                      <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#121358]/10 text-[#121358] font-mono">
+                        {p.code}
+                      </span>
+                    </div>
+
+                    {/* Product list */}
+                    <div className="mt-2 space-y-0.5">
+                      {p.purchasing_items.map(item => (
+                        <p key={item.id} className="text-xs text-gray-600 truncate">
+                          · {item.products?.name ?? '-'} <span className="text-gray-400">({item.qty})</span>
+                        </p>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 mt-2">
+                      {p.due_date && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600">
+                          JT: {new Date(p.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </span>
+                      )}
+                      {isInit || isCreated ? (
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PURCHASING_STATUS[p.status as 'init' | 'created'].className}`}>
+                          {PURCHASING_STATUS[p.status as 'init' | 'created'].label}
+                        </span>
+                      ) : p.status === 'completed' ? (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-600">
+                          ✓ Sudah Tiba
+                        </span>
+                      ) : (
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ARRIVAL_STATUS[status!].className}`}>
+                          {ARRIVAL_STATUS[status!].label}
+                        </span>
+                      )}
                     </div>
                   </button>
 
