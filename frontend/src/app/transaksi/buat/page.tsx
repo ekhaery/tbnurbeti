@@ -52,8 +52,9 @@ export default function BuatTransaksiPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [date, setDate] = useState(localDateStr())
   const [notes, setNotes] = useState('')
-  const [items, setItems] = useState<ItemRow[]>([emptyItem()])
-  const [autocomplete, setAutocomplete] = useState<AutocompleteState[]>([{ open: false, focused: -1 }])
+  const [items, setItems] = useState<ItemRow[]>([])
+  const [current, setCurrent] = useState<ItemRow>(emptyItem())
+  const [autocomplete, setAutocomplete] = useState<AutocompleteState>({ open: false, focused: -1 })
   const [isInitialTransformation, setIsInitialTransformation] = useState(true)
   const [showConfirm, setShowConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -105,33 +106,31 @@ export default function BuatTransaksiPage() {
 
   useEffect(() => { fetchProducts() }, [])
 
-  const updateItem = (i: number, field: keyof ItemRow, value: string | number) => {
-    setItems(prev => prev.map((row, idx) => {
-      if (idx !== i) return row
-      const updated = { ...row, [field]: value }
+  const updateCurrent = (field: keyof ItemRow, value: string) => {
+    setCurrent(prev => {
+      const updated = { ...prev, [field]: value }
       if (field === 'product_id') {
         const product = products.find(p => p.id === Number(value))
         if (product) updated.price_sold = String(product.price)
       }
       return updated
-    }))
+    })
+  }
+
+  const selectProduct = (product: Product) => {
+    setCurrent(prev => ({ ...prev, product_id: product.id, query: product.name, price_sold: String(product.price) }))
+    setAutocomplete({ open: false, focused: -1 })
   }
 
   const addItem = () => {
-    setItems(prev => [...prev, emptyItem()])
-    setAutocomplete(prev => [...prev, { open: false, focused: -1 }])
-  }
-  const removeItem = (i: number) => {
-    setItems(prev => prev.filter((_, idx) => idx !== i))
-    setAutocomplete(prev => prev.filter((_, idx) => idx !== i))
+    if (!current.product_id || !current.qty) return
+    setItems(prev => [...prev, current])
+    setCurrent(emptyItem())
+    setAutocomplete({ open: false, focused: -1 })
   }
 
-  const selectProduct = (i: number, product: Product) => {
-    setItems(prev => prev.map((row, idx) => idx === i
-      ? { ...row, product_id: product.id, query: product.name, price_sold: String(product.price) }
-      : row
-    ))
-    setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: false, focused: -1 } : s))
+  const removeItem = (i: number) => {
+    setItems(prev => prev.filter((_, idx) => idx !== i))
   }
 
   const filteredProducts = (query: string) => {
@@ -146,12 +145,11 @@ export default function BuatTransaksiPage() {
   const subtotal = (r: ItemRow) => (parseFloat(r.price_sold) || 0) * (parseInt(r.qty) || 0) - (parseFloat(r.discount) || 0)
   const total = validItems.reduce((sum, r) => sum + subtotal(r), 0)
 
-  const stockError = (i: number): string | null => {
-    const row = items[i]
-    if (!row.product_id || !row.qty) return null
-    const product = products.find(p => p.id === Number(row.product_id))
+  const currentStockError = (): string | null => {
+    if (!current.product_id || !current.qty) return null
+    const product = products.find(p => p.id === Number(current.product_id))
     if (!product) return null
-    if (parseInt(row.qty) > product.stock) return `Stok tersedia: ${product.stock}`
+    if (parseInt(current.qty) > product.stock) return `Stok tersedia: ${product.stock}`
     return null
   }
 
@@ -266,7 +264,9 @@ export default function BuatTransaksiPage() {
       notes: notes.trim(),
     })
     setNotes('')
-    setItems([emptyItem()])
+    setItems([])
+    setCurrent(emptyItem())
+    setAutocomplete({ open: false, focused: -1 })
     setDate(localDateStr())
     fetchProducts()
   }
@@ -347,135 +347,91 @@ export default function BuatTransaksiPage() {
           </div>
 
           {/* Product rows */}
-          <div className="space-y-3">
-            {items.map((row, i) => {
-              const selectedProduct = products.find(p => p.id === Number(row.product_id))
-              const sErr = stockError(i)
-              return (
-                <div key={i} className="bg-white rounded-xl shadow-sm p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-gray-400">Produk {i + 1}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeItem(i)}
-                      disabled={items.length === 1}
-                      className="w-6 h-6 flex items-center justify-center rounded-full bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-600 disabled:opacity-20 transition"
-                    >
-                      <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                    </button>
-                  </div>
-
-                  <div className="relative">
-                    <label className="block text-xs text-gray-500 mb-1">Produk <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      value={row.query}
-                      onChange={e => {
-                        updateItem(i, 'query', e.target.value)
-                        // clear selected product if user types
-                        setItems(prev => prev.map((r, idx) => idx === i ? { ...r, product_id: '', query: e.target.value } : r))
-                        setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: true, focused: -1 } : s))
-                      }}
-                      onFocus={() => setAutocomplete(prev => prev.map((s, idx) => idx === i ? { ...s, open: true } : s))}
-                      onBlur={() => setTimeout(() => setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: false, focused: -1 } : s)), 150)}
-                      onKeyDown={e => {
-                        const opts = filteredProducts(row.query)
-                        const ac = autocomplete[i]
-                        if (e.key === 'ArrowDown') {
-                          e.preventDefault()
-                          setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: true, focused: Math.min(s.focused + 1, opts.length - 1) } : s))
-                        } else if (e.key === 'ArrowUp') {
-                          e.preventDefault()
-                          setAutocomplete(prev => prev.map((s, idx) => idx === i ? { ...s, focused: Math.max(s.focused - 1, 0) } : s))
-                        } else if (e.key === 'Enter' && ac.focused >= 0) {
-                          e.preventDefault()
-                          selectProduct(i, opts[ac.focused])
-                        } else if (e.key === 'Escape') {
-                          setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: false, focused: -1 } : s))
-                        }
-                      }}
-                      placeholder="Cari produk..."
-                      autoComplete="off"
-                      className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${row.product_id ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-300'}`}
-                    />
-                    {autocomplete[i]?.open && filteredProducts(row.query).length > 0 && (
-                      <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
-                        {filteredProducts(row.query).map((p, optIdx) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onMouseDown={() => selectProduct(i, p)}
-                            className={`w-full text-left px-4 py-2.5 text-sm transition flex items-center justify-between gap-3 ${
-                              autocomplete[i].focused === optIdx ? 'bg-[#121358] text-white' : 'hover:bg-gray-50 text-gray-700'
-                            }`}
-                          >
-                            <span className="font-medium">{p.name}</span>
-                            <span className={`text-xs shrink-0 ${autocomplete[i].focused === optIdx ? 'text-white/70' : 'text-gray-400'}`}>
-                              Rp {p.price.toLocaleString('id-ID')} · stok: {p.stock}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {selectedProduct && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Harga jual: <span className="font-semibold text-gray-600">Rp {fmt(selectedProduct.price)}</span>
-                        <span className="mx-1">·</span>
-                        Stok: <span className="font-semibold text-gray-600">{selectedProduct.stock}</span>
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Qty <span className="text-red-500">*</span></label>
-                      <input
-                        type="number"
-                        value={row.qty}
-                        onChange={e => updateItem(i, 'qty', e.target.value)}
-                        placeholder="0"
-                        min="1"
-                        className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${sErr ? 'border-red-400' : 'border-gray-300'}`}
-                      />
-                      {sErr && <p className="text-xs text-red-500 mt-1">{sErr}</p>}
+          {/* Single product entry */}
+          {(() => {
+            const selectedProduct = products.find(p => p.id === Number(current.product_id))
+            const sErr = currentStockError()
+            return (
+              <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+                <div className="relative">
+                  <label className="block text-xs text-gray-500 mb-1">Produk <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={current.query}
+                    onChange={e => {
+                      setCurrent(prev => ({ ...prev, product_id: '', query: e.target.value }))
+                      setAutocomplete({ open: true, focused: -1 })
+                    }}
+                    onFocus={() => setAutocomplete(prev => ({ ...prev, open: true }))}
+                    onBlur={() => setTimeout(() => setAutocomplete({ open: false, focused: -1 }), 150)}
+                    onKeyDown={e => {
+                      const opts = filteredProducts(current.query)
+                      if (e.key === 'ArrowDown') { e.preventDefault(); setAutocomplete(prev => ({ open: true, focused: Math.min(prev.focused + 1, opts.length - 1) })) }
+                      else if (e.key === 'ArrowUp') { e.preventDefault(); setAutocomplete(prev => ({ ...prev, focused: Math.max(prev.focused - 1, 0) })) }
+                      else if (e.key === 'Enter' && autocomplete.focused >= 0) { e.preventDefault(); selectProduct(opts[autocomplete.focused]) }
+                      else if (e.key === 'Escape') setAutocomplete({ open: false, focused: -1 })
+                    }}
+                    placeholder="Cari produk..."
+                    autoComplete="off"
+                    className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${current.product_id ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-300'}`}
+                  />
+                  {autocomplete.open && filteredProducts(current.query).length > 0 && (
+                    <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                      {filteredProducts(current.query).map((p, optIdx) => (
+                        <button key={p.id} type="button" onMouseDown={() => selectProduct(p)}
+                          className={`w-full text-left px-4 py-2.5 text-sm transition flex items-center justify-between gap-3 ${autocomplete.focused === optIdx ? 'bg-[#121358] text-white' : 'hover:bg-gray-50 text-gray-700'}`}>
+                          <span className="font-medium">{p.name}</span>
+                          <span className={`text-xs shrink-0 ${autocomplete.focused === optIdx ? 'text-white/70' : 'text-gray-400'}`}>
+                            Rp {p.price.toLocaleString('id-ID')} · stok: {p.stock}
+                          </span>
+                        </button>
+                      ))}
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Harga Jual</label>
-                      <input
-                        type="number"
-                        value={row.price_sold}
-                        disabled
-                        placeholder="0"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 text-gray-400 cursor-not-allowed"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Diskon</label>
-                      <input
-                        type="number"
-                        value={row.discount}
-                        onChange={e => updateItem(i, 'discount', e.target.value)}
-                        placeholder="0"
-                        min="0"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
-                      />
-                    </div>
-                  </div>
-
-                  {row.qty && row.price_sold && (
-                    <p className="text-xs text-gray-400 text-right">
-                      Subtotal: <span className="font-semibold text-gray-700">Rp {fmt(subtotal(row))}</span>
+                  )}
+                  {selectedProduct && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Harga jual: <span className="font-semibold text-gray-600">Rp {fmt(selectedProduct.price)}</span>
+                      <span className="mx-1">·</span>
+                      Stok: <span className="font-semibold text-gray-600">{selectedProduct.stock}</span>
                     </p>
                   )}
                 </div>
-              )
-            })}
-          </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Qty <span className="text-red-500">*</span></label>
+                    <input type="number" value={current.qty} onChange={e => updateCurrent('qty', e.target.value)}
+                      placeholder="0" min="1"
+                      className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${sErr ? 'border-red-400' : 'border-gray-300'}`} />
+                    {sErr && <p className="text-xs text-red-500 mt-1">{sErr}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Harga Jual</label>
+                    <input type="number" value={current.price_sold} disabled placeholder="0"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 text-gray-400 cursor-not-allowed" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Diskon</label>
+                    <input type="number" value={current.discount} onChange={e => updateCurrent('discount', e.target.value)}
+                      placeholder="0" min="0"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                  </div>
+                </div>
+
+                {current.qty && current.price_sold && (
+                  <p className="text-xs text-gray-400 text-right">
+                    Subtotal: <span className="font-semibold text-gray-700">Rp {fmt(subtotal(current))}</span>
+                  </p>
+                )}
+              </div>
+            )
+          })()}
 
           <button
             type="button"
             onClick={addItem}
-            className="w-full border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm text-[#121358] hover:border-[#121358]/30 hover:bg-[#121358]/5 transition font-medium"
+            disabled={!current.product_id || !current.qty}
+            className="w-full border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm text-[#121358] hover:border-[#121358]/30 hover:bg-[#121358]/5 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium"
           >
             + Tambah Produk
           </button>
@@ -492,16 +448,22 @@ export default function BuatTransaksiPage() {
               {validItems.length === 0 ? (
                 <p className="text-white/30 text-sm">Belum ada produk dipilih.</p>
               ) : (
-                <div className="space-y-3 flex-1">
-                  {validItems.map((row, i) => {
+                <div className="space-y-2 flex-1 overflow-y-auto">
+                  {items.map((row, i) => {
                     const product = products.find(p => p.id === Number(row.product_id))
                     return (
-                      <div key={i} className="bg-white/10 rounded-xl px-4 py-3 space-y-1">
-                        <p className="text-sm font-semibold text-white truncate">{product?.name ?? '-'}</p>
-                        <div className="flex justify-between text-xs text-white/60">
-                          <span>{row.qty} × Rp {fmt(parseFloat(row.price_sold) || 0)}{parseFloat(row.discount) > 0 ? ` − Rp ${fmt(parseFloat(row.discount))}` : ''}</span>
-                          <span className="font-semibold text-white">Rp {fmt(subtotal(row))}</span>
+                      <div key={i} className="bg-white/10 rounded-xl px-3 py-2.5 flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">{product?.name ?? '-'}</p>
+                          <div className="flex justify-between text-xs text-white/60 mt-0.5">
+                            <span>{row.qty} × Rp {fmt(parseFloat(row.price_sold) || 0)}{parseFloat(row.discount) > 0 ? ` − Rp ${fmt(parseFloat(row.discount))}` : ''}</span>
+                            <span className="font-semibold text-white">Rp {fmt(subtotal(row))}</span>
+                          </div>
                         </div>
+                        <button type="button" onClick={() => removeItem(i)}
+                          className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-400/30 text-white/40 hover:text-red-300 transition">
+                          <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                        </button>
                       </div>
                     )
                   })}
