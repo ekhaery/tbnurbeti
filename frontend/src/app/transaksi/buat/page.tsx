@@ -379,7 +379,7 @@ export default function BuatTransaksiPage() {
                     className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] ${current.product_id ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-300'}`}
                   />
                   {autocomplete.open && filteredProducts(current.query).length > 0 && (
-                    <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                    <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-[26rem] overflow-y-auto">
                       {filteredProducts(current.query).map((p, optIdx) => (
                         <button key={p.id} type="button" onMouseDown={() => selectProduct(p)}
                           className={`w-full text-left px-4 py-2.5 text-sm transition flex items-center justify-between gap-3 ${autocomplete.focused === optIdx ? 'bg-[#121358] text-white' : 'hover:bg-gray-50 text-gray-700'}`}>
