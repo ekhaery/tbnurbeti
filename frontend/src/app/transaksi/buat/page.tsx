@@ -306,33 +306,35 @@ export default function BuatTransaksiPage() {
 
               {/* Info Transaksi — 3/7 */}
               <div className="col-span-7 md:col-span-3">
-                <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Info Transaksi</p>
+                <div className="rounded-xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#ffc908' }}>
+                  <p className="text-xs font-semibold text-[#121358] uppercase tracking-wide">Info Transaksi</p>
 
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Tanggal <span className="text-red-500">*</span></label>
+                    <label className="block text-xs text-[#121358] mb-1">Tanggal <span className="text-[#121358]">*</span></label>
                     <input
                       type="date"
                       value={date}
                       onChange={e => setDate(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                      className="w-full border border-[#e6b400] bg-white rounded-lg px-3 py-2.5 text-sm text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358]"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Catatan</label>
-                    <input
-                      type="text"
+                    <label className="block text-xs text-[#121358] mb-1">Catatan</label>
+                    <textarea
                       value={notes}
                       onChange={e => setNotes(e.target.value)}
                       placeholder="Opsional"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                      rows={1}
+                      className="w-full border border-[#e6b400] bg-white rounded-lg px-3 py-2.5 text-sm text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358] resize-none overflow-hidden"
+                      style={{ height: 'auto' }}
+                      onInput={e => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px' }}
                     />
                   </div>
 
-                  <div className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 border transition ${isInitialTransformation ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200'}`}>
-                    <p className="text-[10px] text-gray-500">Initial Transformation</p>
+                  <div className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 border transition ${isInitialTransformation ? 'bg-[#e6a800] border-[#cc9600]' : 'bg-[#e6b400]/40 border-[#cc9600]/40'}`}>
+                    <p className="text-[10px] text-[#121358]">Initial Transformation</p>
                     <button
                       type="button"
                       onClick={() => setIsInitialTransformation(v => !v)}
