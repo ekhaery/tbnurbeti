@@ -408,7 +408,7 @@ export default function RiwayatPurchasingPage() {
                 <div key={p.id} className="relative bg-white rounded-xl shadow-sm">
                   <button
                     onClick={() => openProductModal(p)}
-                    className="w-full px-4 py-3 pr-12 text-left transition hover:bg-gray-50"
+                    className="w-full px-4 py-3 text-left transition hover:bg-gray-50"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -461,47 +461,6 @@ export default function RiwayatPurchasingPage() {
                     </div>
                   </button>
 
-                  {/* Edit icon for non-created, kebab for created */}
-                  {isCreated ? (
-                    <div className="absolute top-3 right-3">
-                      <button
-                        onClick={e => { e.stopPropagation(); setKebabOpen(kebabOpen === p.id ? null : p.id) }}
-                        className="w-7 h-7 flex items-center justify-center rounded-full text-[#121358]/50 hover:bg-[#121358]/10 hover:text-[#121358] transition"
-                      >
-                        <FontAwesomeIcon icon={faEllipsisV} className="w-3 h-3" />
-                      </button>
-                      {kebabOpen === p.id && (
-                        <>
-                          <div className="fixed inset-0 z-30" onClick={() => setKebabOpen(null)} />
-                          <div className="absolute right-0 top-8 z-40 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden w-44">
-                            <button
-                              onMouseDown={e => { e.stopPropagation(); setKebabOpen(null); openEdit(p, e as unknown as React.MouseEvent) }}
-                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
-                            >
-                              <FontAwesomeIcon icon={faPen} className="w-3 h-3 text-gray-400" />
-                              Edit
-                            </button>
-                            <button
-                              onMouseDown={e => { e.stopPropagation(); setKebabOpen(null); openProductModal(p) }}
-                              className="w-full text-left px-4 py-2.5 text-sm font-semibold text-[#121358] hover:bg-[#121358]/5 flex items-center gap-2 transition border-t border-gray-100"
-                            >
-                              <FontAwesomeIcon icon={faBoxOpen} className="w-3 h-3" style={{ color: '#9FA1FF' }} />
-                              Tandai Tiba
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <button
-                      onClick={e => canEdit ? openEdit(p, e) : showToast('Purchasing completed tidak dapat diedit.')}
-                      className={`absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-full transition ${
-                        canEdit ? 'text-[#121358]/50 hover:bg-[#121358]/10 hover:text-[#121358]' : 'text-gray-200 cursor-default'
-                      }`}
-                    >
-                      <FontAwesomeIcon icon={faPen} className="w-3 h-3" />
-                    </button>
-                  )}
                 </div>
               )
             })}
