@@ -359,7 +359,7 @@ export default function BuatTransaksiPage() {
             return (
               <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
                 <div className="relative">
-                  <label className="block text-xs text-gray-500 mb-1">Produk <span className="text-red-500">*</span></label>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Tambahkan Produk</p>
                   <input
                     type="text"
                     value={current.query}
@@ -402,7 +402,7 @@ export default function BuatTransaksiPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-3 mt-2">
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Qty <span className="text-red-500">*</span></label>
                     <input type="number" value={current.qty} onChange={e => updateCurrent('qty', e.target.value)}
@@ -428,19 +428,21 @@ export default function BuatTransaksiPage() {
                     Subtotal: <span className="font-semibold text-gray-700">Rp {fmt(subtotal(current))}</span>
                   </p>
                 )}
+
+                <div className="pt-1 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    disabled={!current.product_id || !current.qty}
+                    className="w-full border-2 border-dashed border-gray-200 rounded-xl py-2.5 text-sm text-[#121358] hover:border-[#121358]/30 hover:bg-[#121358]/5 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium"
+                  >
+                    + Tambah Produk
+                  </button>
+                </div>
               </div>
             )
           })()}
           </div>
-
-          <button
-            type="button"
-            onClick={addItem}
-            disabled={!current.product_id || !current.qty}
-            className="w-full border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm text-[#121358] hover:border-[#121358]/30 hover:bg-[#121358]/5 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium"
-          >
-            + Tambah Produk
-          </button>
 
         </form>
 
@@ -461,7 +463,18 @@ export default function BuatTransaksiPage() {
           {/* Right side — dark navy summary card (5/12) */}
           <div className="col-span-12 md:col-span-5">
             <div className="rounded-2xl p-6 min-h-[400px] flex flex-col gap-4" style={{ backgroundColor: '#121358' }}>
-              <p className="text-xs font-semibold text-white uppercase tracking-widest">Ringkasan Transaksi</p>
+              <div className="text-center">
+                <p className="text-xs text-white uppercase tracking-widest">
+                  <span className="font-semibold">Ringkasan Transaksi</span>
+                  {date ? <span className="font-normal"> | {new Date(date + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span> : ''}
+                </p>
+                {notes && (
+                  <>
+                    <p className="text-xs text-white/60 mt-1 italic">{notes}</p>
+                    <div className="mt-2 border-t border-white/15" />
+                  </>
+                )}
+              </div>
 
               {validItems.length === 0 ? (
                 <p className="text-white/30 text-sm">Belum ada produk dipilih.</p>
@@ -479,7 +492,7 @@ export default function BuatTransaksiPage() {
                           </div>
                         </div>
                         <button type="button" onClick={() => removeItem(i)}
-                          className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-400/30 text-white/40 hover:text-red-300 transition">
+                          className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-pink-200/20 hover:bg-pink-300/30 text-pink-300 hover:text-pink-400 transition">
                           <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
                         </button>
                       </div>
