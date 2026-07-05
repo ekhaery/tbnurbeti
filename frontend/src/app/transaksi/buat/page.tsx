@@ -274,8 +274,10 @@ export default function BuatTransaksiPage() {
   return (
     <>
     <div className="min-h-screen bg-gray-50">
-      <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
-        <div className="flex items-center gap-3">
+      <div className="px-4 pt-3 pb-10 max-w-7xl mx-auto">
+
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-4">
           <Link href="/" className="w-8 h-8 flex items-center justify-center rounded-full bg-white shadow-sm text-gray-500 hover:text-gray-800 transition shrink-0">
             <FontAwesomeIcon icon={faArrowLeft} className="w-3.5 h-3.5" />
           </Link>
@@ -286,12 +288,24 @@ export default function BuatTransaksiPage() {
         </div>
 
         {success && (
-          <div className="p-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm">✅ {success}</div>
+          <div className="p-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm mb-4">✅ {success}</div>
         )}
         {error && (
-          <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">⚠️ {error}</div>
+          <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm mb-4">⚠️ {error}</div>
         )}
 
+        {/* Desktop 3-column grid: 2-5-5 */}
+        <div className="grid grid-cols-12 gap-4 items-start">
+
+          {/* Col 1 — product image placeholder (2/12) */}
+          <div className="col-span-12 md:col-span-2">
+            <div className="bg-white rounded-xl shadow-sm flex items-center justify-center text-gray-300 text-xs h-32 md:h-full md:min-h-[400px]">
+              <span className="text-center px-2">Gambar Produk<br/>(upcoming)</span>
+            </div>
+          </div>
+
+          {/* Col 2 — form (5/12) */}
+          <div className="col-span-12 md:col-span-5">
         <form onSubmit={e => e.preventDefault()} className="space-y-4">
 
           {/* Header card */}
@@ -320,17 +334,14 @@ export default function BuatTransaksiPage() {
               />
             </div>
 
-            <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 border transition ${isInitialTransformation ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200'}`}>
-              <div>
-                <p className="text-xs font-semibold text-gray-700">Initial Transformation</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">Catat penjualan tanpa COGS & stok. Backfill nanti.</p>
-              </div>
+            <div className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 border transition ${isInitialTransformation ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200'}`}>
+              <p className="text-[10px] text-gray-500">Initial Transformation</p>
               <button
                 type="button"
                 onClick={() => setIsInitialTransformation(v => !v)}
-                className={`relative w-10 h-6 rounded-full transition-colors ${isInitialTransformation ? 'bg-amber-400' : 'bg-gray-300'}`}
+                className={`relative w-8 h-4 rounded-full transition-colors shrink-0 ${isInitialTransformation ? 'bg-amber-400' : 'bg-gray-300'}`}
               >
-                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${isInitialTransformation ? 'translate-x-5' : 'translate-x-1'}`} />
+                <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${isInitialTransformation ? 'translate-x-4' : 'translate-x-0.5'}`} />
               </button>
             </div>
           </div>
@@ -469,32 +480,61 @@ export default function BuatTransaksiPage() {
             + Tambah Produk
           </button>
 
-          {total > 0 && (
-            <div className="bg-white rounded-xl shadow-sm px-4 py-3 flex justify-between items-center">
-              <span className="text-sm text-gray-500">Total Penjualan</span>
-              <span className="text-base font-bold text-[#121358]">Rp {fmt(total)}</span>
-            </div>
-          )}
-
-          {printData && (
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="w-full border-2 border-[#121358] text-[#121358] font-semibold py-3 rounded-xl transition text-sm hover:bg-[#121358]/5"
-            >
-              🖨 Print Nota Terakhir
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => { if (validItems.length > 0) setShowConfirm(true) }}
-            disabled={submitting || validItems.length === 0}
-            className="w-full bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white font-semibold py-3 rounded-xl transition text-sm"
-          >
-            {submitting ? 'Menyimpan...' : 'Simpan Transaksi'}
-          </button>
         </form>
+
+          </div>{/* end form col */}
+
+          {/* Col 3 — dark navy summary card (5/12) */}
+          <div className="col-span-12 md:col-span-5">
+            <div className="rounded-2xl p-6 min-h-[400px] flex flex-col gap-4" style={{ backgroundColor: '#121358' }}>
+              <p className="text-xs font-semibold text-white/50 uppercase tracking-widest">Ringkasan Transaksi</p>
+
+              {validItems.length === 0 ? (
+                <p className="text-white/30 text-sm">Belum ada produk dipilih.</p>
+              ) : (
+                <div className="space-y-3 flex-1">
+                  {validItems.map((row, i) => {
+                    const product = products.find(p => p.id === Number(row.product_id))
+                    return (
+                      <div key={i} className="bg-white/10 rounded-xl px-4 py-3 space-y-1">
+                        <p className="text-sm font-semibold text-white truncate">{product?.name ?? '-'}</p>
+                        <div className="flex justify-between text-xs text-white/60">
+                          <span>{row.qty} × Rp {fmt(parseFloat(row.price_sold) || 0)}{parseFloat(row.discount) > 0 ? ` − Rp ${fmt(parseFloat(row.discount))}` : ''}</span>
+                          <span className="font-semibold text-white">Rp {fmt(subtotal(row))}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              <div className="border-t border-white/10 pt-4 mt-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-sm text-white/60">Total</span>
+                  <span className="text-2xl font-bold text-white">Rp {fmt(total)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { if (validItems.length > 0) setShowConfirm(true) }}
+                  disabled={submitting || validItems.length === 0}
+                  className="w-full py-3 rounded-xl bg-white text-[#121358] font-bold text-sm hover:bg-white/90 disabled:opacity-30 transition"
+                >
+                  {submitting ? 'Menyimpan...' : 'Simpan Transaksi'}
+                </button>
+                {printData && (
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="w-full mt-2 py-2.5 rounded-xl border border-white/20 text-white/70 text-sm hover:bg-white/10 transition"
+                  >
+                    🖨 Print Nota Terakhir
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+        </div>{/* end grid */}
 
         {showConfirm && (
           <>
