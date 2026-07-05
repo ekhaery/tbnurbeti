@@ -21,6 +21,7 @@ export default function Navbar() {
   const router = useRouter()
   const { appUser, signOut } = useAuth()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [transaksiOpen, setTransaksiOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const [activityCount, setActivityCount] = useState(0)
   const [showProdukAlert, setShowProdukAlert] = useState(false)
@@ -222,10 +223,34 @@ export default function Navbar() {
               </Link>
             )}
 
-            {/* Transaksi link */}
-            <Link href="/transaksi" className={linkClass(pathname.startsWith('/transaksi'))}>
-              Transaksi
-            </Link>
+            {/* Transaksi dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setTransaksiOpen(o => !o)}
+                className={linkClass(pathname.startsWith('/transaksi'))}
+              >
+                Transaksi
+              </button>
+              {transaksiOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setTransaksiOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden z-50">
+                    <Link href="/transaksi/buat" onClick={() => setTransaksiOpen(false)}
+                      className={`flex items-center gap-2 px-4 py-2.5 text-sm transition ${pathname === '/transaksi/buat' ? 'text-[#121358] font-semibold bg-[#121358]/5' : 'text-gray-700 hover:bg-gray-50'}`}>
+                      Buat Transaksi
+                    </Link>
+                    <Link href="/transaksi/riwayat" onClick={() => setTransaksiOpen(false)}
+                      className={`flex items-center gap-2 px-4 py-2.5 text-sm transition border-t border-gray-50 ${pathname.startsWith('/transaksi/riwayat') ? 'text-[#121358] font-semibold bg-[#121358]/5' : 'text-gray-700 hover:bg-gray-50'}`}>
+                      Riwayat
+                    </Link>
+                    <Link href="/transaksi/setting" onClick={() => setTransaksiOpen(false)}
+                      className={`flex items-center gap-2 px-4 py-2.5 text-sm transition border-t border-gray-50 ${pathname.startsWith('/transaksi/setting') ? 'text-[#121358] font-semibold bg-[#121358]/5' : 'text-gray-700 hover:bg-gray-50'}`}>
+                      Setting
+                    </Link>
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* Activity link */}
             <Link href="/activity" className={`${linkClass(pathname.startsWith('/activity'))} relative`}>

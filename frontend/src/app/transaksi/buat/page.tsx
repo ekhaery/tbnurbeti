@@ -4,9 +4,8 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faTrash, faChevronLeft } from '@fortawesome/free-solid-svg-icons'
+import { faTrash, faChevronLeft, faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 import Link from 'next/link'
-import TransaksiTabs from '@/lib/TransaksiTabs'
 import { localDateStr } from '@/lib/date'
 
 type Product = {
@@ -276,14 +275,14 @@ export default function BuatTransaksiPage() {
     <>
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
-        <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#121358] hover:opacity-70 transition">
-          <FontAwesomeIcon icon={faChevronLeft} className="w-3 h-3" /> Home
-        </Link>
-        <TransaksiTabs />
-
-        <div>
-          <h2 className="text-lg font-bold text-gray-800">Buat Transaksi</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Catat penjualan produk.</p>
+        <div className="flex items-center gap-3">
+          <Link href="/" className="w-8 h-8 flex items-center justify-center rounded-full bg-white shadow-sm text-gray-500 hover:text-gray-800 transition shrink-0">
+            <FontAwesomeIcon icon={faArrowLeft} className="w-3.5 h-3.5" />
+          </Link>
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">Buat Transaksi</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Catat penjualan produk.</p>
+          </div>
         </div>
 
         {success && (
