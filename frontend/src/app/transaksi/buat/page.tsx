@@ -55,6 +55,7 @@ export default function BuatTransaksiPage() {
   const [items, setItems] = useState<ItemRow[]>([])
   const [current, setCurrent] = useState<ItemRow>(emptyItem())
   const [autocomplete, setAutocomplete] = useState<AutocompleteState>({ open: false, focused: -1 })
+  const [entryKey, setEntryKey] = useState(0)
   const [isInitialTransformation, setIsInitialTransformation] = useState(true)
   const [showConfirm, setShowConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -118,7 +119,7 @@ export default function BuatTransaksiPage() {
   }
 
   const selectProduct = (product: Product) => {
-    setCurrent(prev => ({ ...prev, product_id: product.id, query: product.name, price_sold: String(product.price) }))
+    setCurrent(prev => ({ ...prev, product_id: product.id, query: product.name, price_sold: String(product.price), qty: prev.qty || '1' }))
     setAutocomplete({ open: false, focused: -1 })
   }
 
@@ -127,6 +128,7 @@ export default function BuatTransaksiPage() {
     setItems(prev => [...prev, current])
     setCurrent(emptyItem())
     setAutocomplete({ open: false, focused: -1 })
+    setEntryKey(k => k + 1)
   }
 
   const removeItem = (i: number) => {
@@ -348,6 +350,7 @@ export default function BuatTransaksiPage() {
 
           {/* Product rows */}
           {/* Single product entry */}
+          <div key={entryKey}>
           {(() => {
             const selectedProduct = products.find(p => p.id === Number(current.product_id))
             const sErr = currentStockError()
@@ -426,6 +429,7 @@ export default function BuatTransaksiPage() {
               </div>
             )
           })()}
+          </div>
 
           <button
             type="button"
@@ -443,7 +447,7 @@ export default function BuatTransaksiPage() {
           {/* Col 3 — dark navy summary card (5/12) */}
           <div className="col-span-12 md:col-span-5">
             <div className="rounded-2xl p-6 min-h-[400px] flex flex-col gap-4" style={{ backgroundColor: '#121358' }}>
-              <p className="text-xs font-semibold text-white/50 uppercase tracking-widest">Ringkasan Transaksi</p>
+              <p className="text-xs font-semibold text-white uppercase tracking-widest">Ringkasan Transaksi</p>
 
               {validItems.length === 0 ? (
                 <p className="text-white/30 text-sm">Belum ada produk dipilih.</p>
