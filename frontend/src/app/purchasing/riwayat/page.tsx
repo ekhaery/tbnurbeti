@@ -407,10 +407,8 @@ export default function RiwayatPurchasingPage() {
               return (
                 <div key={p.id} className="relative bg-white rounded-xl shadow-sm">
                   <button
-                    onClick={() => {
-                      if (!isInit) openProductModal(p)
-                    }}
-                    className={`w-full px-4 py-3 pr-12 text-left transition ${isInit ? 'cursor-default' : 'hover:bg-gray-50'}`}
+                    onClick={() => openProductModal(p)}
+                    className="w-full px-4 py-3 pr-12 text-left transition hover:bg-gray-50"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -551,16 +549,26 @@ export default function RiwayatPurchasingPage() {
               <span className="text-sm font-bold text-[#121358]">Rp {fmt(productModal.total)}</span>
             </div>
 
-            {/* Tandai Tiba button — only for created status */}
-            {productModal.status === 'created' && (
-              <div className="px-5 py-4 border-t border-gray-100">
+            <div className="px-5 py-4 border-t border-gray-100 space-y-2">
+              {productModal.status === 'created' && (
                 <button onClick={handleTandaiTibaFromModal} disabled={tandaiTibaConfirming}
                   className="w-full py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold flex items-center justify-center gap-2 transition">
                   <FontAwesomeIcon icon={faBoxOpen} className="w-3.5 h-3.5" style={{ color: '#9FA1FF' }} />
                   {tandaiTibaConfirming ? 'Menyimpan...' : 'Tandai Tiba & Update Stok'}
                 </button>
-              </div>
-            )}
+              )}
+              {productModal.status !== 'completed' && (
+                <button
+                  onClick={() => {
+                    const p = list.find(x => x.id === productModal.id)
+                    if (p) { setProductModal(null); openEdit(p, { stopPropagation: () => {} } as React.MouseEvent) }
+                  }}
+                  className="w-full py-2.5 rounded-xl border border-[#121358] text-[#121358] text-sm font-semibold hover:bg-[#121358]/5 flex items-center justify-center gap-2 transition">
+                  <FontAwesomeIcon icon={faPen} className="w-3 h-3" />
+                  Edit Purchasing
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
