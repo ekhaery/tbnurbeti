@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
+import { localDateStr } from '@/lib/date'
 
 type Tab = 'purchasing' | 'operasional'
 
@@ -26,6 +27,9 @@ export default function LaporanPengeluaranPage() {
   const [tab, setTab] = useState<Tab>('purchasing')
   const [rows, setRows] = useState<OutflowRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [dateFrom, setDateFrom] = useState(localDateStr())
+  const [dateTo, setDateTo] = useState(localDateStr())
+  const [supplierFilter, setSupplierFilter] = useState('')
 
   useEffect(() => {
     async function fetchData() {
@@ -38,17 +42,14 @@ export default function LaporanPengeluaranPage() {
           debt_loan:debt_loan_id ( debt_type, supplier_id, suppliers:supplier_id ( name ) ),
           users:paid_by ( name )
         `)
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
         .order('date', { ascending: false })
       setRows((data as OutflowRow[]) ?? [])
       setLoading(false)
     }
     fetchData()
-  }, [])
-
-  const purchasing = rows.filter(r => r.purchasing_id !== null)
-  const operasional = rows.filter(r => r.purchasing_id === null)
-
-  const displayed = tab === 'purchasing' ? purchasing : operasional
+  }, [dateFrom, dateTo])
 
   function getSupplierName(r: OutflowRow) {
     if (r.purchasing?.suppliers?.name) return r.purchasing.suppliers.name
@@ -62,7 +63,11 @@ export default function LaporanPengeluaranPage() {
     return r.category ?? '—'
   }
 
-  const total = displayed.reduce((sum, r) => sum + (r.amount ?? 0), 0)
+  const filtered = rows
+    .filter(r => tab === 'purchasing' ? r.purchasing_id !== null : r.purchasing_id === null)
+    .filter(r => !supplierFilter || getSupplierName(r).toLowerCase().includes(supplierFilter.toLowerCase()))
+
+  const total = filtered.reduce((sum, r) => sum + (r.amount ?? 0), 0)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -83,20 +88,45 @@ export default function LaporanPengeluaranPage() {
           ))}
         </div>
 
+        {/* Filter card */}
+        <div className="rounded-2xl shadow-sm px-4 py-3 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
+          <p className="text-xs font-semibold text-[#121358] uppercase tracking-wide">Filter</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-semibold text-[#121358] mb-1">Dari</label>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                className="w-auto border border-gray-200 bg-white rounded-lg px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#121358] mb-1">Sampai</label>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                className="w-auto border border-gray-200 bg-white rounded-lg px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+            </div>
+          </div>
+          {tab === 'purchasing' && (
+            <div>
+              <label className="block text-[10px] font-semibold text-[#121358] mb-1">Supplier</label>
+              <input type="text" value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)}
+                placeholder="Cari supplier..."
+                className="w-full border border-gray-200 bg-white rounded-lg px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+            </div>
+          )}
+        </div>
+
         {/* Total */}
         <div className="bg-white rounded-2xl shadow-sm px-4 py-3 flex justify-between items-center">
           <span className="text-xs text-gray-500">Total {tab === 'purchasing' ? 'Purchasing' : 'Operasional'}</span>
           <span className="text-sm font-bold text-[#121358]">Rp {fmt(total)}</span>
         </div>
 
-        {/* Table */}
+        {/* List */}
         {loading ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat data...</div>
-        ) : displayed.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-10">Tidak ada data.</div>
         ) : (
           <div className="space-y-2">
-            {displayed.map(r => (
+            {filtered.map(r => (
               <div key={r.id} className="bg-white rounded-2xl shadow-sm px-4 py-3 space-y-1.5">
                 <div className="flex justify-between items-start">
                   <div className="space-y-0.5">
