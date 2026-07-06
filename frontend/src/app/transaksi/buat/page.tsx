@@ -278,7 +278,6 @@ export default function BuatTransaksiPage() {
     }
     setPrintData(pd)
     setSuccess(`Transaksi ${code} berhasil disimpan.`)
-    epsonPrint(pd).catch(err => setError(`Print gagal: ${err.message}`))
     setNotes('')
     setItems([])
     setCurrent(emptyItem())
