@@ -364,6 +364,7 @@ export default function BuatTransaksiPage() {
               <div className="rounded-xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#121358' }}>
                 <div className="relative">
                   <p className="text-xs font-semibold text-white uppercase tracking-wide mb-3">Tambahkan Produk</p>
+                  <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={current.query}
@@ -382,8 +383,15 @@ export default function BuatTransaksiPage() {
                     }}
                     placeholder="Cari produk..."
                     autoComplete="off"
-                    className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white ${current.product_id ? 'border-[#121358]/40' : 'border-gray-300'}`}
+                    className={`flex-1 border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white ${current.product_id ? 'border-[#121358]/40' : 'border-gray-300'}`}
                   />
+                  {current.query && (
+                    <button type="button" onMouseDown={() => { setCurrent(emptyItem()); setAutocomplete({ open: false, focused: -1 }) }}
+                      className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-pink-200/20 hover:bg-pink-300/30 text-pink-300 hover:text-pink-400 transition">
+                      <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                    </button>
+                  )}
+                  </div>
                   {autocomplete.open && filteredProducts(current.query).length > 0 && (
                     <div className="absolute z-20 left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-[26rem] overflow-y-auto w-[124%]">
                       {filteredProducts(current.query).map((p, optIdx) => (
