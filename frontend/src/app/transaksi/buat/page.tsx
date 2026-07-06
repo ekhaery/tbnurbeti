@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faTrash, faChevronLeft, faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 import Link from 'next/link'
 import { localDateStr } from '@/lib/date'
+import { epsonPrint } from '@/lib/epsonPrint'
 
 type Product = {
   id: number
@@ -105,7 +106,9 @@ export default function BuatTransaksiPage() {
     setProducts(allProducts.map(p => ({ ...p, stock: stockMap[p.id] ?? 0 })))
   }
 
-  useEffect(() => { fetchProducts() }, [])
+  useEffect(() => {
+    fetchProducts()
+  }, [])
 
   const updateCurrent = (field: keyof ItemRow, value: string) => {
     setCurrent(prev => {
@@ -260,8 +263,7 @@ export default function BuatTransaksiPage() {
     }
 
     setSubmitting(false)
-    setSuccess(`Transaksi ${code} berhasil disimpan.`)
-    setPrintData({
+    const pd = {
       code,
       date,
       items: validItems.map(r => ({
@@ -272,7 +274,10 @@ export default function BuatTransaksiPage() {
       })),
       total,
       notes: notes.trim(),
-    })
+    }
+    setPrintData(pd)
+    setSuccess(`Transaksi ${code} berhasil disimpan.`)
+    epsonPrint(pd).catch(err => setError(`Print gagal: ${err.message}`))
     setNotes('')
     setItems([])
     setCurrent(emptyItem())
