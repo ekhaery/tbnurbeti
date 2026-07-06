@@ -59,6 +59,7 @@ export default function BuatTransaksiPage() {
   const [entryKey, setEntryKey] = useState(0)
   const [isInitialTransformation, setIsInitialTransformation] = useState(true)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [previewCode, setPreviewCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -185,7 +186,7 @@ export default function BuatTransaksiPage() {
     }
 
     setSubmitting(true)
-    const code = generateCode()
+    const code = previewCode || generateCode()
 
     // 1. Insert transaction header
     const { data: trx, error: trxErr } = await supabase
@@ -544,7 +545,7 @@ export default function BuatTransaksiPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => { if (validItems.length > 0) setShowConfirm(true) }}
+                  onClick={() => { if (validItems.length > 0) { setPreviewCode(generateCode()); setShowConfirm(true) } }}
                   disabled={submitting || validItems.length === 0}
                   className="w-full py-3 rounded-xl font-bold text-sm disabled:opacity-30 transition hover:brightness-105"
                   style={{ backgroundColor: '#ffc908', color: '#121358' }}
@@ -575,32 +576,55 @@ export default function BuatTransaksiPage() {
                 <p className="text-[10px] text-gray-400 mt-0.5">Periksa kembali sebelum menyimpan.</p>
               </div>
               <div className="overflow-y-auto px-4 py-3 space-y-3" style={{ maxHeight: 'calc(80vh - 110px)' }}>
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Tanggal</span>
-                  <span className="font-semibold text-gray-700">{date}</span>
-                </div>
                 {isInitialTransformation && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 text-[10px] font-semibold text-amber-700">
                     Initial Transformation — COGS & stok tidak dicatat sekarang.
                   </div>
                 )}
-                <div className="space-y-2">
+
+                {/* Receipt preview */}
+                <div className="bg-white border border-dashed border-gray-300 rounded-xl px-3 py-3 font-mono text-[10px] text-gray-800 leading-relaxed">
+                  <p className="text-center">{'================================'}</p>
+                  <p className="text-center font-bold">TB. NURBETI</p>
+                  <p className="text-center">Jl. KS. Tubun No. 46</p>
+                  <p className="text-center">Tegal</p>
+                  <p className="text-center">HP Admin: 0815-4806-4220</p>
+                  <p className="text-center">{'================================'}</p>
+                  <p>No. Invoice : {previewCode}</p>
+                  <p>Tanggal&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : {date ? new Date(date + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</p>
+                  <p>{'--------------------------------'}</p>
+                  <p>Nama Barang&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Qty&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Total</p>
+                  <p>{'--------------------------------'}</p>
                   {validItems.map((row, i) => {
                     const product = products.find(p => p.id === Number(row.product_id))
+                    const priceSold = parseFloat(row.price_sold) || 0
+                    const disc = parseFloat(row.discount) || 0
+                    const qty = parseInt(row.qty) || 0
+                    const sub = priceSold * qty - disc
                     return (
-                      <div key={i} className="bg-gray-50 rounded-xl px-3 py-2.5 space-y-1">
-                        <p className="text-xs font-semibold text-gray-800">{product?.name ?? '-'}</p>
-                        <div className="flex justify-between text-[10px] text-gray-500">
-                          <span>{row.qty} × Rp {fmt(parseFloat(row.price_sold) || 0)}{parseFloat(row.discount) > 0 ? ` − Rp ${fmt(parseFloat(row.discount))} diskon` : ''}</span>
-                          <span className="font-semibold text-gray-700">Rp {fmt(subtotal(row))}</span>
-                        </div>
+                      <div key={i}>
+                        <p className="font-semibold truncate">{product?.name ?? '—'}</p>
+                        <p className="pl-2 text-gray-600">
+                          {disc > 0 && <span>Disc: Rp {fmt(disc)}{'\n'}</span>}
+                          {qty} pcs &nbsp;&nbsp; Rp {fmt(sub)}
+                        </p>
                       </div>
                     )
                   })}
-                </div>
-                <div className="flex justify-between items-center pt-1 border-t border-gray-100">
-                  <span className="text-xs text-gray-500">Total</span>
-                  <span className="text-sm font-bold text-[#121358]">Rp {fmt(total)}</span>
+                  <p>{'--------------------------------'}</p>
+                  <p className="font-bold">TOTAL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Rp {fmt(total)}</p>
+                  <p>&nbsp;</p>
+                  <p>Terima kasih atas kepercayaan Anda.</p>
+                  <p>&nbsp;</p>
+                  <p className="font-bold">Ketentuan Pengembalian Barang:</p>
+                  <p>- Konfirmasi sebelum pengembalian.</p>
+                  <p>- Maksimal 1 hari setelah barang diterima.</p>
+                  <p>- Barang belum digunakan dan kemasan</p>
+                  <p>&nbsp;&nbsp;masih utuh.</p>
+                  <p>- Nota asli wajib dibawa.</p>
+                  <p>- Barang pesanan khusus atau yang telah</p>
+                  <p>&nbsp;&nbsp;dipotong tidak dapat dikembalikan.</p>
+                  <p>{'================================'}</p>
                 </div>
               </div>
               <div className="flex gap-2 px-4 py-3 border-t border-gray-100">

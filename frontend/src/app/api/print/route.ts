@@ -83,57 +83,71 @@ function buildEscPos(payload: PrintPayload): Buffer {
   const push = (...b: number[]) => bytes.push(...b)
   const text = (s: string) => bytes.push(...Buffer.from(s, 'utf8'))
   const line = (s = '') => { text(s); push(LF) }
-  const divider = () => line('--------------------------------')
+  const center = () => push(ESC, 0x61, 1)
+  const left = () => push(ESC, 0x61, 0)
+  const bold = (on: boolean) => push(ESC, 0x45, on ? 1 : 0)
+  const wide = () => line('================================')
+  const thin = () => line('--------------------------------')
 
   // Initialize printer
   push(ESC, 0x40)
 
-  // Center align
-  push(ESC, 0x61, 1)
+  // Header
+  center()
+  wide()
+  bold(true)
+  line('TB. NURBETI')
+  bold(false)
+  line('Jl. KS. Tubun No. 46')
+  line('Tegal')
+  line('HP Admin: 0815-4806-4220')
+  wide()
 
-  // Bold on, double size
-  push(ESC, 0x45, 1)
-  push(GS, 0x21, 0x11)
-  line('TOKO')
-
-  // Reset size, bold off
-  push(GS, 0x21, 0x00)
-  push(ESC, 0x45, 0)
-
-  // Left align
-  push(ESC, 0x61, 0)
-  divider()
-
+  // Invoice info
+  left()
   const dateStr = new Date(payload.date + 'T00:00:00').toLocaleDateString('id-ID', {
     day: 'numeric', month: 'long', year: 'numeric'
   })
-  line(`No : ${payload.code}`)
-  line(`Tgl: ${dateStr}`)
-  divider()
+  line(`No. Invoice : ${payload.code}`)
+  line(`Tanggal     : ${dateStr}`)
+
+  // Items
+  thin()
+  line('Nama Barang      Qty      Total')
+  thin()
 
   for (const item of payload.items) {
     const subtotal = item.price_sold * item.qty - item.discount
     line(item.name)
-    let detail = `  ${item.qty} x Rp ${fmt(item.price_sold)}`
-    if (item.discount > 0) detail += ` - Rp ${fmt(item.discount)}`
-    detail += `  = Rp ${fmt(subtotal)}`
-    line(detail)
+    if (item.discount > 0) line(`  Disc: Rp ${fmt(item.discount)}`)
+    line(`  ${item.qty} pcs        Rp ${fmt(subtotal)}`)
   }
 
-  divider()
+  thin()
 
-  // Bold total
-  push(ESC, 0x45, 1)
-  line(`TOTAL: Rp ${fmt(payload.total)}`)
-  push(ESC, 0x45, 0)
+  // Total
+  bold(true)
+  line(`TOTAL          Rp ${fmt(payload.total)}`)
+  bold(false)
 
-  if (payload.notes) {
-    line(`Catatan: ${payload.notes}`)
-  }
+  line('')
+  line('Terima kasih atas kepercayaan Anda.')
+  line('')
+  bold(true)
+  line('Ketentuan Pengembalian Barang:')
+  bold(false)
+  line('- Konfirmasi sebelum pengembalian.')
+  line('- Maksimal 1 hari setelah barang diterima.')
+  line('- Barang belum digunakan dan kemasan')
+  line('  masih utuh.')
+  line('- Nota asli wajib dibawa.')
+  line('- Barang pesanan khusus atau yang telah')
+  line('  dipotong tidak dapat dikembalikan.')
+  wide()
 
   // Feed and cut
   push(LF, LF, LF)
-  push(GS, 0x56, 0x41, 0x03) // partial cut with feed
+  push(GS, 0x56, 0x41, 0x03)
 
   return Buffer.from(bytes)
 }
