@@ -328,7 +328,7 @@ export default function BuatTransaksiPage() {
                       type="date"
                       value={date}
                       onChange={e => setDate(e.target.value)}
-                      className="w-auto border border-[#e6b400] bg-white rounded-lg px-2 py-1.5 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                      className="w-44 border border-[#e6b400] bg-white rounded-lg px-2 py-1.5 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358]"
                       required
                     />
                   </div>
