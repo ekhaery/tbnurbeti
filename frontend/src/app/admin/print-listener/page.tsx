@@ -96,10 +96,12 @@ export default function PrintListenerPage() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'transactions' },
         (payload: { new: { id: string | number } }) => {
+          console.log('[PrintListener] New transaction:', payload.new)
           printTransaction(String(payload.new.id))
         }
       )
       .subscribe((status: string) => {
+        console.log('[PrintListener] Realtime status:', status)
         setConnected(status === 'SUBSCRIBED')
       })
 

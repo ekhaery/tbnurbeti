@@ -315,7 +315,7 @@ export default function BuatTransaksiPage() {
           <div className="col-span-12 md:col-span-7 space-y-4">
 
             {/* Top row: Info Transaksi (3) + Produk card (4) */}
-            <div className="grid grid-cols-7 gap-4 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-start">
 
               {/* Info Transaksi + Photo — 3/7 */}
               <div className="col-span-7 md:col-span-3 space-y-4">
@@ -358,7 +358,7 @@ export default function BuatTransaksiPage() {
                   </div>
                 </div>
                 {/* Photo card — directly below Info Transaksi */}
-                <div className="bg-white rounded-xl shadow-sm flex items-center justify-center text-gray-300 text-xs h-32">
+                <div className="hidden md:flex bg-white rounded-xl shadow-sm items-center justify-center text-gray-300 text-xs h-32">
                   <span className="text-center px-2">Gambar Produk<br/>(upcoming)</span>
                 </div>
               </div>{/* end Info Transaksi + Photo */}
@@ -471,7 +471,7 @@ export default function BuatTransaksiPage() {
                     type="button"
                     onClick={addItem}
                     disabled={!current.product_id || !current.qty}
-                    className="w-full rounded-xl py-[4.375rem] text-sm font-semibold text-[#121358] disabled:opacity-40 disabled:cursor-not-allowed transition hover:brightness-105"
+                    className="w-full rounded-xl py-2.5 md:py-[4.375rem] text-sm font-semibold text-[#121358] disabled:opacity-40 disabled:cursor-not-allowed transition hover:brightness-105"
                     style={{ backgroundColor: '#ffc908' }}
                   >
                     + Tambah Produk
