@@ -395,7 +395,7 @@ export default function BuatTransaksiPage() {
                   />
                   {current.query && (
                     <button type="button" onMouseDown={() => { setCurrent(emptyItem()); setAutocomplete({ open: false, focused: -1 }) }}
-                      className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-pink-200/20 hover:bg-pink-300/30 text-pink-300 hover:text-pink-400 transition">
+                      className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-red-400/20 hover:bg-red-400/30 text-red-400 hover:text-red-500 transition">
                       <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
                     </button>
                   )}
@@ -523,7 +523,7 @@ export default function BuatTransaksiPage() {
                           </div>
                         </div>
                         <button type="button" onClick={() => removeItem(i)}
-                          className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-pink-200/20 hover:bg-pink-300/30 text-pink-300 hover:text-pink-400 transition">
+                          className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-red-400/20 hover:bg-red-400/30 text-red-400 hover:text-red-500 transition">
                           <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
                         </button>
                       </div>
