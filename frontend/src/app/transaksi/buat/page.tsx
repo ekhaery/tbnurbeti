@@ -406,12 +406,13 @@ export default function BuatTransaksiPage() {
                     </div>
                   )}
                   {selectedProduct && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Harga jual: <span className="font-semibold text-gray-600">Rp {fmt(selectedProduct.price)}</span>
+                    <p className="text-xs mt-1" style={{ color: '#ffc908' }}>
+                      <span className="font-normal">Harga jual:</span> <span className="font-semibold">Rp {fmt(selectedProduct.price)}</span>
                       <span className="mx-1">·</span>
-                      Stok: <span className="font-semibold text-gray-600">{selectedProduct.stock}</span>
+                      <span className="font-normal">Stok:</span> <span className="font-semibold">{selectedProduct.stock}</span>
                     </p>
                   )}
+                  <div className="mt-6" />
                 </div>
 
                 <div className="grid grid-cols-3 gap-3 mt-2">
@@ -436,8 +437,8 @@ export default function BuatTransaksiPage() {
                 </div>
 
                 {current.qty && current.price_sold && (
-                  <p className="text-xs text-gray-400 text-right">
-                    Subtotal: <span className="font-semibold text-gray-700">Rp {fmt(subtotal(current))}</span>
+                  <p className="text-sm text-white text-right">
+                    Subtotal: <span className="font-bold text-base" style={{ color: '#ffc908' }}>Rp {fmt(subtotal(current))}</span>
                   </p>
                 )}
 
@@ -489,9 +490,9 @@ export default function BuatTransaksiPage() {
                     return (
                       <div key={i} className="bg-white/10 rounded-xl px-3 py-2.5 flex items-center gap-2">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-white truncate">{product?.name ?? '-'}</p>
-                          <div className="flex justify-between text-xs text-white/60 mt-0.5">
-                            <span>{row.qty} × Rp {fmt(parseFloat(row.price_sold) || 0)}{parseFloat(row.discount) > 0 ? ` − Rp ${fmt(parseFloat(row.discount))}` : ''}</span>
+                          <p className="text-[15px] font-semibold text-white truncate">{product?.name ?? '-'}</p>
+                          <div className="flex justify-between text-sm text-white/60 mt-0.5">
+                            <span><span className="font-bold text-white">{row.qty}</span> × Rp {fmt(parseFloat(row.price_sold) || 0)}{parseFloat(row.discount) > 0 ? ` − Rp ${fmt(parseFloat(row.discount))}` : ''}</span>
                             <span className="font-semibold text-white">Rp {fmt(subtotal(row))}</span>
                           </div>
                         </div>
