@@ -406,13 +406,14 @@ export default function BuatTransaksiPage() {
                   )}
                   </div>
                   {autocomplete.open && filteredProducts(current.query).length > 0 && (
-                    <div className="absolute z-20 left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-[26rem] overflow-y-auto w-[124%]">
+                    <div className="absolute z-20 left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-[26rem] overflow-y-auto w-full md:w-[124%]">
                       {filteredProducts(current.query).map((p, optIdx) => (
                         <button key={p.id} type="button" onMouseDown={() => selectProduct(p)}
                           className={`w-full text-left px-4 py-2.5 text-sm transition flex items-center justify-between gap-3 ${autocomplete.focused === optIdx ? 'bg-[#121358] text-white' : 'hover:bg-gray-50 text-gray-700'}`}>
                           <span className="font-medium">{p.name}</span>
                           <span className={`text-xs shrink-0 ${autocomplete.focused === optIdx ? 'text-white/70' : 'text-gray-400'}`}>
-                            Rp {p.price.toLocaleString('id-ID')} · stok: {p.stock}
+                            <span className="hidden md:inline">Rp {p.price.toLocaleString('id-ID')} · stok: {p.stock}</span>
+                            <span className="md:hidden">Rp {p.price.toLocaleString('id-ID')} | <span className="font-bold">{p.stock}</span></span>
                           </span>
                         </button>
                       ))}
