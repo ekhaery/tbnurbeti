@@ -135,6 +135,14 @@ export default function BuatTransaksiPage() {
     setItems(prev => prev.filter((_, idx) => idx !== i))
   }
 
+  const updateItemQty = (i: number, delta: number) => {
+    setItems(prev => prev.map((row, idx) => {
+      if (idx !== i) return row
+      const newQty = Math.max(1, (parseInt(row.qty) || 1) + delta)
+      return { ...row, qty: String(newQty) }
+    }))
+  }
+
   const filteredProducts = (query: string) => {
     const withStock = products.filter(p => p.stock > 0)
     return query.trim() === ''
@@ -492,7 +500,14 @@ export default function BuatTransaksiPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-[15px] font-semibold text-white truncate">{product?.name ?? '-'}</p>
                           <div className="flex justify-between text-sm text-white/60 mt-0.5">
-                            <span><span className="font-bold text-white">{row.qty}</span> × Rp {fmt(parseFloat(row.price_sold) || 0)}{parseFloat(row.discount) > 0 ? ` − Rp ${fmt(parseFloat(row.discount))}` : ''}</span>
+                            <div className="flex items-center gap-1.5">
+                              <button type="button" onClick={() => updateItemQty(i, -1)}
+                                className="w-5 h-5 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-xs transition leading-none">−</button>
+                              <span className="font-bold text-white">{row.qty}</span>
+                              <button type="button" onClick={() => updateItemQty(i, 1)}
+                                className="w-5 h-5 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-xs transition leading-none">+</button>
+                              <span className="ml-1">× Rp {fmt(parseFloat(row.price_sold) || 0)}{parseFloat(row.discount) > 0 ? ` − Rp ${fmt(parseFloat(row.discount))}` : ''}</span>
+                            </div>
                             <span className="font-semibold text-white">Rp {fmt(subtotal(row))}</span>
                           </div>
                         </div>
