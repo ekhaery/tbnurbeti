@@ -423,24 +423,35 @@ export default function BuatTransaksiPage() {
                   <div className="mt-6" />
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 mt-2">
+                <div className="space-y-3 mt-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-white/80 mb-1">Harga Jual</label>
+                      <input type="number" value={current.price_sold} disabled placeholder="0"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white text-gray-400 cursor-not-allowed" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-white/80 mb-1">Diskon</label>
+                      <input type="number" value={current.discount} onChange={e => updateCurrent('discount', e.target.value)}
+                        placeholder="0" min="0"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white" />
+                    </div>
+                  </div>
                   <div>
                     <label className="block text-xs text-white/80 mb-1">Qty <span className="text-red-300">*</span></label>
-                    <input type="number" value={current.qty} onChange={e => updateCurrent('qty', e.target.value)}
-                      placeholder="0" min="1"
-                      className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white ${sErr ? 'border-red-400' : 'border-gray-300'}`} />
-                    {sErr && <p className="text-xs text-red-500 mt-1">{sErr}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-xs text-white/80 mb-1">Harga Jual</label>
-                    <input type="number" value={current.price_sold} disabled placeholder="0"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white text-gray-400 cursor-not-allowed" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-white/80 mb-1">Diskon</label>
-                    <input type="number" value={current.discount} onChange={e => updateCurrent('discount', e.target.value)}
-                      placeholder="0" min="0"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white" />
+                    <div className="flex items-center gap-2">
+                      <button type="button"
+                        onClick={() => updateCurrent('qty', String(Math.max(1, (parseInt(current.qty) || 1) - 1)))}
+                        className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-400 hover:bg-red-500 text-white font-bold text-lg transition shrink-0">−</button>
+                      <input type="number" value={current.qty} onChange={e => updateCurrent('qty', e.target.value)}
+                        placeholder="0" min="1"
+                        className={`flex-1 border rounded-lg px-3 py-2.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white ${sErr ? 'border-red-400' : 'border-gray-300'}`} />
+                      <button type="button"
+                        onClick={() => updateCurrent('qty', String((parseInt(current.qty) || 0) + 1))}
+                        className="w-9 h-9 flex items-center justify-center rounded-lg font-bold text-lg transition shrink-0"
+                        style={{ backgroundColor: '#ffc908', color: '#121358' }}>+</button>
+                    </div>
+                    {sErr && <p className="text-xs text-red-300 mt-1">{sErr}</p>}
                   </div>
                 </div>
 
