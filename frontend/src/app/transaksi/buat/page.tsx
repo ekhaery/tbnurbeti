@@ -319,7 +319,7 @@ export default function BuatTransaksiPage() {
 
               {/* Info Transaksi + Photo — 3/7 */}
               <div className="col-span-7 md:col-span-3 space-y-4">
-                <div className="rounded-xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#ffc908' }}>
+                <div className="rounded-xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
                   <p className="text-xs font-semibold text-[#121358] uppercase tracking-wide">Info Transaksi</p>
 
                   <div>
@@ -328,7 +328,7 @@ export default function BuatTransaksiPage() {
                       type="date"
                       value={date}
                       onChange={e => setDate(e.target.value)}
-                      className="w-44 border border-[#e6b400] bg-white rounded-lg px-2 py-1.5 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                      className="w-44 border border-[#9099e8] bg-white rounded-lg px-2 py-1.5 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358]"
                       required
                     />
                   </div>
@@ -340,7 +340,7 @@ export default function BuatTransaksiPage() {
                       onChange={e => setNotes(e.target.value)}
                       placeholder="Opsional"
                       rows={1}
-                      className="w-full border border-[#e6b400] bg-white rounded-lg px-3 py-2.5 text-sm text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358] resize-none overflow-hidden"
+                      className="w-full border border-[#9099e8] bg-white rounded-lg px-3 py-2.5 text-sm text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358] resize-none overflow-hidden"
                       style={{ height: 'auto' }}
                       onInput={e => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px' }}
                     />
@@ -494,7 +494,7 @@ export default function BuatTransaksiPage() {
           <div className="col-span-12 md:col-span-5">
             <div className="rounded-2xl p-6 min-h-[400px] flex flex-col gap-4" style={{ backgroundColor: '#121358' }}>
               <div className="text-center">
-                <p className="text-xs uppercase tracking-widest -mx-6 -mt-6 px-6 py-3 rounded-t-2xl font-semibold" style={{ backgroundColor: '#ffc908', color: '#121358' }}>
+                <p className="text-xs uppercase tracking-widest -mx-6 -mt-6 px-6 py-3 rounded-t-2xl font-semibold" style={{ backgroundColor: '#B5BAFF', color: '#121358' }}>
                   <span className="font-semibold">Ringkasan Transaksi</span>
                   {date ? <span className="font-normal"> | {new Date(date + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span> : ''}
                 </p>
