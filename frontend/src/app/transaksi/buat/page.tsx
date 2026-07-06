@@ -304,8 +304,8 @@ export default function BuatTransaksiPage() {
             {/* Top row: Info Transaksi (3) + Produk card (4) */}
             <div className="grid grid-cols-7 gap-4 items-start">
 
-              {/* Info Transaksi — 3/7 */}
-              <div className="col-span-7 md:col-span-3">
+              {/* Info Transaksi + Photo — 3/7 */}
+              <div className="col-span-7 md:col-span-3 space-y-4">
                 <div className="rounded-xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#ffc908' }}>
                   <p className="text-xs font-semibold text-[#121358] uppercase tracking-wide">Info Transaksi</p>
 
@@ -344,7 +344,11 @@ export default function BuatTransaksiPage() {
                     </button>
                   </div>
                 </div>
-              </div>{/* end Info Transaksi */}
+                {/* Photo card — directly below Info Transaksi */}
+                <div className="bg-white rounded-xl shadow-sm flex items-center justify-center text-gray-300 text-xs h-32">
+                  <span className="text-center px-2">Gambar Produk<br/>(upcoming)</span>
+                </div>
+              </div>{/* end Info Transaksi + Photo */}
 
               {/* Produk entry form — 4/7 */}
               <div className="col-span-7 md:col-span-4">
@@ -449,15 +453,6 @@ export default function BuatTransaksiPage() {
 
               </div>{/* end Produk entry col (4/7) */}
             </div>{/* end top row grid (3+4) */}
-
-            {/* Photo card — 3/7, below Info Transaksi */}
-            <div className="grid grid-cols-7 gap-4">
-              <div className="col-span-7 md:col-span-3">
-                <div className="bg-white rounded-xl shadow-sm flex items-center justify-center text-gray-300 text-xs h-32">
-                  <span className="text-center px-2">Gambar Produk<br/>(upcoming)</span>
-                </div>
-              </div>
-            </div>
 
           </div>{/* end left 7-col */}
 
