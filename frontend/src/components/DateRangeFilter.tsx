@@ -16,13 +16,13 @@ export default function DateRangeFilter({ dateFrom, dateTo, onFromChange, onToCh
           <label className="block text-[10px] font-semibold text-[#121358] mb-1">Dari</label>
           <input type="date" value={dateFrom} onChange={e => onFromChange(e.target.value)}
             style={{ fontSize: '11px' }}
-            className="w-full bg-white border border-gray-200 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+            className="w-auto bg-white border border-gray-200 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
         </div>
         <div>
           <label className="block text-[10px] font-semibold text-[#121358] mb-1">Sampai</label>
           <input type="date" value={dateTo} onChange={e => onToChange(e.target.value)}
             style={{ fontSize: '11px' }}
-            className="w-full bg-white border border-gray-200 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+            className="w-auto bg-white border border-gray-200 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#121358]" />
         </div>
       </div>
     </div>
