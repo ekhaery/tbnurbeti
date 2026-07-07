@@ -61,7 +61,7 @@ export default function RiwayatTransaksiPage() {
   const [fetching, setFetching] = useState(true)
   const [expanded, setExpanded] = useState<number | null>(null)
   const [profitRows, setProfitRows] = useState<ProfitRow[]>([])
-  const [isDefaultRange, setIsDefaultRange] = useState(true)
+  const [isDefaultRange, setIsDefaultRange] = useState(!searchParams.get('from'))
 
   // Reason modal
   const [showReason, setShowReason] = useState(false)
