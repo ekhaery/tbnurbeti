@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faHandshake, faTag, faReceipt, faUserCheck, faLightbulb, faSackDollar, faBuildingColumns } from '@fortawesome/free-solid-svg-icons'
+import { faHandshake, faTag, faReceipt, faUserCheck, faLightbulb, faSackDollar, faBuildingColumns, faChartLine } from '@fortawesome/free-solid-svg-icons'
 
 const cards = [
   {
@@ -31,6 +31,14 @@ const cards = [
     bg: '#4C8CE4',
     text: 'white',
     sub: 'Buat & lihat riwayat transaksi',
+  },
+  {
+    label: 'Cashflow',
+    icon: faChartLine,
+    href: '/arus-keuangan',
+    bg: '#ffc908',
+    text: '#121358',
+    sub: 'Arus keuangan & net profit',
   },
   {
     label: 'Tagihan Dagang Insight',

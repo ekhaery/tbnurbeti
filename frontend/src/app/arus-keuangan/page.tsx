@@ -91,7 +91,7 @@ export default function ArusKeuanganPage() {
           <div className="text-center text-sm text-gray-400 py-10">Memuat data...</div>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-3 items-stretch">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
               <Link href={`/transaksi/riwayat?from=${dateFrom}&to=${dateTo}`}
                 className="rounded-2xl shadow-sm px-3 py-3 text-center bg-white hover:bg-green-50 transition flex flex-col justify-center">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1">Pemasukan</p>
