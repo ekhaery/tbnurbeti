@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faHandshake, faTag, faReceipt, faUserCheck, faLightbulb, faSackDollar, faBuildingColumns, faChartLine } from '@fortawesome/free-solid-svg-icons'
 
-const cards = [
+const primaryCards = [
   {
     label: 'Kunjungan Sales',
     icon: faHandshake,
@@ -40,6 +40,9 @@ const cards = [
     text: '#121358',
     sub: 'Arus keuangan & net profit',
   },
+]
+
+const secondaryCards = [
   {
     label: 'Tagihan Dagang Insight',
     icon: faLightbulb,
@@ -99,7 +102,7 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {cards.map(card => {
+          {primaryCards.map(card => {
             const inner = (
               <>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
@@ -125,6 +128,31 @@ export default function HomePage() {
               )
             }
 
+            return (
+              <Link key={card.label} href={card.href} className={cardClass} style={{ backgroundColor: card.bg }}>
+                {inner}
+              </Link>
+            )
+          })}
+        </div>
+
+        <div>
+          <h2 className="text-sm font-bold text-gray-700">Kewajiban Pembayaran & Biaya Operasional</h2>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {secondaryCards.map(card => {
+            const inner = (
+              <>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
+                  <FontAwesomeIcon icon={card.icon} className="w-5 h-5" style={{ color: card.text }} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold leading-tight" style={{ color: card.text }}>{card.label}</p>
+                  <p className="text-[10px] mt-0.5 opacity-70" style={{ color: card.text }}>{card.sub}</p>
+                </div>
+              </>
+            )
             return (
               <Link key={card.label} href={card.href} className={cardClass} style={{ backgroundColor: card.bg }}>
                 {inner}
