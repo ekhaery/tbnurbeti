@@ -334,17 +334,6 @@ export default function Navbar() {
           <div>
             <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Laporan</p>
             <Link
-              href="/laporan-pengeluaran"
-              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
-                pathname.startsWith('/laporan-pengeluaran')
-                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
-                  : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <FontAwesomeIcon icon={faChartBar} className="w-4 h-4 text-gray-400" />
-              Laporan Pengeluaran
-            </Link>
-            <Link
               href="/arus-keuangan"
               className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
                 pathname.startsWith('/arus-keuangan')
@@ -354,6 +343,17 @@ export default function Navbar() {
             >
               <FontAwesomeIcon icon={faChartBar} className="w-4 h-4 text-gray-400" />
               Arus Keuangan / Cashflow
+            </Link>
+            <Link
+              href="/laporan-pengeluaran"
+              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                pathname.startsWith('/laporan-pengeluaran')
+                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FontAwesomeIcon icon={faChartBar} className="w-4 h-4 text-gray-400" />
+              Laporan Pengeluaran
             </Link>
             <Link
               href="/laporan-tagihan-hutang"

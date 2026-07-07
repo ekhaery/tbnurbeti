@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { localDateStr } from '@/lib/date'
+import { useSearchParams } from 'next/navigation'
 
 type Tab = 'purchasing' | 'operasional'
 
@@ -24,11 +25,12 @@ const fmt = (n: number) => n.toLocaleString('id-ID')
 
 export default function LaporanPengeluaranPage() {
   const supabase = createClient()
+  const searchParams = useSearchParams()
   const [tab, setTab] = useState<Tab>('purchasing')
   const [rows, setRows] = useState<OutflowRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [dateFrom, setDateFrom] = useState(localDateStr())
-  const [dateTo, setDateTo] = useState(localDateStr())
+  const [dateFrom, setDateFrom] = useState(searchParams.get('from') ?? localDateStr())
+  const [dateTo, setDateTo] = useState(searchParams.get('to') ?? localDateStr())
   const [supplierFilter, setSupplierFilter] = useState('')
 
   useEffect(() => {

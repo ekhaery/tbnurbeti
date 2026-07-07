@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faChevronDown, faChevronUp, faChevronLeft, faChevronRight, faXmark, faTrash, faArrowLeft } from '@fortawesome/free-solid-svg-icons'
@@ -47,9 +48,10 @@ export default function RiwayatTransaksiPage() {
   const supabase = createClient()
   const { appUser } = useAuth()
   const isAdmin = appUser?.role === 'admin'
+  const searchParams = useSearchParams()
 
-  const [dateFrom, setDateFrom] = useState(todayStr)
-  const [dateTo, setDateTo] = useState(todayStr)
+  const [dateFrom, setDateFrom] = useState(searchParams.get('from') ?? todayStr)
+  const [dateTo, setDateTo] = useState(searchParams.get('to') ?? todayStr)
   const [productFilterInput, setProductFilterInput] = useState('')
   const [productFilter, setProductFilter] = useState('')
   const [initFilter, setInitFilter] = useState<'all' | 'normal' | 'init'>('all')
