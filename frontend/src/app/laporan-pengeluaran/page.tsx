@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { localDateStr } from '@/lib/date'
 import { useSearchParams } from 'next/navigation'
@@ -23,7 +23,7 @@ type OutflowRow = {
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
 
-export default function LaporanPengeluaranPage() {
+function LaporanPengeluaranContent() {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const [tab, setTab] = useState<Tab>('purchasing')
@@ -156,4 +156,8 @@ export default function LaporanPengeluaranPage() {
       </div>
     </div>
   )
+}
+
+export default function LaporanPengeluaranPage() {
+  return <Suspense><LaporanPengeluaranContent /></Suspense>
 }

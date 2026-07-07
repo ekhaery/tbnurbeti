@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -44,7 +44,7 @@ const PAGE_SIZE = 10
 const now = new Date()
 const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
-export default function RiwayatTransaksiPage() {
+function RiwayatTransaksiContent() {
   const supabase = createClient()
   const { appUser } = useAuth()
   const isAdmin = appUser?.role === 'admin'
@@ -808,4 +808,8 @@ export default function RiwayatTransaksiPage() {
       })()}
     </div>
   )
+}
+
+export default function RiwayatTransaksiPage() {
+  return <Suspense><RiwayatTransaksiContent /></Suspense>
 }
