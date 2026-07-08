@@ -1,0 +1,18 @@
+[Unit]
+Description=TB. Nurbeti Printer Listener
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=orangepi
+WorkingDirectory=/home/orangepi/tbnurbeti-listener
+ExecStart=/usr/bin/node listener.js
+EnvironmentFile=/home/orangepi/tbnurbeti-listener/.env
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

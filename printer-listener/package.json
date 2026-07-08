@@ -1,0 +1,13 @@
+{
+  "name": "tbnurbeti-printer-listener",
+  "version": "1.0.0",
+  "description": "Supabase Realtime → ESC/POS printer listener for Orange Pi",
+  "main": "listener.js",
+  "scripts": {
+    "start": "node listener.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5"
+  }
+}
