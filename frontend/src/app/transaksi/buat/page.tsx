@@ -142,7 +142,7 @@ export default function BuatTransaksiPage() {
   const updateItemQty = (i: number, delta: number) => {
     setItems(prev => prev.map((row, idx) => {
       if (idx !== i) return row
-      const newQty = Math.max(1, (parseInt(row.qty) || 1) + delta)
+      const newQty = Math.max(0.25, Math.round(((parseFloat(row.qty) || 0.25) + delta) * 100) / 100)
       return { ...row, qty: String(newQty) }
     }))
   }
@@ -156,14 +156,14 @@ export default function BuatTransaksiPage() {
   }
 
   const validItems = items.filter(r => r.product_id && r.qty && r.price_sold)
-  const subtotal = (r: ItemRow) => (parseFloat(r.price_sold) || 0) * (parseInt(r.qty) || 0) - (parseFloat(r.discount) || 0)
+  const subtotal = (r: ItemRow) => (parseFloat(r.price_sold) || 0) * (parseFloat(r.qty) || 0) - (parseFloat(r.discount) || 0)
   const total = validItems.reduce((sum, r) => sum + subtotal(r), 0)
 
   const currentStockError = (): string | null => {
     if (!current.product_id || !current.qty) return null
     const product = products.find(p => p.id === Number(current.product_id))
     if (!product) return null
-    if (parseInt(current.qty) > product.stock) return `Stok tersedia: ${product.stock}`
+    if (parseFloat(current.qty) > product.stock) return `Stok tersedia: ${product.stock}`
     return null
   }
 
@@ -178,7 +178,7 @@ export default function BuatTransaksiPage() {
       for (const row of validItems) {
         const product = products.find(p => p.id === Number(row.product_id))
         if (!product) { setError('Produk tidak ditemukan.'); return }
-        if (parseInt(row.qty) > product.stock) {
+        if (parseFloat(row.qty) > product.stock) {
           setError(`Stok ${product.name} tidak cukup. Tersedia: ${product.stock}`)
           return
         }
@@ -200,7 +200,7 @@ export default function BuatTransaksiPage() {
       // Initial transformation: record revenue only, skip stock & COGS
       for (const row of validItems) {
         const productId = Number(row.product_id)
-        const qtyNeeded = parseInt(row.qty)
+        const qtyNeeded = parseFloat(row.qty)
         const discount = parseFloat(row.discount) || 0
         const priceSold = (parseFloat(row.price_sold) || 0) * qtyNeeded - discount
         const { error: txItemErr } = await supabase
@@ -212,7 +212,7 @@ export default function BuatTransaksiPage() {
       // Normal flow: FIFO consumption per item
       for (const row of validItems) {
         const productId = Number(row.product_id)
-        const qtyNeeded = parseInt(row.qty)
+        const qtyNeeded = parseFloat(row.qty)
         const discount = parseFloat(row.discount) || 0
         const priceSold = (parseFloat(row.price_sold) || 0) * qtyNeeded - discount
 
@@ -269,7 +269,7 @@ export default function BuatTransaksiPage() {
       date,
       items: validItems.map(r => ({
         name: products.find(p => p.id === Number(r.product_id))?.name ?? '-',
-        qty: parseInt(r.qty),
+        qty: parseFloat(r.qty),
         price_sold: parseFloat(r.price_sold) || 0,
         discount: parseFloat(r.discount) || 0,
       })),
@@ -447,13 +447,16 @@ export default function BuatTransaksiPage() {
                     <label className="block text-xs text-white/80 mb-1">Qty <span className="text-red-300">*</span></label>
                     <div className="flex items-center gap-2">
                       <button type="button"
-                        onClick={() => updateCurrent('qty', String(Math.max(1, (parseInt(current.qty) || 1) - 1)))}
+                        onClick={() => updateCurrent('qty', String(Math.max(0.25, Math.round(((parseFloat(current.qty) || 0.25) - 0.25) * 100) / 100)))}
                         className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-400 hover:bg-red-500 text-white font-bold text-lg transition shrink-0">−</button>
-                      <input type="number" value={current.qty} onChange={e => updateCurrent('qty', e.target.value)}
-                        placeholder="0" min="1"
+                      <input type="text" inputMode="numeric" value={current.qty}
+                        onChange={e => { const v = e.target.value; if (v === '' || /^\d+$/.test(v)) updateCurrent('qty', v) }}
+                        onFocus={e => { if (current.qty.includes('.')) e.target.select() }}
+                        onClick={e => { if (current.qty.includes('.')) e.currentTarget.select() }}
+                        placeholder="0"
                         className={`flex-1 border rounded-lg px-3 py-2.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white ${sErr ? 'border-red-400' : 'border-gray-300'}`} />
                       <button type="button"
-                        onClick={() => updateCurrent('qty', String((parseInt(current.qty) || 0) + 1))}
+                        onClick={() => updateCurrent('qty', String(Math.round(((parseFloat(current.qty) || 0) + 0.25) * 100) / 100))}
                         className="w-9 h-9 flex items-center justify-center rounded-lg font-bold text-lg transition shrink-0"
                         style={{ backgroundColor: '#ffc908', color: '#121358' }}>+</button>
                     </div>
@@ -518,10 +521,10 @@ export default function BuatTransaksiPage() {
                           <p className="text-[15px] font-semibold text-white truncate">{product?.name ?? '-'}</p>
                           <div className="flex justify-between text-sm text-white/60 mt-0.5">
                             <div className="flex items-center gap-1.5">
-                              <button type="button" onClick={() => updateItemQty(i, -1)}
+                              <button type="button" onClick={() => updateItemQty(i, -0.25)}
                                 className="w-5 h-5 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-xs transition leading-none">−</button>
                               <span className="font-bold text-white">{row.qty}</span>
-                              <button type="button" onClick={() => updateItemQty(i, 1)}
+                              <button type="button" onClick={() => updateItemQty(i, 0.25)}
                                 className="w-5 h-5 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-xs transition leading-none">+</button>
                               <span className="ml-1">× Rp {fmt(parseFloat(row.price_sold) || 0)}{parseFloat(row.discount) > 0 ? ` − Rp ${fmt(parseFloat(row.discount))}` : ''}</span>
                             </div>
@@ -599,7 +602,7 @@ export default function BuatTransaksiPage() {
                     const product = products.find(p => p.id === Number(row.product_id))
                     const priceSold = parseFloat(row.price_sold) || 0
                     const disc = parseFloat(row.discount) || 0
-                    const qty = parseInt(row.qty) || 0
+                    const qty = parseFloat(row.qty) || 0
                     const sub = priceSold * qty - disc
                     return (
                       <div key={i}>

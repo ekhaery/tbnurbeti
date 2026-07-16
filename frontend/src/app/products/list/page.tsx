@@ -565,7 +565,7 @@ export default function ProductListPage() {
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
                                   <p className="text-[10px] text-gray-400 mb-0.5">Qty</p>
-                                  <input type="number" min="0" value={editBatchQty} onChange={e => setEditBatchQty(e.target.value)}
+                                  <input type="number" min="0" step="any" value={editBatchQty} onChange={e => setEditBatchQty(e.target.value)}
                                     className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#121358]" />
                                 </div>
                                 <div>
@@ -582,7 +582,7 @@ export default function ProductListPage() {
                                 <button disabled={savingBatch}
                                   onClick={async () => {
                                     setSavingBatch(true)
-                                    const { data: updated } = await supabase.from('stock_batches').update({ qty_remaining: parseInt(editBatchQty) || 0, base_price: parseFloat(editBatchPrice) || 0 }).eq('id', b.id).select('id, qty_remaining, base_price').single()
+                                    const { data: updated } = await supabase.from('stock_batches').update({ qty_remaining: parseFloat(editBatchQty) || 0, base_price: parseFloat(editBatchPrice) || 0 }).eq('id', b.id).select('id, qty_remaining, base_price').single()
                                     if (updated) setViewBatches(prev => prev.map(x => x.id === b.id ? { ...x, qty_remaining: (updated as any).qty_remaining, base_price: (updated as any).base_price } : x))
                                     setEditingBatchId(null)
                                     setSavingBatch(false)
