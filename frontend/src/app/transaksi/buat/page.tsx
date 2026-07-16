@@ -285,8 +285,8 @@ export default function BuatTransaksiPage() {
 
           {/* Info Transaksi — row 1, 7/12 */}
           <div className="col-span-12 md:col-span-8">
-            <div className="rounded-xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
-              <div className="flex gap-3">
+            <div className="rounded-xl shadow-sm p-2.5 space-y-2" style={{ backgroundColor: '#B5BAFF' }}>
+              <div className="flex gap-2">
                 <div className="shrink-0">
                   <label className="block text-xs text-[#121358] mb-1">Tanggal <span className="text-[#121358]">*</span></label>
                   <input
