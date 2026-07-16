@@ -79,6 +79,7 @@ export default function BuatTransaksiPage() {
     items: { name: string; qty: number; price_sold: number; discount: number }[]
     total: number
     notes: string
+    isHutang: boolean
   } | null>(null)
 
   const fetchProducts = async () => {
@@ -212,6 +213,7 @@ export default function BuatTransaksiPage() {
     }
 
     if (isHutang && !customerId) { setError('Pilih customer untuk transaksi hutang.'); return }
+    if (isHutang && !notes.trim()) { setError('Catat Nama / Alamat / No Rek / Lain lain wajib diisi untuk transaksi hutang.'); return }
 
     setSubmitting(true)
     const code = previewCode || generateCode()
@@ -307,6 +309,7 @@ export default function BuatTransaksiPage() {
       })),
       total,
       notes: notes.trim(),
+      isHutang,
     }
     setPrintData(pd)
     setSuccess(`Transaksi ${code} berhasil disimpan.`)
@@ -352,13 +355,15 @@ export default function BuatTransaksiPage() {
                 </div>
 
                 <div className="flex-1">
-                  <label className="block text-xs text-[#121358] mb-1">Catat Nama / Alamat / No Rek / Lain lain</label>
+                  <label className="block text-xs text-[#121358] mb-1">
+                    Catat Nama / Alamat / No Rek / Lain lain {isHutang && <span className="text-[#121358]">*</span>}
+                  </label>
                   <textarea
                     value={notes}
                     onChange={e => setNotes(e.target.value)}
-                    placeholder="Opsional"
+                    placeholder={isHutang ? 'Wajib diisi untuk transaksi hutang' : 'Opsional'}
                     rows={1}
-                    className="w-full h-9 border border-[#9099e8] bg-white rounded-lg px-3 py-2 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358] resize-none overflow-hidden"
+                    className={`w-full h-9 border bg-white rounded-lg px-3 py-2 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358] resize-none overflow-hidden ${isHutang && !notes.trim() ? 'border-red-400' : 'border-[#9099e8]'}`}
                   />
                 </div>
 
@@ -658,6 +663,7 @@ export default function BuatTransaksiPage() {
                   <p className="text-center">{'================================'}</p>
                   <p>No. Invoice : {previewCode}</p>
                   <p>Tanggal&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : {date ? new Date(date + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</p>
+                  <p>Status&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : {isHutang ? 'BELUM LUNAS' : 'LUNAS'}</p>
                   <p>{'--------------------------------'}</p>
                   <p>Nama Barang&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Qty&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Total</p>
                   <p>{'--------------------------------'}</p>
@@ -780,33 +786,38 @@ export default function BuatTransaksiPage() {
             color: #000;
           }
         `}</style>
-        <div style={{ textAlign: 'center', marginBottom: 8 }}>
-          <div style={{ fontWeight: 700, fontSize: 14 }}>NOTA PENJUALAN</div>
-          <div>{printData.code}</div>
-          <div>{new Date(printData.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-        </div>
-        <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '6px 0', marginBottom: 6 }}>
-          {printData.items.map((item, i) => (
-            <div key={i} style={{ marginBottom: 4 }}>
-              <div style={{ fontWeight: 600 }}>{item.name}</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{item.qty} × Rp {(item.price_sold).toLocaleString('id-ID')}</span>
-                <span>Rp {(item.qty * item.price_sold - item.discount).toLocaleString('id-ID')}</span>
-              </div>
-              {item.discount > 0 && (
-                <div style={{ color: '#555' }}>Diskon: -Rp {item.discount.toLocaleString('id-ID')}</div>
-              )}
+        {Array.from({ length: printData.isHutang ? 2 : 1 }).map((_, copyIdx) => (
+          <div key={copyIdx} style={copyIdx === 0 && printData.isHutang ? { pageBreakAfter: 'always' } : undefined}>
+            <div style={{ textAlign: 'center', marginBottom: 8 }}>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>NOTA PENJUALAN</div>
+              <div>{printData.code}</div>
+              <div>{new Date(printData.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+              <div>Status: {printData.isHutang ? 'BELUM LUNAS' : 'LUNAS'}</div>
             </div>
-          ))}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
-          <span>TOTAL</span>
-          <span>Rp {printData.total.toLocaleString('id-ID')}</span>
-        </div>
-        {printData.notes && (
-          <div style={{ fontSize: 10, color: '#555', marginBottom: 6 }}>Catatan: {printData.notes}</div>
-        )}
-        <div style={{ textAlign: 'center', fontSize: 10, marginTop: 8 }}>Terima kasih!</div>
+            <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '6px 0', marginBottom: 6 }}>
+              {printData.items.map((item, i) => (
+                <div key={i} style={{ marginBottom: 4 }}>
+                  <div style={{ fontWeight: 600 }}>{item.name}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{item.qty} × Rp {(item.price_sold).toLocaleString('id-ID')}</span>
+                    <span>Rp {(item.qty * item.price_sold - item.discount).toLocaleString('id-ID')}</span>
+                  </div>
+                  {item.discount > 0 && (
+                    <div style={{ color: '#555' }}>Diskon: -Rp {item.discount.toLocaleString('id-ID')}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
+              <span>TOTAL</span>
+              <span>Rp {printData.total.toLocaleString('id-ID')}</span>
+            </div>
+            {printData.notes && (
+              <div style={{ fontSize: 10, color: '#555', marginBottom: 6 }}>Catatan: {printData.notes}</div>
+            )}
+            <div style={{ textAlign: 'center', fontSize: 10, marginTop: 8 }}>Terima kasih!</div>
+          </div>
+        ))}
       </div>
     )}
     </>
