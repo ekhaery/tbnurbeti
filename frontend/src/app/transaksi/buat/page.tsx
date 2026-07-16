@@ -308,63 +308,62 @@ export default function BuatTransaksiPage() {
           <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm mb-4">⚠️ {error}</div>
         )}
 
-        {/* Desktop grid: 7-5 top, then 2-5 under left column */}
+        {/* Desktop grid: row1 = Info Transaksi(7) + white area(5); row2 = Tambahkan Produk(4) + Ringkasan(3) + white area continues */}
         <div className="grid grid-cols-12 gap-4 items-start">
 
-          {/* Left side: 7 cols */}
-          <div className="col-span-12 md:col-span-7 space-y-4">
+          {/* Info Transaksi — row 1, 7/12 */}
+          <div className="col-span-12 md:col-span-7">
+            <div className="rounded-xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
+              <p className="text-xs font-semibold text-[#121358] uppercase tracking-wide">Info Transaksi</p>
 
-            {/* Top row: Info Transaksi (3) + Produk card (4) */}
-            <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-start">
-
-              {/* Info Transaksi + Photo — 3/7 */}
-              <div className="col-span-7 md:col-span-3 space-y-4">
-                <div className="rounded-xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
-                  <p className="text-xs font-semibold text-[#121358] uppercase tracking-wide">Info Transaksi</p>
-
-                  <div>
-                    <label className="block text-xs text-[#121358] mb-1">Tanggal <span className="text-[#121358]">*</span></label>
-                    <input
-                      type="date"
-                      value={date}
-                      onChange={e => setDate(e.target.value)}
-                      className="w-44 border border-[#9099e8] bg-white rounded-lg px-2 py-1.5 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358]"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-[#121358] mb-1">Catatan</label>
-                    <textarea
-                      value={notes}
-                      onChange={e => setNotes(e.target.value)}
-                      placeholder="Opsional"
-                      rows={1}
-                      className="w-full border border-[#9099e8] bg-white rounded-lg px-3 py-2.5 text-sm text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358] resize-none overflow-hidden"
-                      style={{ height: 'auto' }}
-                      onInput={e => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px' }}
-                    />
-                  </div>
-
-                  <div className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 border transition ${isInitialTransformation ? 'bg-[#e6a800] border-[#cc9600]' : 'bg-[#e6b400]/40 border-[#cc9600]/40'}`}>
-                    <p className="text-[10px] text-[#121358]">Initial Transformation</p>
-                    <button
-                      type="button"
-                      onClick={() => setIsInitialTransformation(v => !v)}
-                      className={`relative w-8 h-4 rounded-full transition-colors shrink-0 ${isInitialTransformation ? 'bg-amber-400' : 'bg-gray-300'}`}
-                    >
-                      <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${isInitialTransformation ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                    </button>
-                  </div>
+              <div className="flex gap-3">
+                <div className="shrink-0">
+                  <label className="block text-xs text-[#121358] mb-1">Tanggal <span className="text-[#121358]">*</span></label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={e => setDate(e.target.value)}
+                    className="w-44 border border-[#9099e8] bg-white rounded-lg px-2 py-1.5 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                    required
+                  />
                 </div>
-                {/* Photo card — directly below Info Transaksi */}
-                <div className="hidden md:flex bg-white rounded-xl shadow-sm items-center justify-center text-gray-300 text-xs h-32">
-                  <span className="text-center px-2">Gambar Produk<br/>(upcoming)</span>
-                </div>
-              </div>{/* end Info Transaksi + Photo */}
 
-              {/* Produk entry form — 4/7 */}
-              <div className="col-span-7 md:col-span-4">
+                <div className="flex-1">
+                  <label className="block text-xs text-[#121358] mb-1">Catatan</label>
+                  <textarea
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    placeholder="Opsional"
+                    rows={1}
+                    className="w-full border border-[#9099e8] bg-white rounded-lg px-3 py-2.5 text-sm text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358] resize-none overflow-hidden"
+                    style={{ height: 'auto' }}
+                    onInput={e => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px' }}
+                  />
+                </div>
+              </div>
+
+              <div className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 border transition ${isInitialTransformation ? 'bg-[#e6a800] border-[#cc9600]' : 'bg-[#e6b400]/40 border-[#cc9600]/40'}`}>
+                <p className="text-[10px] text-[#121358]">Initial Transformation</p>
+                <button
+                  type="button"
+                  onClick={() => setIsInitialTransformation(v => !v)}
+                  className={`relative w-8 h-4 rounded-full transition-colors shrink-0 ${isInitialTransformation ? 'bg-amber-400' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${isInitialTransformation ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+            </div>
+          </div>{/* end Info Transaksi */}
+
+          {/* White area — spans row 1 & 2, 5/12 */}
+          <div className="col-span-12 md:col-span-5 md:row-span-2 md:self-stretch">
+            <div className="hidden md:flex bg-white rounded-xl shadow-sm items-center justify-center text-gray-300 text-xs h-full min-h-[400px]">
+              <span className="text-center px-2">Gambar Produk<br/>(upcoming)</span>
+            </div>
+          </div>{/* end white area */}
+
+          {/* Produk entry form — row 2, 4/12 */}
+          <div className="col-span-12 md:col-span-4">
         <form onSubmit={e => e.preventDefault()} className="space-y-4">
 
           {/* Product rows */}
@@ -488,13 +487,10 @@ export default function BuatTransaksiPage() {
 
         </form>
 
-              </div>{/* end Produk entry col (4/7) */}
-            </div>{/* end top row grid (3+4) */}
+          </div>{/* end Tambahkan Produk */}
 
-          </div>{/* end left 7-col */}
-
-          {/* Right side — dark navy summary card (5/12) */}
-          <div className="col-span-12 md:col-span-5">
+          {/* Ringkasan Transaksi — row 2, 3/12 */}
+          <div className="col-span-12 md:col-span-3">
             <div className="rounded-2xl p-6 min-h-[400px] flex flex-col gap-4" style={{ backgroundColor: '#121358' }}>
               <div className="text-center">
                 <p className="text-xs uppercase tracking-widest -mx-6 -mt-6 px-6 py-3 rounded-t-2xl font-semibold" style={{ backgroundColor: '#B5BAFF', color: '#121358' }}>
