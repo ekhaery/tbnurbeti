@@ -29,6 +29,8 @@ type AutocompleteState = {
   focused: number // focused option index
 }
 
+type Customer = { id: number; name: string }
+
 type StockBatch = {
   id: number
   qty_remaining: number
@@ -52,6 +54,16 @@ export default function BuatTransaksiPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [date, setDate] = useState(localDateStr())
   const [notes, setNotes] = useState('')
+  const [isHutang, setIsHutang] = useState(false)
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [customerId, setCustomerId] = useState<number | ''>('')
+  const [customerQuery, setCustomerQuery] = useState('')
+  const [customerDropdown, setCustomerDropdown] = useState(false)
+  const [showNewCustomer, setShowNewCustomer] = useState(false)
+  const [newCustomerName, setNewCustomerName] = useState('')
+  const [newCustomerPhone, setNewCustomerPhone] = useState('')
+  const [newCustomerSaving, setNewCustomerSaving] = useState(false)
+  const [newCustomerError, setNewCustomerError] = useState<string | null>(null)
   const [items, setItems] = useState<ItemRow[]>([])
   const [current, setCurrent] = useState<ItemRow>(emptyItem())
   const [autocomplete, setAutocomplete] = useState<AutocompleteState>({ open: false, focused: -1 })
@@ -107,6 +119,8 @@ export default function BuatTransaksiPage() {
 
   useEffect(() => {
     fetchProducts()
+    supabase.from('customers').select('id, name').order('name')
+      .then(({ data }: { data: Customer[] | null }) => setCustomers(data ?? []))
   }, [])
 
   const updateCurrent = (field: keyof ItemRow, value: string) => {
@@ -153,6 +167,22 @@ export default function BuatTransaksiPage() {
           (p.categories?.name ?? '').toLowerCase().includes(query.toLowerCase()))
   }
 
+  const handleSaveNewCustomer = async () => {
+    if (!newCustomerName.trim()) { setNewCustomerError('Nama customer wajib diisi.'); return }
+    setNewCustomerSaving(true); setNewCustomerError(null)
+    const { data: newC, error: newCErr } = await supabase.from('customers')
+      .insert({ name: newCustomerName.trim(), phone_number_1: newCustomerPhone.trim() || null })
+      .select('id, name').single()
+    setNewCustomerSaving(false)
+    if (newCErr || !newC) { setNewCustomerError(newCErr?.message ?? 'Gagal menyimpan customer.'); return }
+    setCustomers(prev => [...prev, newC].sort((a, b) => a.name.localeCompare(b.name)))
+    setCustomerId(newC.id)
+    setCustomerQuery(newC.name)
+    setShowNewCustomer(false)
+    setNewCustomerName('')
+    setNewCustomerPhone('')
+  }
+
   const validItems = items.filter(r => r.product_id && r.qty && r.price_sold)
   const subtotal = (r: ItemRow) => (parseFloat(r.price_sold) || 0) * (parseFloat(r.qty) || 0) - (parseFloat(r.discount) || 0)
   const total = validItems.reduce((sum, r) => sum + subtotal(r), 0)
@@ -181,16 +211,36 @@ export default function BuatTransaksiPage() {
       }
     }
 
+    if (isHutang && !customerId) { setError('Pilih customer untuk transaksi hutang.'); return }
+
     setSubmitting(true)
     const code = previewCode || generateCode()
 
-    // 1. Insert transaction header
-    const { data: trx, error: trxErr } = await supabase
-      .from('transactions')
-      .insert({ code, date, notes: notes.trim() || null, created_by: appUser?.id, is_initial_transformation: false })
-      .select('id').single()
+    // 1. Insert transaction header — atomically with the receivable when this is a Hutang sale,
+    // so a transaction can never exist without its matching customer_receivables record.
+    let trxId: number | null = null
+    if (isHutang) {
+      const { data: newTrxId, error: rpcErr } = await supabase.rpc('create_transaction_with_receivable', {
+        p_code: code,
+        p_date: date,
+        p_notes: notes.trim() || null,
+        p_created_by: appUser?.id ?? null,
+        p_is_initial_transformation: false,
+        p_customer_id: Number(customerId),
+        p_due_date: null,
+        p_total: total,
+      })
+      if (rpcErr || newTrxId == null) { setError(rpcErr?.message ?? 'Gagal menyimpan.'); setSubmitting(false); return }
+      trxId = newTrxId
+    } else {
+      const { data: trx, error: trxErr } = await supabase
+        .from('transactions')
+        .insert({ code, date, notes: notes.trim() || null, created_by: appUser?.id, is_initial_transformation: false })
+        .select('id').single()
 
-    if (trxErr || !trx) { setError(trxErr?.message ?? 'Gagal menyimpan.'); setSubmitting(false); return }
+      if (trxErr || !trx) { setError(trxErr?.message ?? 'Gagal menyimpan.'); setSubmitting(false); return }
+      trxId = trx.id
+    }
 
     // FIFO consumption per item
     for (const row of validItems) {
@@ -224,7 +274,7 @@ export default function BuatTransaksiPage() {
 
       const { data: txItem, error: txItemErr } = await supabase
         .from('transaction_items')
-        .insert({ transaction_id: trx.id, product_id: productId, qty: qtyNeeded, price_sold: priceSold, cogs: totalCogs, discount })
+        .insert({ transaction_id: trxId, product_id: productId, qty: qtyNeeded, price_sold: priceSold, cogs: totalCogs, discount })
         .select('id').single()
 
       if (txItemErr || !txItem) { setError(txItemErr?.message ?? 'Gagal menyimpan item.'); setSubmitting(false); return }
@@ -265,6 +315,9 @@ export default function BuatTransaksiPage() {
     setCurrent(emptyItem())
     setAutocomplete({ open: false, focused: -1 })
     setDate(localDateStr())
+    setIsHutang(false)
+    setCustomerId('')
+    setCustomerQuery('')
     fetchProducts()
   }
 
@@ -308,6 +361,65 @@ export default function BuatTransaksiPage() {
                     className="w-full h-9 border border-[#9099e8] bg-white rounded-lg px-3 py-2 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358] resize-none overflow-hidden"
                   />
                 </div>
+
+                <div className="shrink-0">
+                  <label className="block text-xs text-[#121358] mb-1">Hutang</label>
+                  <div className="h-9 flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => setIsHutang(v => !v)}
+                      className={`relative w-8 h-4 rounded-full transition-colors shrink-0 ${isHutang ? 'bg-amber-500' : 'bg-gray-300'}`}
+                    >
+                      <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${isHutang ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {isHutang && (
+                  <div className="relative flex-1">
+                    <label className="block text-xs text-[#121358] mb-1">Customer <span className="text-[#121358]">*</span></label>
+                    <input
+                      type="text"
+                      value={customerQuery}
+                      onChange={e => {
+                        setCustomerQuery(e.target.value)
+                        setCustomerId('')
+                        setCustomerDropdown(true)
+                      }}
+                      onFocus={() => setCustomerDropdown(true)}
+                      onBlur={() => setTimeout(() => setCustomerDropdown(false), 150)}
+                      placeholder="Cari atau tambah customer..."
+                      autoComplete="off"
+                      className={`w-full h-9 border rounded-lg px-3 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white ${customerId ? 'border-[#121358]/40' : 'border-[#9099e8]'}`}
+                    />
+                    {customerDropdown && (
+                      <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                        {customers
+                          .filter(c => c.name.toLowerCase().includes(customerQuery.toLowerCase()))
+                          .map(c => (
+                            <button key={c.id} type="button"
+                              onMouseDown={() => { setCustomerQuery(c.name); setCustomerId(c.id); setCustomerDropdown(false) }}
+                              className={`w-full text-left px-4 py-2.5 text-sm transition ${customerId === c.id ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                              {c.name}
+                            </button>
+                          ))}
+                        {customerQuery.trim() && !customers.some(c => c.name.toLowerCase() === customerQuery.toLowerCase()) && (
+                          <button type="button"
+                            onMouseDown={() => {
+                              setNewCustomerName(customerQuery.trim())
+                              setNewCustomerPhone('')
+                              setNewCustomerError(null)
+                              setShowNewCustomer(true)
+                              setCustomerDropdown(false)
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-[#121358] font-semibold hover:bg-[#121358]/5 transition border-t border-gray-100">
+                            + New Customer: "{customerQuery.trim()}"
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>{/* end Info Transaksi */}
@@ -592,6 +704,52 @@ export default function BuatTransaksiPage() {
                 </button>
               </div>
             </div>
+            </div>
+          </>
+        )}
+
+        {showNewCustomer && (
+          <>
+            <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4" onClick={() => setShowNewCustomer(false)}>
+              <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <p className="text-sm font-bold text-gray-800">Customer Baru</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Belum tersimpan di data customer.</p>
+                </div>
+                <div className="px-4 py-3 space-y-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Nama <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      value={newCustomerName}
+                      onChange={e => setNewCustomerName(e.target.value)}
+                      placeholder="Nama customer"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">No. Telepon</label>
+                    <input
+                      type="text"
+                      value={newCustomerPhone}
+                      onChange={e => setNewCustomerPhone(e.target.value)}
+                      placeholder="Opsional"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                    />
+                  </div>
+                  {newCustomerError && <p className="text-xs text-red-500">{newCustomerError}</p>}
+                </div>
+                <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
+                  <button type="button" onClick={() => setShowNewCustomer(false)}
+                    className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-600 text-sm font-semibold hover:bg-gray-200 transition">
+                    Batal
+                  </button>
+                  <button type="button" onClick={handleSaveNewCustomer} disabled={newCustomerSaving}
+                    className="flex-1 py-2.5 rounded-xl bg-[#121358] text-white text-sm font-semibold hover:bg-[#1a1c6e] disabled:opacity-50 transition">
+                    {newCustomerSaving ? 'Menyimpan...' : 'Simpan'}
+                  </button>
+                </div>
+              </div>
             </div>
           </>
         )}
