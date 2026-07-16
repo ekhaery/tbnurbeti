@@ -36,7 +36,7 @@ type Transaction = {
   transaction_items: TransactionItem[]
 }
 
-type ProfitRow = { date: string; is_initial_transformation: boolean; transaction_items: { price_sold: number; profit: number }[] }
+type ProfitRow = { date: string; is_initial_transformation: boolean; is_paid: boolean; transaction_items: { price_sold: number; profit: number }[] }
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
 const PAGE_SIZE = 10
@@ -158,7 +158,7 @@ function RiwayatTransaksiContent() {
       if (trxIds.length === 0) { setProfitRows([]); return }
     }
 
-    let q = supabase.from('transactions').select('date, is_initial_transformation, transaction_items(price_sold, profit)') as any
+    let q = supabase.from('transactions').select('date, is_initial_transformation, is_paid, transaction_items(price_sold, profit)') as any
     if (from) q = q.gte('date', from)
     if (to) q = q.lte('date', to)
     if (trxIds) q = q.in('id', trxIds)
@@ -397,7 +397,7 @@ function RiwayatTransaksiContent() {
         </div>
 
         {isAdmin && (() => {
-          const validRows = profitRows.filter(t => !t.is_initial_transformation)
+          const validRows = profitRows.filter(t => !t.is_initial_transformation && t.is_paid)
           if (validRows.length === 0) return null
 
           const dateLabel = isDefaultRange
@@ -410,6 +410,10 @@ function RiwayatTransaksiContent() {
           const totalRev = validRows.reduce((s, t) => s + t.transaction_items.reduce((si, i) => si + i.price_sold, 0), 0)
           const totalProfit = validRows.reduce((s, t) => s + t.transaction_items.reduce((si, i) => si + i.profit, 0), 0)
           const margin = totalRev > 0 ? (totalProfit / totalRev) * 100 : 0
+
+          const piutangRows = profitRows.filter(t => !t.is_initial_transformation && !t.is_paid)
+          const totalPiutang = piutangRows.reduce((s, t) => s + t.transaction_items.reduce((si, i) => si + i.price_sold, 0), 0)
+          const totalProfitPiutang = piutangRows.reduce((s, t) => s + t.transaction_items.reduce((si, i) => si + i.profit, 0), 0)
 
           return (
             <div className="rounded-2xl px-4 py-4 space-y-2" style={{ backgroundColor: '#121358' }}>
@@ -432,6 +436,21 @@ function RiwayatTransaksiContent() {
                 <div className="h-full rounded-full bg-green-400" style={{ width: `${Math.min(100, Math.max(0, margin))}%` }} />
               </div>
               <p className="text-[10px] text-right" style={{ color: '#B5BAFF' }}>Margin {margin.toFixed(1)}%</p>
+
+              {piutangRows.length > 0 && (
+                <div className="flex items-end justify-between gap-3 pt-2 border-t border-white/10">
+                  <div>
+                    <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Piutang</p>
+                    <p className="text-sm font-bold text-white">Rp {fmt(totalPiutang)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px]" style={{ color: '#B5BAFF' }}>Total Profit Piutang</p>
+                    <p className={`text-xl font-bold ${totalProfitPiutang >= 0 ? 'text-amber-400' : 'text-red-400'}`}>
+                      Rp {fmt(totalProfitPiutang)}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )
         })()}

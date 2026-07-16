@@ -339,14 +339,14 @@ export default function BuatTransaksiPage() {
           {/* Info Transaksi — row 1, 7/12 */}
           <div className="col-span-12 md:col-span-8">
             <div className="rounded-xl shadow-sm p-2.5 space-y-2" style={{ backgroundColor: '#B5BAFF' }}>
-              <div className="flex gap-2">
+              <div className="flex flex-col md:flex-row gap-2">
                 <div className="shrink-0">
                   <label className="block text-xs text-[#121358] mb-1">Tanggal <span className="text-[#121358]">*</span></label>
                   <input
                     type="date"
                     value={date}
                     onChange={e => setDate(e.target.value)}
-                    className="w-44 h-9 border border-[#9099e8] bg-white rounded-lg px-2 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                    className="w-full md:w-44 h-9 border border-[#9099e8] bg-white rounded-lg px-2 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358]"
                     required
                   />
                 </div>
