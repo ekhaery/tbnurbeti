@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faTrash, faChevronLeft, faArrowLeft } from '@fortawesome/free-solid-svg-icons'
-import Link from 'next/link'
+import { faTrash, faChevronLeft, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { localDateStr } from '@/lib/date'
 import { epsonPrint } from '@/lib/epsonPrint'
 
@@ -272,17 +271,7 @@ export default function BuatTransaksiPage() {
   return (
     <>
     <div className="min-h-screen bg-gray-50">
-      <div className="px-4 pt-3 pb-10 max-w-7xl mx-auto">
-
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-4">
-          <Link href="/" className="w-8 h-8 flex items-center justify-center rounded-full bg-white shadow-sm text-gray-500 hover:text-gray-800 transition shrink-0">
-            <FontAwesomeIcon icon={faArrowLeft} className="w-3.5 h-3.5" />
-          </Link>
-          <div>
-            <h2 className="text-lg font-bold text-gray-800">Buat Transaksi</h2>
-          </div>
-        </div>
+      <div className="px-4 pb-10 max-w-7xl mx-auto -mt-2">
 
         {success && (
           <div className="p-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm mb-4">✅ {success}</div>
@@ -295,10 +284,8 @@ export default function BuatTransaksiPage() {
         <div className="grid grid-cols-12 gap-4 items-start">
 
           {/* Info Transaksi — row 1, 7/12 */}
-          <div className="col-span-12 md:col-span-7">
+          <div className="col-span-12 md:col-span-8">
             <div className="rounded-xl shadow-sm p-4 space-y-3" style={{ backgroundColor: '#B5BAFF' }}>
-              <p className="text-xs font-semibold text-[#121358] uppercase tracking-wide">Info Transaksi</p>
-
               <div className="flex gap-3">
                 <div className="shrink-0">
                   <label className="block text-xs text-[#121358] mb-1">Tanggal <span className="text-[#121358]">*</span></label>
@@ -306,21 +293,19 @@ export default function BuatTransaksiPage() {
                     type="date"
                     value={date}
                     onChange={e => setDate(e.target.value)}
-                    className="w-44 border border-[#9099e8] bg-white rounded-lg px-2 py-1.5 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                    className="w-44 h-9 border border-[#9099e8] bg-white rounded-lg px-2 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358]"
                     required
                   />
                 </div>
 
                 <div className="flex-1">
-                  <label className="block text-xs text-[#121358] mb-1">Catatan</label>
+                  <label className="block text-xs text-[#121358] mb-1">Catat Nama / Alamat / No Rek / Lain lain</label>
                   <textarea
                     value={notes}
                     onChange={e => setNotes(e.target.value)}
                     placeholder="Opsional"
                     rows={1}
-                    className="w-full border border-[#9099e8] bg-white rounded-lg px-3 py-2.5 text-sm text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358] resize-none overflow-hidden"
-                    style={{ height: 'auto' }}
-                    onInput={e => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px' }}
+                    className="w-full h-9 border border-[#9099e8] bg-white rounded-lg px-3 py-2 text-xs text-[#121358] focus:outline-none focus:ring-2 focus:ring-[#121358] resize-none overflow-hidden"
                   />
                 </div>
               </div>
@@ -328,9 +313,12 @@ export default function BuatTransaksiPage() {
           </div>{/* end Info Transaksi */}
 
           {/* White area — spans row 1 & 2, 5/12 */}
-          <div className="col-span-12 md:col-span-5 md:row-span-2 md:self-stretch">
-            <div className="hidden md:flex bg-white rounded-xl shadow-sm items-center justify-center text-gray-300 text-xs h-full min-h-[400px]">
-              <span className="text-center px-2">Gambar Produk<br/>(upcoming)</span>
+          <div className="col-span-12 md:col-span-4 md:row-span-2 md:self-stretch">
+            <div className="hidden md:flex md:flex-col h-full">
+              <h2 className="text-lg font-bold text-gray-800 mb-4">Buat Transaksi</h2>
+              <div className="flex-1 bg-white rounded-xl shadow-sm flex items-center justify-center text-gray-300 text-xs min-h-[300px]">
+                <span className="text-center px-2">Gambar Produk<br/>(upcoming)</span>
+              </div>
             </div>
           </div>{/* end white area */}
 
@@ -446,7 +434,7 @@ export default function BuatTransaksiPage() {
                     type="button"
                     onClick={addItem}
                     disabled={!current.product_id || !current.qty}
-                    className="w-full rounded-xl py-2.5 md:py-[4.375rem] text-sm font-semibold text-[#121358] disabled:opacity-40 disabled:cursor-not-allowed transition hover:brightness-105"
+                    className="w-full rounded-xl py-2.5 md:py-12 text-sm font-semibold text-[#121358] disabled:opacity-40 disabled:cursor-not-allowed transition hover:brightness-105"
                     style={{ backgroundColor: '#ffc908' }}
                   >
                     + Tambah Produk
@@ -462,7 +450,7 @@ export default function BuatTransaksiPage() {
           </div>{/* end Tambahkan Produk */}
 
           {/* Ringkasan Transaksi — row 2, 3/12 */}
-          <div className="col-span-12 md:col-span-3">
+          <div className="col-span-12 md:col-span-4">
             <div className="rounded-2xl p-6 min-h-[400px] flex flex-col gap-4" style={{ backgroundColor: '#121358' }}>
               <div className="text-center">
                 <p className="text-xs uppercase tracking-widest -mx-6 -mt-6 px-6 py-3 rounded-t-2xl font-semibold" style={{ backgroundColor: '#B5BAFF', color: '#121358' }}>
@@ -484,9 +472,13 @@ export default function BuatTransaksiPage() {
                   {items.map((row, i) => {
                     const product = products.find(p => p.id === Number(row.product_id))
                     return (
-                      <div key={i} className="bg-white/10 rounded-xl px-3 py-2.5 flex items-center gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[15px] font-semibold text-white truncate">{product?.name ?? '-'}</p>
+                      <div key={i} className="relative bg-white/10 rounded-xl px-3 py-2.5">
+                        <button type="button" onClick={() => removeItem(i)}
+                          className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center rounded-full bg-red-400/20 hover:bg-red-400/30 text-red-400 hover:text-red-500 transition">
+                          <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+                        </button>
+                        <div className="pr-6 min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">{product?.name ?? '-'}</p>
                           <div className="flex justify-between text-sm text-white/60 mt-0.5">
                             <div className="flex items-center gap-1.5">
                               <button type="button" onClick={() => updateItemQty(i, -0.25)}
@@ -494,15 +486,11 @@ export default function BuatTransaksiPage() {
                               <span className="font-bold text-white">{row.qty}</span>
                               <button type="button" onClick={() => updateItemQty(i, 0.25)}
                                 className="w-5 h-5 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-xs transition leading-none">+</button>
-                              <span className="ml-1">× Rp {fmt(parseFloat(row.price_sold) || 0)}{parseFloat(row.discount) > 0 ? ` − Rp ${fmt(parseFloat(row.discount))}` : ''}</span>
+                              <span className="ml-1">× {fmt(parseFloat(row.price_sold) || 0)}{parseFloat(row.discount) > 0 ? ` − ${fmt(parseFloat(row.discount))}` : ''}</span>
                             </div>
-                            <span className="font-semibold text-white">Rp {fmt(subtotal(row))}</span>
+                            <span className="font-semibold text-white">{fmt(subtotal(row))}</span>
                           </div>
                         </div>
-                        <button type="button" onClick={() => removeItem(i)}
-                          className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-red-400/20 hover:bg-red-400/30 text-red-400 hover:text-red-500 transition">
-                          <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                        </button>
                       </div>
                     )
                   })}
