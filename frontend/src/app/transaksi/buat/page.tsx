@@ -31,12 +31,6 @@ type AutocompleteState = {
 
 type Customer = { id: number; name: string }
 
-type StockBatch = {
-  id: number
-  qty_remaining: number
-  base_price: number
-}
-
 const emptyItem = (): ItemRow => ({ product_id: '', query: '', qty: '', price_sold: '', discount: '' })
 const fmt = (n: number) => n.toLocaleString('id-ID')
 
@@ -218,84 +212,33 @@ export default function BuatTransaksiPage() {
     setSubmitting(true)
     const code = previewCode || generateCode()
 
-    // 1. Insert transaction header — atomically with the receivable when this is a Hutang sale,
-    // so a transaction can never exist without its matching customer_receivables record.
-    let trxId: number | null = null
-    if (isHutang) {
-      const { data: newTrxId, error: rpcErr } = await supabase.rpc('create_transaction_with_receivable', {
-        p_code: code,
-        p_date: date,
-        p_notes: notes.trim() || null,
-        p_created_by: appUser?.id ?? null,
-        p_is_initial_transformation: false,
-        p_customer_id: Number(customerId),
-        p_due_date: null,
-        p_total: total,
-      })
-      if (rpcErr || newTrxId == null) { setError(rpcErr?.message ?? 'Gagal menyimpan.'); setSubmitting(false); return }
-      trxId = newTrxId
-    } else {
-      const { data: trx, error: trxErr } = await supabase
-        .from('transactions')
-        .insert({ code, date, notes: notes.trim() || null, created_by: appUser?.id, is_initial_transformation: false })
-        .select('id').single()
+    // One atomic call: transaction header, every transaction_item, FIFO stock
+    // consumption (stock_batch_consumption + stock_batches decrement), and — when
+    // Hutang — the customer_receivables row all happen inside a single DB
+    // transaction. If anything fails, nothing is inserted and no stock moves.
+    const { data: rpcResult, error: rpcErr } = await supabase.rpc('create_transaction_with_items', {
+      p_code: code,
+      p_date: date,
+      p_notes: notes.trim() || null,
+      p_created_by: appUser?.id ?? null,
+      p_is_initial_transformation: false,
+      p_items: validItems.map(row => {
+        const qty = parseFloat(row.qty)
+        const discount = parseFloat(row.discount) || 0
+        return {
+          product_id: Number(row.product_id),
+          qty,
+          price_sold: (parseFloat(row.price_sold) || 0) * qty - discount,
+          discount,
+        }
+      }),
+      p_hutang: isHutang,
+      p_customer_id: isHutang ? Number(customerId) : null,
+      p_due_date: null,
+      p_total: total,
+    })
 
-      if (trxErr || !trx) { setError(trxErr?.message ?? 'Gagal menyimpan.'); setSubmitting(false); return }
-      trxId = trx.id
-    }
-
-    // FIFO consumption per item
-    for (const row of validItems) {
-      const productId = Number(row.product_id)
-      const qtyNeeded = parseFloat(row.qty)
-      const discount = parseFloat(row.discount) || 0
-      const priceSold = (parseFloat(row.price_sold) || 0) * qtyNeeded - discount
-
-      const { data: batches, error: batchErr } = await supabase
-        .from('stock_batches')
-        .select('id, qty_remaining, base_price')
-        .eq('product_id', productId)
-        .eq('is_available', true)
-        .gt('qty_remaining', 0)
-        .order('received_at', { ascending: true })
-        .order('id', { ascending: true })
-
-      if (batchErr || !batches) { setError(batchErr?.message ?? 'Gagal membaca stok.'); setSubmitting(false); return }
-
-      let totalCogs = 0
-      let remaining = qtyNeeded
-      const consumptions: { batch: StockBatch; qty: number }[] = []
-
-      for (const batch of batches as StockBatch[]) {
-        if (remaining <= 0) break
-        const consume = Math.min(remaining, batch.qty_remaining)
-        totalCogs += consume * batch.base_price
-        consumptions.push({ batch, qty: consume })
-        remaining -= consume
-      }
-
-      const { data: txItem, error: txItemErr } = await supabase
-        .from('transaction_items')
-        .insert({ transaction_id: trxId, product_id: productId, qty: qtyNeeded, price_sold: priceSold, cogs: totalCogs, discount })
-        .select('id').single()
-
-      if (txItemErr || !txItem) { setError(txItemErr?.message ?? 'Gagal menyimpan item.'); setSubmitting(false); return }
-
-      for (const c of consumptions) {
-        const { error: consErr } = await supabase.from('stock_batch_consumption').insert({
-          transaction_item_id: txItem.id,
-          stock_batch_id: c.batch.id,
-          qty_consumed: c.qty,
-        })
-        if (consErr) { setError(consErr.message); setSubmitting(false); return }
-
-        const { error: batchUpdateErr } = await supabase
-          .from('stock_batches')
-          .update({ qty_remaining: c.batch.qty_remaining - c.qty })
-          .eq('id', c.batch.id)
-        if (batchUpdateErr) { setError(batchUpdateErr.message); setSubmitting(false); return }
-      }
-    }
+    if (rpcErr || !rpcResult) { setError(rpcErr?.message ?? 'Gagal menyimpan.'); setSubmitting(false); return }
 
     setSubmitting(false)
     const pd = {
