@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faChevronDown, faChevronUp, faChevronLeft, faChevronRight, faXmark, faTrash, faArrowLeft } from '@fortawesome/free-solid-svg-icons'
+import { faChevronDown, faChevronUp, faChevronLeft, faChevronRight, faXmark, faTrash, faArrowLeft, faPrint } from '@fortawesome/free-solid-svg-icons'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import DateRangeFilter from '@/components/DateRangeFilter'
@@ -81,6 +81,8 @@ function RiwayatTransaksiContent() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // Print state
+  const [printingId, setPrintingId] = useState<number | null>(null)
   // Product search for adding new items
   const [products, setProducts] = useState<Product[]>([])
   const [loadingProducts, setLoadingProducts] = useState(false)
@@ -325,6 +327,15 @@ function RiwayatTransaksiContent() {
     fetchData(page, dateFrom, dateTo, productFilter, initFilter)
   }
 
+  async function handlePrint(transactionId: number) {
+    setPrintingId(transactionId)
+    try {
+      await supabase.from('print_jobs').insert({ transaction_id: transactionId })
+    } finally {
+      setPrintingId(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
@@ -516,6 +527,10 @@ function RiwayatTransaksiContent() {
                           ))}
                         </div>
                         <div className="px-4 py-2.5 border-t border-gray-100 flex justify-end gap-2">
+                          <button onClick={() => handlePrint(trx.id)} disabled={printingId === trx.id}
+                            className="text-xs font-semibold text-blue-500 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-full transition disabled:opacity-50">
+                            <FontAwesomeIcon icon={faPrint} className="w-3 h-3" />
+                          </button>
                           <button onClick={() => { setPendingDeleteTrx(trx); setDeleteConfirmText(''); setShowDelete(true) }}
                             className="text-xs font-semibold text-red-500 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-full transition">
                             <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
