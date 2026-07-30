@@ -72,6 +72,7 @@ function RiwayatTransaksiContent() {
   const [editDate, setEditDate] = useState('')
   const [editItems, setEditItems] = useState<EditItem[]>([])
   const [newEditItems, setNewEditItems] = useState<NewEditItem[]>([])
+  const [removedItems, setRemovedItems] = useState<EditItem[]>([])
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [showEditConfirm, setShowEditConfirm] = useState(false)
@@ -234,13 +235,73 @@ function RiwayatTransaksiContent() {
       }
     }))
     setNewEditItems([])
+    setRemovedItems([])
     setNewItemQuery('')
     setEditError(null)
     fetchProducts()
   }
 
+  const removeEditItem = (id: number) => {
+    if (editItems.length + newEditItems.length <= 1) {
+      setEditError('Transaksi harus memiliki minimal satu barang.')
+      return
+    }
+    const target = editItems.find(i => i.id === id)
+    if (!target) return
+    setEditError(null)
+    setEditItems(prev => prev.filter(i => i.id !== id))
+    setRemovedItems(prev => [...prev, target])
+  }
+
+  const restoreEditItem = (id: number) => {
+    const target = removedItems.find(i => i.id === id)
+    if (!target) return
+    setRemovedItems(prev => prev.filter(i => i.id !== id))
+    setEditItems(prev => [...prev, target])
+  }
+
+  // Restores FIFO stock consumed by the given transaction_items (reverses
+  // stock_batch_consumption onto stock_batches.qty_remaining), then removes
+  // the consumption rows. Shared by whole-transaction delete and single-item
+  // removal during edit so stock stays in sync either way.
+  const restoreStockForItems = async (itemIds: number[]): Promise<string | null> => {
+    if (itemIds.length === 0) return null
+    const { data: consumptions, error: consFetchErr } = await supabase
+      .from('stock_batch_consumption')
+      .select('stock_batch_id, qty_consumed')
+      .in('transaction_item_id', itemIds)
+    if (consFetchErr) return consFetchErr.message
+    if (!consumptions || consumptions.length === 0) return null
+
+    const batchMap: Record<number, number> = {}
+    for (const c of consumptions as { stock_batch_id: number; qty_consumed: number }[]) {
+      batchMap[c.stock_batch_id] = (batchMap[c.stock_batch_id] ?? 0) + c.qty_consumed
+    }
+    for (const [batchId, qtyToRestore] of Object.entries(batchMap)) {
+      const { data: batch } = await supabase
+        .from('stock_batches')
+        .select('qty_remaining')
+        .eq('id', Number(batchId))
+        .single()
+      if (batch) {
+        const { error: batchErr } = await supabase
+          .from('stock_batches')
+          .update({ qty_remaining: (batch as { qty_remaining: number }).qty_remaining + qtyToRestore })
+          .eq('id', Number(batchId))
+        if (batchErr) return batchErr.message
+      }
+    }
+    const { error: consErr } = await supabase.from('stock_batch_consumption').delete().in('transaction_item_id', itemIds)
+    if (consErr) return consErr.message
+    return null
+  }
+
   const handleSave = async () => {
     if (!editingTrx) return
+    if (editItems.length + newEditItems.length === 0) {
+      setEditError('Transaksi harus memiliki minimal satu barang.')
+      return
+    }
     setSaving(true)
     setEditError(null)
 
@@ -253,6 +314,18 @@ function RiwayatTransaksiContent() {
       .eq('id', editingTrx.id)
 
     if (trxErr) { setEditError(trxErr.message); setSaving(false); return }
+
+    if (removedItems.length > 0) {
+      const removedIds = removedItems.map(i => i.id)
+
+      if (!editingTrx.is_initial_transformation) {
+        const restoreErr = await restoreStockForItems(removedIds)
+        if (restoreErr) { setEditError(restoreErr); setSaving(false); return }
+      }
+
+      const { error: delItemsErr } = await supabase.from('transaction_items').delete().in('id', removedIds)
+      if (delItemsErr) { setEditError(delItemsErr.message); setSaving(false); return }
+    }
 
     for (const item of editItems) {
       const { error: itemErr } = await supabase
@@ -272,6 +345,7 @@ function RiwayatTransaksiContent() {
     setSaving(false)
     setShowEditConfirm(false)
     setEditingTrx(null)
+    setRemovedItems([])
     fetchData(page, dateFrom, dateTo, productFilter, initFilter)
   }
 
@@ -283,33 +357,8 @@ function RiwayatTransaksiContent() {
     const itemIds = pendingDeleteTrx.transaction_items.map(i => i.id)
 
     if (!pendingDeleteTrx.is_initial_transformation && itemIds.length > 0) {
-      const { data: consumptions } = await supabase
-        .from('stock_batch_consumption')
-        .select('stock_batch_id, qty_consumed')
-        .in('transaction_item_id', itemIds)
-
-      if (consumptions && consumptions.length > 0) {
-        const batchMap: Record<number, number> = {}
-        for (const c of consumptions as { stock_batch_id: number; qty_consumed: number }[]) {
-          batchMap[c.stock_batch_id] = (batchMap[c.stock_batch_id] ?? 0) + c.qty_consumed
-        }
-        for (const [batchId, qtyToRestore] of Object.entries(batchMap)) {
-          const { data: batch } = await supabase
-            .from('stock_batches')
-            .select('qty_remaining')
-            .eq('id', Number(batchId))
-            .single()
-          if (batch) {
-            const { error: batchErr } = await supabase
-              .from('stock_batches')
-              .update({ qty_remaining: (batch as { qty_remaining: number }).qty_remaining + qtyToRestore })
-              .eq('id', Number(batchId))
-            if (batchErr) { setDeleteError(batchErr.message); setDeleting(false); return }
-          }
-        }
-        const { error: consErr } = await supabase.from('stock_batch_consumption').delete().in('transaction_item_id', itemIds)
-        if (consErr) { setDeleteError(consErr.message); setDeleting(false); return }
-      }
+      const restoreErr = await restoreStockForItems(itemIds)
+      if (restoreErr) { setDeleteError(restoreErr); setDeleting(false); return }
     }
 
     if (itemIds.length > 0) {
@@ -658,7 +707,12 @@ function RiwayatTransaksiContent() {
                   const subtotal = item.price_sold - (item.discount ?? 0)
                   return (
                     <div key={item.id} className="bg-gray-50 rounded-xl p-3 space-y-2">
-                      <p className="text-xs font-semibold text-gray-700">{item.product_name}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-gray-700">{item.product_name}</p>
+                        <button type="button" onClick={() => removeEditItem(item.id)}>
+                          <FontAwesomeIcon icon={faTrash} className="w-3 h-3 text-gray-400 hover:text-red-400" />
+                        </button>
+                      </div>
                       <div className="grid grid-cols-3 gap-2">
                         <div>
                           <label className="block text-[10px] text-gray-400 mb-1">Qty</label>
@@ -733,6 +787,25 @@ function RiwayatTransaksiContent() {
                       </div>
                     )
                   })}
+                </div>
+              )}
+
+              {/* Removed items */}
+              {removedItems.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Akan Dihapus</p>
+                  {removedItems.map(item => (
+                    <div key={item.id} className="bg-red-50 rounded-xl p-3 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-gray-700 truncate line-through">{item.product_name}</p>
+                        <p className="text-[10px] text-gray-400">qty {item.qty} · Rp {fmt(item.unitPrice)}</p>
+                      </div>
+                      <button type="button" onClick={() => restoreEditItem(item.id)}
+                        className="text-[10px] font-semibold text-[#121358] bg-white border border-gray-200 px-2 py-1 rounded-full hover:bg-gray-50 shrink-0">
+                        Batalkan
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -820,6 +893,17 @@ function RiwayatTransaksiContent() {
                     </div>
                   </div>
                 ))}
+                {removedItems.length > 0 && (
+                  <>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-1">Dihapus (stok dikembalikan)</p>
+                    {removedItems.map(item => (
+                      <div key={item.id} className="rounded-xl px-3 py-2.5 bg-red-50">
+                        <p className="text-xs font-semibold text-gray-700 line-through">{item.product_name}</p>
+                        <p className="text-[10px] text-gray-400">qty {item.qty} · Rp {fmt(item.unitPrice)}</p>
+                      </div>
+                    ))}
+                  </>
+                )}
                 <div className="flex items-center justify-between border-t border-gray-100 pt-2 mt-2">
                   <p className="text-sm font-bold text-gray-700">Total</p>
                   <p className="text-sm font-bold text-[#121358]">Rp {fmt(grandTotal)}</p>
