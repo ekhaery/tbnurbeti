@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons'
+import { faChevronLeft, faPen } from '@fortawesome/free-solid-svg-icons'
 
 type Session = {
   id: number
@@ -31,7 +31,7 @@ export default function StokOpnameDetailPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [productWarehouseMap, setProductWarehouseMap] = useState<Record<number, number[]>>({})
   const [warehouseCounts, setWarehouseCounts] = useState<Record<number, number>>({})
-  const [savedCounts, setSavedCounts] = useState<Record<number, number>>({})
+  const [countedStockMap, setCountedStockMap] = useState<Record<string, number>>({})
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -60,8 +60,8 @@ export default function StokOpnameDetailPage() {
           ? supabase.from('product_warehouse').select('product_id, warehouse_id, warehouses(id, name, code)').in('product_id', productIds)
           : Promise.resolve({ data: [] as { product_id: number; warehouse_id: number; warehouses: Warehouse }[] }),
         itemIds.length
-          ? supabase.from('stock_opname_item_warehouses').select('item_id').in('item_id', itemIds)
-          : Promise.resolve({ data: [] as { item_id: number }[] }),
+          ? supabase.from('stock_opname_item_warehouses').select('item_id, warehouse_id, counted_stock').in('item_id', itemIds)
+          : Promise.resolve({ data: [] as { item_id: number; warehouse_id: number; counted_stock: number }[] }),
       ])
 
       const linkRows = (links ?? []) as { product_id: number; warehouse_id: number; warehouses: Warehouse }[]
@@ -83,13 +83,14 @@ export default function StokOpnameDetailPage() {
       for (const l of linkRows) {
         linkTally[l.product_id] = (linkTally[l.product_id] ?? 0) + 1
       }
-      const countTally: Record<number, number> = {}
-      for (const c of (counts ?? []) as { item_id: number }[]) {
-        countTally[c.item_id] = (countTally[c.item_id] ?? 0) + 1
+
+      const stockMap: Record<string, number> = {}
+      for (const c of (counts ?? []) as { item_id: number; warehouse_id: number; counted_stock: number }[]) {
+        stockMap[`${c.item_id}_${c.warehouse_id}`] = c.counted_stock
       }
 
       setWarehouseCounts(linkTally)
-      setSavedCounts(countTally)
+      setCountedStockMap(stockMap)
       setLoading(false)
     })
   }, [id])
@@ -175,9 +176,9 @@ export default function StokOpnameDetailPage() {
                 (productWarehouseMap[item.products.id] ?? []).includes(selectedWarehouseId)
               )
               .map(item => {
-                const linked = item.products ? (warehouseCounts[item.products.id] ?? 0) : 0
-                const saved = savedCounts[item.id] ?? 0
-                const done = linked > 0 && saved >= linked
+                const key = `${item.id}_${selectedWarehouseId}`
+                const counted = countedStockMap[key]
+                const hasCounted = counted !== undefined
                 return (
                   <Link
                     key={item.id}
@@ -185,15 +186,14 @@ export default function StokOpnameDetailPage() {
                     className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors"
                   >
                     <p className="text-sm text-gray-700">{item.products?.name ?? '-'}</p>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                          done ? 'text-green-600 bg-green-50' : 'text-amber-600 bg-amber-50'
-                        }`}
-                      >
-                        {done ? 'Selesai' : 'Pending'}
-                      </span>
-                      <FontAwesomeIcon icon={faChevronRight} className="w-3 h-3 text-gray-300" />
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className={`text-sm font-semibold ${hasCounted ? 'text-gray-800' : 'text-gray-300'}`}>
+                          {hasCounted ? counted : '-'}
+                        </p>
+                        <p className="text-[10px] text-gray-400">stok</p>
+                      </div>
+                      <FontAwesomeIcon icon={faPen} className="w-3 h-3 text-gray-300" />
                     </div>
                   </Link>
                 )
