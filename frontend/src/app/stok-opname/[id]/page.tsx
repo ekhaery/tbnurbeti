@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faChevronLeft } from '@fortawesome/free-solid-svg-icons'
+import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons'
 
 type Session = {
   id: number
@@ -15,7 +16,7 @@ type Session = {
 
 type Item = {
   id: number
-  products: { name: string } | null
+  products: { id: number; name: string } | null
 }
 
 export default function StokOpnameDetailPage() {
@@ -25,6 +26,8 @@ export default function StokOpnameDetailPage() {
 
   const [session, setSession] = useState<Session | null>(null)
   const [items, setItems] = useState<Item[]>([])
+  const [warehouseCounts, setWarehouseCounts] = useState<Record<number, number>>({})
+  const [savedCounts, setSavedCounts] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -36,12 +39,37 @@ export default function StokOpnameDetailPage() {
         .single(),
       supabase
         .from('stock_opname_items')
-        .select('id, products(name)')
+        .select('id, products(id, name)')
         .eq('session_id', id)
         .order('id'),
-    ]).then(([{ data: sessionData }, { data: itemsData }]) => {
+    ]).then(async ([{ data: sessionData }, { data: itemsData }]) => {
       setSession(sessionData as Session | null)
-      setItems((itemsData as Item[]) ?? [])
+      const itemRows = (itemsData as Item[]) ?? []
+      setItems(itemRows)
+
+      const productIds = itemRows.map(i => i.products?.id).filter((v): v is number => v != null)
+      const itemIds = itemRows.map(i => i.id)
+
+      const [{ data: links }, { data: counts }] = await Promise.all([
+        productIds.length
+          ? supabase.from('product_warehouse').select('product_id').in('product_id', productIds)
+          : Promise.resolve({ data: [] as { product_id: number }[] }),
+        itemIds.length
+          ? supabase.from('stock_opname_item_warehouses').select('item_id').in('item_id', itemIds)
+          : Promise.resolve({ data: [] as { item_id: number }[] }),
+      ])
+
+      const linkTally: Record<number, number> = {}
+      for (const l of (links ?? []) as { product_id: number }[]) {
+        linkTally[l.product_id] = (linkTally[l.product_id] ?? 0) + 1
+      }
+      const countTally: Record<number, number> = {}
+      for (const c of (counts ?? []) as { item_id: number }[]) {
+        countTally[c.item_id] = (countTally[c.item_id] ?? 0) + 1
+      }
+
+      setWarehouseCounts(linkTally)
+      setSavedCounts(countTally)
       setLoading(false)
     })
   }, [id])
@@ -102,12 +130,30 @@ export default function StokOpnameDetailPage() {
             <p className="text-xs text-gray-400">{items.length} produk</p>
           </div>
           <div className="divide-y divide-gray-100">
-            {items.map(item => (
-              <div key={item.id} className="flex items-center justify-between px-4 py-3">
-                <p className="text-sm text-gray-700">{item.products?.name ?? '-'}</p>
-                <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Pending</span>
-              </div>
-            ))}
+            {items.map(item => {
+              const linked = item.products ? (warehouseCounts[item.products.id] ?? 0) : 0
+              const saved = savedCounts[item.id] ?? 0
+              const done = linked > 0 && saved >= linked
+              return (
+                <Link
+                  key={item.id}
+                  href={`/stok-opname/${id}/${item.id}`}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                >
+                  <p className="text-sm text-gray-700">{item.products?.name ?? '-'}</p>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        done ? 'text-green-600 bg-green-50' : 'text-amber-600 bg-amber-50'
+                      }`}
+                    >
+                      {done ? 'Selesai' : 'Pending'}
+                    </span>
+                    <FontAwesomeIcon icon={faChevronRight} className="w-3 h-3 text-gray-300" />
+                  </div>
+                </Link>
+              )
+            })}
           </div>
         </div>
       </div>
