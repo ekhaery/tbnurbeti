@@ -214,6 +214,7 @@ if (error) { setError(error.message); setMarkingLunas(false); return }
     const { data } = await supabase
       .from('bills')
       .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date, due_date)')
+      .limit(10000)
     setBills((data as Bill[]) ?? [])
     setFetching(false)
   }
@@ -579,7 +580,8 @@ if (error) { setError(error.message); setMarkingLunas(false); return }
                 {items.map(p => {
                   const pBills = bills.filter(b => b.purchasing_id === p.id)
                   const unpaidBills = pBills.filter(b => !b.is_paid)
-                  const allPaid = pBills.length > 0 && unpaidBills.length === 0
+                  const paidTotal = purchasingPaidMap[p.id] ?? 0
+                  const allPaid = pBills.length > 0 && unpaidBills.length === 0 && Math.round(p.total - paidTotal) <= 0
                   return (
                   <div key={p.id} onClick={() => openPurchasingDetail(p)} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 cursor-pointer hover:shadow-md transition-shadow ${allPaid ? 'border-green-400' : 'border-[#9FA1FF]'}`}>
                     <div className="flex items-start justify-between gap-3">
