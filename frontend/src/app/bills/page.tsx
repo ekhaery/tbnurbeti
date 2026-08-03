@@ -211,11 +211,18 @@ if (error) { setError(error.message); setMarkingLunas(false); return }
   }
 
   const fetchData = async () => {
-    const { data } = await supabase
-      .from('bills')
-      .select('id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date, due_date)')
-      .limit(10000)
-    setBills((data as Bill[]) ?? [])
+    const PAGE = 1000
+    const select = 'id, bill_no, purchasing_id, due_date, installment_due_date, month, installment, paid_amount, is_paid, payment_date, updated_at, suppliers(name), purchasing(code, total, date, due_date)'
+    let all: Bill[] = []
+    let from = 0
+    while (true) {
+      const { data } = await supabase.from('bills').select(select).range(from, from + PAGE - 1)
+      if (!data || data.length === 0) break
+      all = [...all, ...(data as Bill[])]
+      if (data.length < PAGE) break
+      from += PAGE
+    }
+    setBills(all)
     setFetching(false)
   }
 
