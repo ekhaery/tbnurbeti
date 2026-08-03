@@ -13,6 +13,7 @@ import { PURCHASING_STATUS } from '@/lib/purchasingStatus'
 import { localDateStr, nowWIB } from '@/lib/date'
 
 type StockBatch = { id: number; is_available: boolean }
+type Warehouse = { id: number; name: string; code: string }
 
 type PurchasingItem = {
   id: number
@@ -44,6 +45,8 @@ export default function RiwayatPurchasingPage() {
   const { appUser } = useAuth()
   const [list, setList] = useState<Purchasing[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [tandaiTibaWarehouseId, setTandaiTibaWarehouseId] = useState<number | ''>('')
   const [fetching, setFetching] = useState(true)
 
   // Arrival modal
@@ -91,9 +94,10 @@ export default function RiwayatPurchasingPage() {
   const handleTandaiTibaFromModal = async () => {
     if (!productModal) return
     setTandaiTibaConfirming(true)
-    await handleTandaiTiba(productModal)
+    await handleTandaiTiba(productModal, tandaiTibaWarehouseId || null)
     setTandaiTibaConfirming(false)
     setProductModal(null)
+    setTandaiTibaWarehouseId('')
   }
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -117,6 +121,8 @@ export default function RiwayatPurchasingPage() {
     fetchData()
     supabase.from('suppliers').select('id, name').order('name')
       .then(({ data }: { data: Supplier[] | null }) => setSuppliers(data ?? []))
+    supabase.from('warehouses').select('id, name, code').eq('is_active', true).order('name')
+      .then(({ data }: { data: Warehouse[] | null }) => setWarehouses(data ?? []))
   }, [])
 
   // Arrival modal
@@ -243,7 +249,7 @@ export default function RiwayatPurchasingPage() {
   const arrivalStatus = selected ? getArrivalStatus(selected.purchasing_items) : null
 
   // Tandai Tiba for 'created' status
-  const handleTandaiTiba = async (p: Purchasing) => {
+  const handleTandaiTiba = async (p: Purchasing, wId: number | null = null) => {
     const { data: piData } = await supabase
       .from('purchasing_items')
       .select('id, product_id, qty, base_price')
@@ -270,6 +276,17 @@ export default function RiwayatPurchasingPage() {
           await supabase.from('products')
             .update({ base_price: pi.base_price, updated_at: nowWIB() })
             .eq('id', pi.product_id)
+        }
+      }
+
+      // Increment product_warehouse.stock for selected warehouse
+      if (wId) {
+        for (const pi of items) {
+          await supabase.rpc('add_to_warehouse_stock', {
+            p_product_id: pi.product_id,
+            p_warehouse_id: wId,
+            p_qty: pi.qty,
+          })
         }
       }
 
@@ -510,11 +527,26 @@ export default function RiwayatPurchasingPage() {
 
             <div className="px-5 py-4 border-t border-gray-100 space-y-2">
               {productModal.status === 'created' && (
-                <button onClick={handleTandaiTibaFromModal} disabled={tandaiTibaConfirming}
-                  className="w-full py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold flex items-center justify-center gap-2 transition">
-                  <FontAwesomeIcon icon={faBoxOpen} className="w-3.5 h-3.5" style={{ color: '#9FA1FF' }} />
-                  {tandaiTibaConfirming ? 'Menyimpan...' : 'Tandai Tiba & Update Stok'}
-                </button>
+                <>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Warehouse tujuan (opsional)</label>
+                    <select
+                      value={tandaiTibaWarehouseId}
+                      onChange={e => setTandaiTibaWarehouseId(e.target.value ? Number(e.target.value) : '')}
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                    >
+                      <option value="">-- Pilih Warehouse --</option>
+                      {warehouses.map(w => (
+                        <option key={w.id} value={w.id}>{w.name} ({w.code})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button onClick={handleTandaiTibaFromModal} disabled={tandaiTibaConfirming}
+                    className="w-full py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold flex items-center justify-center gap-2 transition">
+                    <FontAwesomeIcon icon={faBoxOpen} className="w-3.5 h-3.5" style={{ color: '#9FA1FF' }} />
+                    {tandaiTibaConfirming ? 'Menyimpan...' : 'Tandai Tiba & Update Stok'}
+                  </button>
+                </>
               )}
               {productModal.status !== 'completed' && (
                 <button

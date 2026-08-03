@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 const tabs = [
   { label: 'Add New Warehouse', href: '/settings/warehouses' },
   { label: 'Set Up Inventory', href: '/settings/warehouses/inventory' },
+  { label: 'Transfer Stok', href: '/settings/warehouses/transfer' },
 ]
 
 export default function WarehouseTabs() {

@@ -87,6 +87,11 @@ export default function ProductListPage() {
     is_primary: boolean
   }[]>([])
   const [fetchingSuppliers, setFetchingSuppliers] = useState(false)
+  const [viewWarehouses, setViewWarehouses] = useState<{
+    stock: number
+    warehouses: { name: string; code: string } | null
+  }[]>([])
+  const [fetchingWarehouses, setFetchingWarehouses] = useState(false)
   const [editingBatchId, setEditingBatchId] = useState<number | null>(null)
   const [editBatchQty, setEditBatchQty] = useState('')
   const [editBatchPrice, setEditBatchPrice] = useState('')
@@ -305,6 +310,8 @@ export default function ProductListPage() {
                 setFetchingBatches(true)
                 setViewSuppliers([])
                 setFetchingSuppliers(true)
+                setViewWarehouses([])
+                setFetchingWarehouses(true)
                 const { data } = await supabase
                   .from('stock_batches')
                   .select('id, qty_remaining, base_price, received_at, is_available, purchasing_items(purchasing(suppliers(name)))')
@@ -332,6 +339,14 @@ export default function ProductListPage() {
                   }))
                   .sort((a: any, b: any) => Number(b.is_primary) - Number(a.is_primary)))
                 setFetchingSuppliers(false)
+
+                const { data: whData } = await supabase
+                  .from('product_warehouse')
+                  .select('stock, warehouses(name, code)')
+                  .eq('product_id', p.id)
+                  .order('stock', { ascending: false })
+                setViewWarehouses((whData ?? []) as { stock: number; warehouses: { name: string; code: string } | null }[])
+                setFetchingWarehouses(false)
               }
               return (
               <div key={p.id} className="bg-white rounded-xl shadow-sm p-4 flex items-start justify-between gap-3 relative">
@@ -565,6 +580,25 @@ export default function ProductListPage() {
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide">Stok</p>
                   <p className="text-sm font-medium text-gray-800 mt-0.5">{viewProduct.stock}</p>
                 </div>
+              </div>
+            </div>
+            <div className="border-t border-gray-100">
+              <div className="px-5 py-3">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2">Stok Fisik per Warehouse</p>
+                {fetchingWarehouses ? (
+                  <p className="text-xs text-gray-400">Memuat...</p>
+                ) : viewWarehouses.length === 0 ? (
+                  <p className="text-xs text-center text-[#800000]">Belum ada data stok warehouse.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {viewWarehouses.map((row, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <span className="text-xs text-gray-600">{row.warehouses?.name ?? '-'} <span className="text-gray-400">({row.warehouses?.code ?? '-'})</span></span>
+                        <span className="text-xs font-semibold text-gray-800">{row.stock}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="border-t border-gray-100">

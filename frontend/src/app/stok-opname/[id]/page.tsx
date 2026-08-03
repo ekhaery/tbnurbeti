@@ -9,6 +9,7 @@ import { faChevronLeft, faPen, faXmark } from '@fortawesome/free-solid-svg-icons
 type Session = {
   id: number
   created_at: string
+  status: string
   categories: { name: string } | null
   users: { name: string } | null
 }
@@ -41,11 +42,14 @@ export default function StokOpnameDetailPage() {
   const [editSaved, setEditSaved] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
+  const [confirming, setConfirming] = useState(false)
+  const [confirmError, setConfirmError] = useState<string | null>(null)
+
   useEffect(() => {
     Promise.all([
       supabase
         .from('stock_opname_sessions')
-        .select('id, created_at, categories(name), users(name)')
+        .select('id, created_at, status, categories(name), users(name)')
         .eq('id', id)
         .single(),
       supabase
@@ -141,6 +145,16 @@ export default function StokOpnameDetailPage() {
 
     setEditSaved(true)
     setTimeout(() => { setEditSaved(false); setEditingItem(null) }, 1000)
+  }
+
+  const handleConfirm = async () => {
+    if (!session || session.status === 'confirmed') return
+    setConfirming(true)
+    setConfirmError(null)
+    const { error } = await supabase.rpc('confirm_stock_opname', { p_session_id: Number(id) })
+    setConfirming(false)
+    if (error) { setConfirmError(error.message); return }
+    setSession(prev => prev ? { ...prev, status: 'confirmed' } : prev)
   }
 
   const formatDate = (iso: string) => {
@@ -239,6 +253,7 @@ export default function StokOpnameDetailPage() {
                 const key = `${item.id}_${selectedWarehouseId}`
                 const counted = countedStockMap[key]
                 const hasCounted = counted !== undefined
+                const isConfirmed = session?.status === 'confirmed'
                 return (
                   <div
                     key={item.id}
@@ -252,18 +267,40 @@ export default function StokOpnameDetailPage() {
                         </p>
                         <p className="text-[10px] text-gray-400">stok</p>
                       </div>
-                      <button
-                        onClick={() => openEdit(item)}
-                        className="p-1.5 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-colors"
-                      >
-                        <FontAwesomeIcon icon={faPen} className="w-3 h-3 text-gray-400" />
-                      </button>
+                      {!isConfirmed && (
+                        <button
+                          onClick={() => openEdit(item)}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-colors"
+                        >
+                          <FontAwesomeIcon icon={faPen} className="w-3 h-3 text-gray-400" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 )
               })}
           </div>
         </div>
+
+        {session.status === 'confirmed' ? (
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2">
+            <span className="text-green-600 text-sm font-semibold">✓ Opname Selesai</span>
+            <span className="text-green-500 text-xs">Stok warehouse telah diperbarui.</span>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {confirmError && (
+              <p className="text-xs text-red-500 px-1">{confirmError}</p>
+            )}
+            <button
+              onClick={handleConfirm}
+              disabled={confirming}
+              className="w-full bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white font-semibold py-3 rounded-xl text-sm transition"
+            >
+              {confirming ? 'Memproses...' : 'Konfirmasi Selesai'}
+            </button>
+          </div>
+        )}
       </div>
 
       {editingItem && (

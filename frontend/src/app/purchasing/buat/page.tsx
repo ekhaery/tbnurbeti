@@ -15,6 +15,7 @@ type Supplier = { id: number; name: string }
 type Category = { id: number; name: string }
 type Product = { id: number; name: string; categories: { name: string } | null }
 type ItemRow = { product_id: number | ''; query: string; qty: string; base_price: string }
+type Warehouse = { id: number; name: string; code: string }
 type AutocompleteState = { open: boolean; focused: number }
 
 const emptyItem = (): ItemRow => ({ product_id: '', query: '', qty: '', base_price: '' })
@@ -35,6 +36,8 @@ export default function BuatPurchasingPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [warehouseId, setWarehouseId] = useState<number | ''>('')
   // New product inline
   const [newProductIdx, setNewProductIdx] = useState<number | null>(null)
   const [newProductName, setNewProductName] = useState('')
@@ -81,6 +84,8 @@ export default function BuatPurchasingPage() {
       .then(({ data }: { data: Supplier[] | null }) => setSuppliers(data ?? []))
     supabase.from('categories').select('id, name').order('name')
       .then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
+    supabase.from('warehouses').select('id, name, code').eq('is_active', true).order('name')
+      .then(({ data }: { data: Warehouse[] | null }) => setWarehouses(data ?? []))
     // Chunked fetch to bypass Supabase's 1000-row default limit
     ;(async () => {
       const chunkSize = 1000
@@ -288,6 +293,17 @@ export default function BuatPurchasingPage() {
             .eq('id', item.product_id)
         }
       }
+
+      // Increment product_warehouse.stock for selected warehouse
+      if (warehouseId) {
+        for (const item of insertedItems as { id: number; product_id: number; qty: number; base_price: number }[]) {
+          await supabase.rpc('add_to_warehouse_stock', {
+            p_product_id: item.product_id,
+            p_warehouse_id: Number(warehouseId),
+            p_qty: item.qty,
+          })
+        }
+      }
     }
 
     // 4. Generate bills if period > 0 (period = weeks), extended by 3 weeks via due_tolerance
@@ -326,6 +342,7 @@ export default function BuatPurchasingPage() {
     setNotes('')
     setJatuhTempo('')
     setItems([emptyItem()])
+    setWarehouseId('')
   }
 
   return (
@@ -371,18 +388,35 @@ export default function BuatPurchasingPage() {
           </div>
 
           {!transformationPhase && (
-            <div className="px-3 pb-3 pt-2 border-t border-[#9FA1FF]/30">
-              <p className="text-xs font-semibold text-[#121358] mb-2">Apakah barang sudah ready di toko?</p>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setBarangReady(true)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${barangReady === true ? 'bg-[#121358] text-white' : 'bg-white/60 text-[#121358] hover:bg-white/80'}`}>
-                  Ya, sudah
-                </button>
-                <button type="button" onClick={() => setBarangReady(false)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${barangReady === false ? 'bg-[#121358] text-white' : 'bg-white/60 text-[#121358] hover:bg-white/80'}`}>
-                  Belum
-                </button>
+            <div className="px-3 pb-3 pt-2 border-t border-[#9FA1FF]/30 space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-[#121358] mb-2">Apakah barang sudah ready di toko?</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setBarangReady(true)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${barangReady === true ? 'bg-[#121358] text-white' : 'bg-white/60 text-[#121358] hover:bg-white/80'}`}>
+                    Ya, sudah
+                  </button>
+                  <button type="button" onClick={() => setBarangReady(false)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${barangReady === false ? 'bg-[#121358] text-white' : 'bg-white/60 text-[#121358] hover:bg-white/80'}`}>
+                    Belum
+                  </button>
+                </div>
               </div>
+              {barangReady === true && (
+                <div>
+                  <p className="text-xs font-semibold text-[#121358] mb-1.5">Simpan ke warehouse mana?</p>
+                  <select
+                    value={warehouseId}
+                    onChange={e => setWarehouseId(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full border border-[#9FA1FF] rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                  >
+                    <option value="">-- Pilih Warehouse --</option>
+                    {warehouses.map(w => (
+                      <option key={w.id} value={w.id}>{w.name} ({w.code})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           )}
         </div>
