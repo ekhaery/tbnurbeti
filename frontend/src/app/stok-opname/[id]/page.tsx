@@ -1,11 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faChevronLeft, faPen } from '@fortawesome/free-solid-svg-icons'
+import { faChevronLeft, faPen, faXmark } from '@fortawesome/free-solid-svg-icons'
 
 type Session = {
   id: number
@@ -34,6 +33,13 @@ export default function StokOpnameDetailPage() {
   const [countedStockMap, setCountedStockMap] = useState<Record<string, number>>({})
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const [editingItem, setEditingItem] = useState<Item | null>(null)
+  const [editStock, setEditStock] = useState('')
+  const [editLoading, setEditLoading] = useState(false)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editSaved, setEditSaved] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -94,6 +100,48 @@ export default function StokOpnameDetailPage() {
       setLoading(false)
     })
   }, [id])
+
+  const openEdit = async (item: Item) => {
+    if (!selectedWarehouseId) return
+    setEditingItem(item)
+    setEditLoading(true)
+    setEditError(null)
+    setEditSaved(false)
+
+    const { data } = await supabase
+      .from('stock_opname_item_warehouses')
+      .select('counted_stock')
+      .eq('item_id', item.id)
+      .eq('warehouse_id', selectedWarehouseId)
+      .maybeSingle()
+
+    setEditStock(data ? String(data.counted_stock) : '')
+    setEditLoading(false)
+  }
+
+  const handleEditSave = async () => {
+    if (!editingItem || !selectedWarehouseId) return
+    setEditSaving(true)
+    setEditError(null)
+
+    const { error: upsertErr } = await supabase
+      .from('stock_opname_item_warehouses')
+      .upsert(
+        { item_id: editingItem.id, warehouse_id: selectedWarehouseId, counted_stock: parseFloat(editStock) || 0 },
+        { onConflict: 'item_id,warehouse_id' }
+      )
+
+    setEditSaving(false)
+    if (upsertErr) { setEditError(upsertErr.message); return }
+
+    setCountedStockMap(prev => ({
+      ...prev,
+      [`${editingItem.id}_${selectedWarehouseId}`]: parseFloat(editStock) || 0,
+    }))
+
+    setEditSaved(true)
+    setTimeout(() => { setEditSaved(false); setEditingItem(null) }, 1000)
+  }
 
   const formatDate = (iso: string) => {
     const d = new Date(iso)
@@ -180,27 +228,76 @@ export default function StokOpnameDetailPage() {
                 const counted = countedStockMap[key]
                 const hasCounted = counted !== undefined
                 return (
-                  <Link
+                  <div
                     key={item.id}
-                    href={`/stok-opname/${id}/${item.id}`}
-                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                    className="flex items-center justify-between px-4 py-3"
                   >
-                    <p className="text-sm text-gray-700">{item.products?.name ?? '-'}</p>
-                    <div className="flex items-center gap-3">
+                    <p className="text-sm text-gray-700 flex-1 min-w-0 truncate">{item.products?.name ?? '-'}</p>
+                    <div className="flex items-center gap-3 flex-shrink-0">
                       <div className="text-right">
                         <p className={`text-sm font-semibold ${hasCounted ? 'text-gray-800' : 'text-gray-300'}`}>
                           {hasCounted ? counted : '-'}
                         </p>
                         <p className="text-[10px] text-gray-400">stok</p>
                       </div>
-                      <FontAwesomeIcon icon={faPen} className="w-3 h-3 text-gray-300" />
+                      <button
+                        onClick={() => openEdit(item)}
+                        className="p-1.5 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-colors"
+                      >
+                        <FontAwesomeIcon icon={faPen} className="w-3 h-3 text-gray-400" />
+                      </button>
                     </div>
-                  </Link>
+                  </div>
                 )
               })}
           </div>
         </div>
       </div>
+
+      {editingItem && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-5 space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-gray-800">{editingItem.products?.name}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Hitung stok per warehouse | {warehouses.find(w => w.id === selectedWarehouseId)?.name}
+                </p>
+              </div>
+              <button onClick={() => setEditingItem(null)} className="text-gray-400 hover:text-gray-600 p-1">
+                <FontAwesomeIcon icon={faXmark} className="w-4 h-4" />
+              </button>
+            </div>
+
+            {editLoading ? (
+              <p className="text-xs text-gray-400 text-center py-4">Memuat...</p>
+            ) : (
+              <>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={editStock}
+                  onChange={e => setEditStock(e.target.value)}
+                  placeholder="0"
+                  autoFocus
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                />
+
+                {editError && <p className="text-xs text-red-500">{editError}</p>}
+                {editSaved && <p className="text-xs text-green-600">✓ Tersimpan.</p>}
+
+                <button
+                  onClick={handleEditSave}
+                  disabled={editSaving}
+                  className="w-full bg-[#121358] text-white font-semibold py-3 rounded-xl text-sm disabled:opacity-40 transition"
+                >
+                  {editSaving ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
