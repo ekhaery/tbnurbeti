@@ -19,6 +19,8 @@ type Item = {
   products: { id: number; name: string } | null
 }
 
+type Warehouse = { id: number; name: string; code: string }
+
 export default function StokOpnameDetailPage() {
   const supabase = createClient()
   const { id } = useParams()
@@ -26,8 +28,11 @@ export default function StokOpnameDetailPage() {
 
   const [session, setSession] = useState<Session | null>(null)
   const [items, setItems] = useState<Item[]>([])
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [productWarehouseMap, setProductWarehouseMap] = useState<Record<number, number[]>>({})
   const [warehouseCounts, setWarehouseCounts] = useState<Record<number, number>>({})
   const [savedCounts, setSavedCounts] = useState<Record<number, number>>({})
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -52,15 +57,30 @@ export default function StokOpnameDetailPage() {
 
       const [{ data: links }, { data: counts }] = await Promise.all([
         productIds.length
-          ? supabase.from('product_warehouse').select('product_id').in('product_id', productIds)
-          : Promise.resolve({ data: [] as { product_id: number }[] }),
+          ? supabase.from('product_warehouse').select('product_id, warehouse_id, warehouses(id, name, code)').in('product_id', productIds)
+          : Promise.resolve({ data: [] as { product_id: number; warehouse_id: number; warehouses: Warehouse }[] }),
         itemIds.length
           ? supabase.from('stock_opname_item_warehouses').select('item_id').in('item_id', itemIds)
           : Promise.resolve({ data: [] as { item_id: number }[] }),
       ])
 
+      const linkRows = (links ?? []) as { product_id: number; warehouse_id: number; warehouses: Warehouse }[]
+
+      const warehouseMap: Record<number, Warehouse> = {}
+      const pwMap: Record<number, number[]> = {}
+      for (const l of linkRows) {
+        if (l.warehouses) warehouseMap[l.warehouse_id] = l.warehouses
+        if (!pwMap[l.product_id]) pwMap[l.product_id] = []
+        pwMap[l.product_id].push(l.warehouse_id)
+      }
+
+      const warehouseList = Object.values(warehouseMap).sort((a, b) => a.name.localeCompare(b.name))
+      setWarehouses(warehouseList)
+      setProductWarehouseMap(pwMap)
+      if (warehouseList.length > 0) setSelectedWarehouseId(warehouseList[0].id)
+
       const linkTally: Record<number, number> = {}
-      for (const l of (links ?? []) as { product_id: number }[]) {
+      for (const l of linkRows) {
         linkTally[l.product_id] = (linkTally[l.product_id] ?? 0) + 1
       }
       const countTally: Record<number, number> = {}
@@ -124,36 +144,60 @@ export default function StokOpnameDetailPage() {
           </div>
         </div>
 
+        {warehouses.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1 overflow-x-auto">
+            {warehouses.map(w => (
+              <button
+                key={w.id}
+                onClick={() => setSelectedWarehouseId(w.id)}
+                className={`flex-1 whitespace-nowrap text-center text-sm font-medium py-2 px-3 rounded-xl transition-colors ${
+                  selectedWarehouseId === w.id
+                    ? 'bg-slate-800 text-white'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                {w.name} ({w.code})
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <p className="text-xs font-semibold text-gray-700">Daftar Produk</p>
             <p className="text-xs text-gray-400">{items.length} produk</p>
           </div>
           <div className="divide-y divide-gray-100">
-            {items.map(item => {
-              const linked = item.products ? (warehouseCounts[item.products.id] ?? 0) : 0
-              const saved = savedCounts[item.id] ?? 0
-              const done = linked > 0 && saved >= linked
-              return (
-                <Link
-                  key={item.id}
-                  href={`/stok-opname/${id}/${item.id}`}
-                  className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors"
-                >
-                  <p className="text-sm text-gray-700">{item.products?.name ?? '-'}</p>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                        done ? 'text-green-600 bg-green-50' : 'text-amber-600 bg-amber-50'
-                      }`}
-                    >
-                      {done ? 'Selesai' : 'Pending'}
-                    </span>
-                    <FontAwesomeIcon icon={faChevronRight} className="w-3 h-3 text-gray-300" />
-                  </div>
-                </Link>
+            {items
+              .filter(item =>
+                selectedWarehouseId === null ||
+                !item.products ||
+                (productWarehouseMap[item.products.id] ?? []).includes(selectedWarehouseId)
               )
-            })}
+              .map(item => {
+                const linked = item.products ? (warehouseCounts[item.products.id] ?? 0) : 0
+                const saved = savedCounts[item.id] ?? 0
+                const done = linked > 0 && saved >= linked
+                return (
+                  <Link
+                    key={item.id}
+                    href={`/stok-opname/${id}/${item.id}`}
+                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                  >
+                    <p className="text-sm text-gray-700">{item.products?.name ?? '-'}</p>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                          done ? 'text-green-600 bg-green-50' : 'text-amber-600 bg-amber-50'
+                        }`}
+                      >
+                        {done ? 'Selesai' : 'Pending'}
+                      </span>
+                      <FontAwesomeIcon icon={faChevronRight} className="w-3 h-3 text-gray-300" />
+                    </div>
+                  </Link>
+                )
+              })}
           </div>
         </div>
       </div>
