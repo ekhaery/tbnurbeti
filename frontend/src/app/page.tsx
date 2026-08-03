@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faHandshake, faTag, faReceipt, faUserCheck, faLightbulb, faSackDollar, faBuildingColumns, faChartLine } from '@fortawesome/free-solid-svg-icons'
+import { faHandshake, faTag, faReceipt, faUserCheck, faLightbulb, faSackDollar, faBuildingColumns, faChartLine, faClipboardList } from '@fortawesome/free-solid-svg-icons'
 
 const primaryCards = [
   {
@@ -39,6 +39,14 @@ const primaryCards = [
     bg: '#ffc908',
     text: '#121358',
     sub: 'Arus keuangan & net profit',
+  },
+  {
+    label: 'Stok Opname',
+    icon: faClipboardList,
+    href: '/stok-opname',
+    bg: '#059669',
+    text: 'white',
+    sub: 'Cek & sesuaikan stok barang',
   },
 ]
 
