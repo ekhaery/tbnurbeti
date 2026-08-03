@@ -54,11 +54,14 @@ export default function SuppliersPage() {
   const [editBank, setEditBank] = useState<BankDetail>(emptyBank())
   const [editCategories, setEditCategories] = useState<number[]>([])
   const [editProducts, setEditProducts] = useState<number[]>([])
+  const [originalEditProductIds, setOriginalEditProductIds] = useState<number[]>([])
   const [catQuery, setCatQuery] = useState('')
   const [catDropdown, setCatDropdown] = useState(false)
   const [prodQuery, setProdQuery] = useState('')
   const [prodDropdown, setProdDropdown] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  const [viewProductIds, setViewProductIds] = useState<number[]>([])
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -127,10 +130,18 @@ export default function SuppliersPage() {
   const handleEdit = async (id: number) => {
     if (!editName.trim()) return
     setSaving(true); setError(null)
+
+    const toAddProds = editProducts.filter(pid => !originalEditProductIds.includes(pid))
+    const toRemoveProds = originalEditProductIds.filter(pid => !editProducts.includes(pid))
+    if (toRemoveProds.length > 0) await supabase.from('product_supplier').delete().eq('supplier_id', id).in('product_id', toRemoveProds)
+    if (toAddProds.length > 0) await supabase.from('product_supplier').insert(toAddProds.map(pid => ({ supplier_id: id, product_id: pid, is_primary: false })))
+    setOriginalEditProductIds([...editProducts])
+    setViewProductIds([...editProducts])
+
     const { error } = await supabase.from('suppliers').update({
       name: editName.trim(), phone: editPhone.trim() || null, address: editAddress.trim() || null,
       sales_name: editSalesName.trim() || null, bank_detail: buildBankDetail(editBank),
-      detail: buildDetail(editCategories, editProducts),
+      detail: buildDetail(editCategories, []),
     }).eq('id', id)
     setSaving(false)
     if (error) { setError(error.message); return }
@@ -144,13 +155,16 @@ export default function SuppliersPage() {
     fetchData()
   }
 
-  const openEdit = (s: Supplier) => {
+  const openEdit = async (s: Supplier) => {
     setEditName(s.name); setEditPhone(s.phone ?? ''); setEditAddress(s.address ?? '')
     setEditSalesName(s.sales_name ?? '')
     setEditBank({ bank: s.bank_detail?.bank ?? '', no_rek: s.bank_detail?.no_rek ?? '', rek_name: s.bank_detail?.rek_name ?? '' })
     setEditCategories(s.detail?.product_categories ?? [])
-    setEditProducts(s.detail?.products ?? [])
     setCatQuery(''); setProdQuery('')
+    const { data: psData } = await supabase.from('product_supplier').select('product_id').eq('supplier_id', s.id)
+    const linkedIds = (psData ?? []).map((r: any) => r.product_id as number)
+    setEditProducts(linkedIds)
+    setOriginalEditProductIds(linkedIds)
     setPopupEditMode(true)
   }
 
@@ -191,7 +205,11 @@ export default function SuppliersPage() {
           <div className="space-y-2">
             {suppliers.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase())).map(s => (
               <div key={s.id} className="bg-white rounded-xl shadow-sm px-4 py-3 cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setSelectedSupplier(s)}>
+                onClick={async () => {
+                  setSelectedSupplier(s); setViewProductIds([])
+                  const { data: psData } = await supabase.from('product_supplier').select('product_id').eq('supplier_id', s.id)
+                  setViewProductIds((psData ?? []).map((r: any) => r.product_id as number))
+                }}>
                 <p className="text-sm font-medium text-gray-800">{s.name}</p>
                 {(s.sales_name || s.phone) && (
                   <p className="text-xs text-gray-400 mt-0.5 truncate">{[s.sales_name, s.phone].filter(Boolean).join(' · ')}</p>
@@ -391,11 +409,11 @@ export default function SuppliersPage() {
                       </div>
                     </div>
                   )}
-                  {(selectedSupplier.detail?.products ?? []).length > 0 && (
+                  {viewProductIds.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Produk ({(selectedSupplier.detail?.products ?? []).length})</p>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Produk ({viewProductIds.length})</p>
                       <div className="flex flex-wrap gap-1 mt-1 max-h-32 overflow-y-auto">
-                        {(selectedSupplier.detail?.products ?? []).map(id => {
+                        {viewProductIds.map(id => {
                           const prod = productsList.find(p => p.id === id)
                           return prod ? <span key={id} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{prod.name}</span> : null
                         })}
@@ -403,7 +421,7 @@ export default function SuppliersPage() {
                     </div>
                   )}
                   {!selectedSupplier.phone && !selectedSupplier.address && !selectedSupplier.bank_detail &&
-                    !(selectedSupplier.detail?.product_categories?.length) && !(selectedSupplier.detail?.products?.length) && (
+                    !(selectedSupplier.detail?.product_categories?.length) && !viewProductIds.length && (
                     <p className="text-sm text-gray-400 text-center py-2">Tidak ada detail tambahan.</p>
                   )}
                 </div>
