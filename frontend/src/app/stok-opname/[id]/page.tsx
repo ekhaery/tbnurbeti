@@ -195,19 +195,31 @@ export default function StokOpnameDetailPage() {
 
         {warehouses.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1 overflow-x-auto">
-            {warehouses.map(w => (
-              <button
-                key={w.id}
-                onClick={() => setSelectedWarehouseId(w.id)}
-                className={`flex-1 whitespace-nowrap text-center text-sm font-medium py-2 px-3 rounded-xl transition-colors ${
-                  selectedWarehouseId === w.id
-                    ? 'bg-slate-800 text-white'
-                    : 'text-slate-500 hover:bg-slate-100'
-                }`}
-              >
-                {w.name} ({w.code})
-              </button>
-            ))}
+            {warehouses.map(w => {
+              const pending = items.filter(item =>
+                item.products &&
+                (productWarehouseMap[item.products.id] ?? []).includes(w.id) &&
+                countedStockMap[`${item.id}_${w.id}`] === undefined
+              ).length
+              return (
+                <button
+                  key={w.id}
+                  onClick={() => setSelectedWarehouseId(w.id)}
+                  className={`flex-1 whitespace-nowrap text-sm font-medium py-2 px-3 rounded-xl transition-colors flex items-center justify-center gap-1.5 ${
+                    selectedWarehouseId === w.id
+                      ? 'bg-slate-800 text-white'
+                      : 'text-slate-500 hover:bg-slate-100'
+                  }`}
+                >
+                  {w.name} ({w.code})
+                  {pending > 0 && (
+                    <span className="min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                      {pending}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </div>
         )}
 
