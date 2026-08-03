@@ -80,6 +80,12 @@ export default function ProductListPage() {
     supplier_name: string | null
   }[]>([])
   const [fetchingBatches, setFetchingBatches] = useState(false)
+  const [viewSuppliers, setViewSuppliers] = useState<{
+    id: number
+    name: string
+    is_primary: boolean
+  }[]>([])
+  const [fetchingSuppliers, setFetchingSuppliers] = useState(false)
   const [editingBatchId, setEditingBatchId] = useState<number | null>(null)
   const [editBatchQty, setEditBatchQty] = useState('')
   const [editBatchPrice, setEditBatchPrice] = useState('')
@@ -296,6 +302,8 @@ export default function ProductListPage() {
                 setViewProduct(p)
                 setViewBatches([])
                 setFetchingBatches(true)
+                setViewSuppliers([])
+                setFetchingSuppliers(true)
                 const { data } = await supabase
                   .from('stock_batches')
                   .select('id, qty_remaining, base_price, received_at, is_available, purchasing_items(purchasing(suppliers(name)))')
@@ -310,6 +318,19 @@ export default function ProductListPage() {
                   supplier_name: b.purchasing_items?.purchasing?.suppliers?.name ?? null,
                 })))
                 setFetchingBatches(false)
+
+                const { data: supplierData } = await supabase
+                  .from('product_supplier')
+                  .select('is_primary, suppliers(id, name)')
+                  .eq('product_id', p.id)
+                setViewSuppliers((supplierData ?? [])
+                  .map((s: any) => ({
+                    id: s.suppliers?.id,
+                    name: s.suppliers?.name ?? '-',
+                    is_primary: s.is_primary,
+                  }))
+                  .sort((a: any, b: any) => Number(b.is_primary) - Number(a.is_primary)))
+                setFetchingSuppliers(false)
               }
               return (
               <div key={p.id} className="bg-white rounded-xl shadow-sm p-4 flex items-start justify-between gap-3 relative">
@@ -537,6 +558,26 @@ export default function ProductListPage() {
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide">Stok</p>
                   <p className="text-sm font-medium text-gray-800 mt-0.5">{viewProduct.stock}</p>
                 </div>
+              </div>
+            </div>
+            <div className="border-t border-gray-100">
+              <div className="px-5 py-3">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2">
+                  Supplier {viewSuppliers.length > 0 && <span className="text-gray-500 font-semibold">| {viewSuppliers.length} data</span>}
+                </p>
+                {fetchingSuppliers ? (
+                  <p className="text-xs text-gray-400">Memuat...</p>
+                ) : viewSuppliers.length === 0 ? (
+                  <p className="text-xs text-center text-[#800000]">Belum ada supplier.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {viewSuppliers.map(s => (
+                      <span key={s.id} className={`text-xs font-medium px-2.5 py-1 rounded-full ${s.is_primary ? 'bg-[#121358] text-white' : 'bg-gray-100 text-gray-700'}`}>
+                        {s.name}{s.is_primary && <FontAwesomeIcon icon={faCheck} className="ml-1.5 w-2.5 h-2.5" />}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="border-t border-gray-100">

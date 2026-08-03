@@ -117,10 +117,9 @@ function buildEscPos(payload: PrintPayload): Buffer {
   thin()
 
   for (const item of payload.items) {
-    const subtotal = item.price_sold * item.qty - item.discount
+    const perUnit = item.qty > 0 ? Math.round(item.price_sold / item.qty) : item.price_sold
     line(item.name)
-    if (item.discount > 0) line(`  Disc: Rp ${fmt(item.discount)}`)
-    line(`  ${item.qty} pcs        Rp ${fmt(subtotal)}`)
+    line(`  ${item.qty} pcs @${fmt(perUnit)}  | Rp ${fmt(item.price_sold)}`)
   }
 
   thin()
