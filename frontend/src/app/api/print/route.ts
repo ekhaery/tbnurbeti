@@ -25,7 +25,7 @@ function sendRaw(data: Buffer): Promise<void> {
           clearTimeout(timeout)
           socket.destroy()
           resolve()
-        }, 500)
+        }, 250)
       })
     })
 
