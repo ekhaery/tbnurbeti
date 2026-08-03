@@ -247,7 +247,10 @@ if (error) { setError(error.message); setMarkingLunas(false); return }
       })
   }, [billsTab])
 
-  const supplierNames = Array.from(new Set(bills.map(b => b.suppliers?.name ?? '').filter(Boolean))).sort()
+  const supplierNames = Array.from(new Set([
+    ...bills.map(b => b.suppliers?.name ?? ''),
+    ...purchasing.map(p => p.suppliers?.name ?? ''),
+  ].filter(Boolean))).sort()
 
   // Unique months from installment_due_date sorted ASC
   const months = Array.from(new Set(
