@@ -5,11 +5,12 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faChevronLeft } from '@fortawesome/free-solid-svg-icons'
+import { faChevronLeft, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { toTitleCase } from '@/lib/utils'
 import { nowWIB } from '@/lib/date'
 
 type Category = { id: number; name: string }
+type Supplier = { id: number; name: string }
 
 export default function EditProductPage() {
   const supabase = createClient()
@@ -20,6 +21,11 @@ export default function EditProductPage() {
   const isAdmin = appUser?.role === 'admin'
 
   const [categories, setCategories] = useState<Category[]>([])
+  const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([])
+  const [selectedSuppliers, setSelectedSuppliers] = useState<Supplier[]>([])
+  const [originalSupplierIds, setOriginalSupplierIds] = useState<number[]>([])
+  const [supplierQuery, setSupplierQuery] = useState('')
+  const [supplierDropdown, setSupplierDropdown] = useState(false)
   const [form, setForm] = useState({
     code: '',
     name: '',
@@ -36,6 +42,18 @@ export default function EditProductPage() {
 
   useEffect(() => {
     supabase.from('categories').select('id, name').order('name').then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
+
+    supabase.from('suppliers').select('id, name').order('name').then(({ data }: { data: Supplier[] | null }) => setAllSuppliers(data ?? []))
+
+    supabase
+      .from('product_supplier')
+      .select('supplier_id, suppliers(id, name)')
+      .eq('product_id', id)
+      .then(({ data }: { data: { supplier_id: number; suppliers: { id: number; name: string } | null }[] | null }) => {
+        const list = (data ?? []).map(r => ({ id: r.suppliers!.id, name: r.suppliers!.name }))
+        setSelectedSuppliers(list)
+        setOriginalSupplierIds(list.map(s => s.id))
+      })
 
     supabase
       .from('products')
@@ -94,6 +112,18 @@ export default function EditProductPage() {
       setSaving(false)
       return
     }
+
+    // Sync product_supplier
+    const currentIds = selectedSuppliers.map(s => s.id)
+    const toAdd = currentIds.filter(id => !originalSupplierIds.includes(id))
+    const toRemove = originalSupplierIds.filter(id => !currentIds.includes(id))
+    if (toRemove.length > 0) {
+      await supabase.from('product_supplier').delete().eq('product_id', id).in('supplier_id', toRemove)
+    }
+    if (toAdd.length > 0) {
+      await supabase.from('product_supplier').insert(toAdd.map(sid => ({ product_id: Number(id), supplier_id: sid, is_primary: false })))
+    }
+    setOriginalSupplierIds(currentIds)
 
     const { error: updateError } = await supabase
       .from('products')
@@ -215,6 +245,51 @@ export default function EditProductPage() {
                 min="0"
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#121358]"
               />
+            </div>
+          </div>
+
+          {/* Suppliers */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Supplier</label>
+            {selectedSuppliers.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {selectedSuppliers.map(s => (
+                  <span key={s.id} className="inline-flex items-center gap-1 text-xs font-medium bg-[#121358] text-white px-2.5 py-1 rounded-full">
+                    {s.name}
+                    <button type="button" onClick={() => setSelectedSuppliers(prev => prev.filter(x => x.id !== s.id))} className="opacity-70 hover:opacity-100">
+                      <FontAwesomeIcon icon={faXmark} className="w-2.5 h-2.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="relative">
+              <input
+                type="text"
+                value={supplierQuery}
+                onChange={e => { setSupplierQuery(e.target.value); setSupplierDropdown(true) }}
+                onFocus={() => setSupplierDropdown(true)}
+                onBlur={() => setTimeout(() => setSupplierDropdown(false), 150)}
+                placeholder="Cari dan tambah supplier..."
+                autoComplete="off"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#121358]"
+              />
+              {supplierDropdown && (
+                <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                  {allSuppliers
+                    .filter(s => s.name.toLowerCase().includes(supplierQuery.toLowerCase()) && !selectedSuppliers.some(x => x.id === s.id))
+                    .map(s => (
+                      <button key={s.id} type="button"
+                        onMouseDown={() => { setSelectedSuppliers(prev => [...prev, s]); setSupplierQuery(''); setSupplierDropdown(false) }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+                        {s.name}
+                      </button>
+                    ))}
+                  {allSuppliers.filter(s => s.name.toLowerCase().includes(supplierQuery.toLowerCase()) && !selectedSuppliers.some(x => x.id === s.id)).length === 0 && (
+                    <p className="px-4 py-2.5 text-xs text-gray-400">Tidak ada supplier.</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
