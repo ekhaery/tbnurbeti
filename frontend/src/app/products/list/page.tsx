@@ -21,6 +21,7 @@ type Product = {
   is_deleted: boolean
   is_discontinued: boolean
   categories: { name: string } | null
+  unit_of_measurements: { abbreviation: string } | null
 }
 
 type Category = {
@@ -119,7 +120,7 @@ export default function ProductListPage() {
       while (true) {
         const { data, error } = await supabase
           .from('products')
-          .select('id, code, name, base_price, price, updated_at, is_deleted, is_discontinued, categories(name)')
+          .select('id, code, name, base_price, price, updated_at, is_deleted, is_discontinued, categories(name), unit_of_measurements(abbreviation)')
           .eq('is_deleted', false)
           .range(from, from + chunkSize - 1)
         if (error || !data || data.length === 0) break
@@ -338,7 +339,9 @@ export default function ProductListPage() {
                   onClick={openView}
                   className="flex-1 min-w-0 text-left"
                 >
-                  <p className="text-sm font-semibold text-gray-800 truncate">{p.name}</p>
+                  <p className="text-sm font-semibold text-gray-800 truncate">
+                    {p.name}{p.unit_of_measurements?.abbreviation && <span className="text-gray-400 font-normal"> | {p.unit_of_measurements.abbreviation}</span>}
+                  </p>
                   <p className="text-xs text-gray-500 mt-0.5">{p.code}</p>
                   <span className="inline-block mt-1 text-[10px] font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
                     {p.categories?.name ?? '-'}
@@ -542,6 +545,10 @@ export default function ProductListPage() {
               <div>
                 <p className="text-[10px] text-gray-400 uppercase tracking-wide">Kategori</p>
                 <p className="text-sm font-medium text-gray-800 mt-0.5">{viewProduct.categories?.name ?? '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Unit</p>
+                <p className="text-sm font-medium text-gray-800 mt-0.5">{viewProduct.unit_of_measurements?.abbreviation ?? '-'}</p>
               </div>
               <div className={`grid gap-3 ${isAdmin && viewBatches.length === 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 {isAdmin && viewBatches.length === 0 && (

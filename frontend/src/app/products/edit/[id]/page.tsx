@@ -11,6 +11,7 @@ import { nowWIB } from '@/lib/date'
 
 type Category = { id: number; name: string }
 type Supplier = { id: number; name: string }
+type UnitOfMeasurement = { id: number; name: string; abbreviation: string }
 
 export default function EditProductPage() {
   const supabase = createClient()
@@ -21,15 +22,19 @@ export default function EditProductPage() {
   const isAdmin = appUser?.role === 'admin'
 
   const [categories, setCategories] = useState<Category[]>([])
+  const [unitOfMeasurements, setUnitOfMeasurements] = useState<UnitOfMeasurement[]>([])
   const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([])
   const [selectedSuppliers, setSelectedSuppliers] = useState<Supplier[]>([])
   const [originalSupplierIds, setOriginalSupplierIds] = useState<number[]>([])
   const [supplierQuery, setSupplierQuery] = useState('')
   const [supplierDropdown, setSupplierDropdown] = useState(false)
+  const [unitQuery, setUnitQuery] = useState('')
+  const [unitDropdown, setUnitDropdown] = useState(false)
   const [form, setForm] = useState({
     code: '',
     name: '',
     category_id: '',
+    unit_of_measurement_id: '',
     base_price: '',
     price: '',
     is_discontinued: false,
@@ -42,6 +47,8 @@ export default function EditProductPage() {
 
   useEffect(() => {
     supabase.from('categories').select('id, name').order('name').then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
+
+    supabase.from('unit_of_measurements').select('id, name, abbreviation').order('name').then(({ data }: { data: UnitOfMeasurement[] | null }) => setUnitOfMeasurements(data ?? []))
 
     supabase.from('suppliers').select('id, name').order('name').then(({ data }: { data: Supplier[] | null }) => setAllSuppliers(data ?? []))
 
@@ -57,15 +64,16 @@ export default function EditProductPage() {
 
     supabase
       .from('products')
-      .select('id, code, name, category_id, base_price, price, is_discontinued')
+      .select('id, code, name, category_id, unit_of_measurement_id, base_price, price, is_discontinued')
       .eq('id', id)
       .single()
-      .then(({ data }: { data: { code: string | null; name: string; category_id: number; base_price: number; price: number; is_discontinued: boolean } | null }) => {
+      .then(({ data }: { data: { code: string | null; name: string; category_id: number; unit_of_measurement_id: number | null; base_price: number; price: number; is_discontinued: boolean } | null }) => {
         if (data) {
           setForm({
             code: data.code ?? '',
             name: data.name ?? '',
             category_id: String(data.category_id ?? ''),
+            unit_of_measurement_id: data.unit_of_measurement_id ? String(data.unit_of_measurement_id) : '',
             base_price: String(data.base_price ?? ''),
             price: String(data.price ?? ''),
             is_discontinued: data.is_discontinued ?? false,
@@ -131,6 +139,7 @@ export default function EditProductPage() {
         code: form.code.trim() || null,
         name: toTitleCase(form.name),
         category_id: Number(form.category_id),
+        unit_of_measurement_id: form.unit_of_measurement_id ? Number(form.unit_of_measurement_id) : null,
         base_price: parseFloat(form.base_price) || 0,
         price: parseFloat(form.price) || 0,
         is_discontinued: form.is_discontinued,
@@ -147,6 +156,8 @@ export default function EditProductPage() {
       setTimeout(() => router.push('/products/list'), 1000)
     }
   }
+
+  const selectedUnit = unitOfMeasurements.find(u => String(u.id) === form.unit_of_measurement_id) ?? null
 
   if (loading || fetching) {
     return (
@@ -219,6 +230,51 @@ export default function EditProductPage() {
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
+          </div>
+
+          {/* Unit of Measurement */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Unit</label>
+            {selectedUnit && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className="inline-flex items-center gap-1 text-xs font-medium bg-[#121358] text-white px-2.5 py-1 rounded-full">
+                  {selectedUnit.name} ({selectedUnit.abbreviation})
+                  <button type="button" onClick={() => setForm({ ...form, unit_of_measurement_id: '' })} className="opacity-70 hover:opacity-100">
+                    <FontAwesomeIcon icon={faXmark} className="w-2.5 h-2.5" />
+                  </button>
+                </span>
+              </div>
+            )}
+            {!selectedUnit && (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={unitQuery}
+                  onChange={e => { setUnitQuery(e.target.value); setUnitDropdown(true) }}
+                  onFocus={() => setUnitDropdown(true)}
+                  onBlur={() => setTimeout(() => setUnitDropdown(false), 150)}
+                  placeholder="Cari unit..."
+                  autoComplete="off"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                />
+                {unitDropdown && (
+                  <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                    {unitOfMeasurements
+                      .filter(u => u.name.toLowerCase().includes(unitQuery.toLowerCase()) || u.abbreviation.toLowerCase().includes(unitQuery.toLowerCase()))
+                      .map(u => (
+                        <button key={u.id} type="button"
+                          onMouseDown={() => { setForm({ ...form, unit_of_measurement_id: String(u.id) }); setUnitQuery(''); setUnitDropdown(false) }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+                          {u.name} ({u.abbreviation})
+                        </button>
+                      ))}
+                    {unitOfMeasurements.filter(u => u.name.toLowerCase().includes(unitQuery.toLowerCase()) || u.abbreviation.toLowerCase().includes(unitQuery.toLowerCase())).length === 0 && (
+                      <p className="px-4 py-2.5 text-xs text-gray-400">Tidak ada unit.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Price + Base Price + Stock */}
