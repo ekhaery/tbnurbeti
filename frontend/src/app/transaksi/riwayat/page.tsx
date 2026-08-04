@@ -13,6 +13,7 @@ import DeleteConfirmPopup from '@/components/DeleteConfirmPopup'
 
 type TransactionItem = {
   id: number
+  product_id: number
   qty: number
   price_sold: number
   cogs: number
@@ -21,9 +22,9 @@ type TransactionItem = {
   products: { name: string } | null
 }
 
-type EditItem = { id: number; product_name: string; qty: number; unitPrice: number; price_sold: number; discount: number }
+type EditItem = { id: number; product_id: number; product_name: string; qty: number; originalQty: number; unitPrice: number; price_sold: number; discount: number }
 type NewEditItem = { product_id: number; product_name: string; qty: number; unitPrice: number; price_sold: number; discount: number }
-type Product = { id: number; name: string; price: number }
+type Product = { id: number; name: string; price: number; stock: number }
 
 type Transaction = {
   id: number
@@ -123,7 +124,7 @@ function RiwayatTransaksiContent() {
 
     if (pFilter.trim()) {
       const { data } = await applyFilters(
-        buildQ('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, qty, price_sold, cogs, profit, discount, products(name))')
+        buildQ('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, product_id, qty, price_sold, cogs, profit, discount, products(name))')
           .order('date', { ascending: false }).order('id', { ascending: false }),
         from, to, iFilter, trxIds!
       )
@@ -139,7 +140,7 @@ function RiwayatTransaksiContent() {
     const [{ count }, { data }] = await Promise.all([
       applyFilters(buildQ('id', { count: 'exact', head: true }), from, to, iFilter),
       applyFilters(
-        buildQ('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, qty, price_sold, cogs, profit, discount, products(name))')
+        buildQ('id, code, date, notes, reason_to_edit, is_initial_transformation, users(name), transaction_items(id, product_id, qty, price_sold, cogs, profit, discount, products(name))')
           .order('date', { ascending: false }).order('id', { ascending: false }).range(rangeFrom, rangeTo),
         from, to, iFilter
       ),
@@ -203,7 +204,7 @@ function RiwayatTransaksiContent() {
     setLoadingProducts(true)
     const chunkSize = 1000
     let from = 0
-    let all: Product[] = []
+    let all: Omit<Product, 'stock'>[] = []
     while (true) {
       const { data, error } = await supabase
         .from('products')
@@ -212,11 +213,26 @@ function RiwayatTransaksiContent() {
         .order('name')
         .range(from, from + chunkSize - 1)
       if (error || !data || data.length === 0) break
-      all = [...all, ...(data as Product[])]
+      all = [...all, ...(data as Omit<Product, 'stock'>[])]
       if (data.length < chunkSize) break
       from += chunkSize
     }
-    setProducts(all)
+    from = 0
+    const stockMap: Record<number, number> = {}
+    while (true) {
+      const { data, error } = await supabase
+        .from('stock_batches')
+        .select('product_id, qty_remaining')
+        .eq('is_available', true)
+        .range(from, from + chunkSize - 1)
+      if (error || !data || data.length === 0) break
+      for (const b of data as { product_id: number; qty_remaining: number }[]) {
+        stockMap[b.product_id] = (stockMap[b.product_id] ?? 0) + b.qty_remaining
+      }
+      if (data.length < chunkSize) break
+      from += chunkSize
+    }
+    setProducts(all.map(p => ({ ...p, stock: stockMap[p.id] ?? 0 })))
     setLoadingProducts(false)
   }
 
@@ -227,8 +243,10 @@ function RiwayatTransaksiContent() {
       const unitPrice = i.qty > 0 ? i.price_sold / i.qty : i.price_sold
       return {
         id: i.id,
+        product_id: i.product_id,
         product_name: i.products?.name ?? '-',
         qty: i.qty,
+        originalQty: i.qty,
         unitPrice,
         price_sold: i.price_sold,
         discount: i.discount ?? 0,
@@ -258,6 +276,17 @@ function RiwayatTransaksiContent() {
     if (!target) return
     setRemovedItems(prev => prev.filter(i => i.id !== id))
     setEditItems(prev => [...prev, target])
+  }
+
+  // Stock available for a line item's new qty = remaining stock_batches for the
+  // product, plus this item's own originalQty (0 for brand-new lines) since that
+  // amount is already "reserved" by this transaction and isn't in stock_batches.
+  const stockErrorFor = (productId: number, qty: number, originalQty: number): string | null => {
+    const product = products.find(p => p.id === productId)
+    if (!product) return null
+    const available = product.stock + originalQty
+    if (qty > available) return `Stok tersedia: ${available}`
+    return null
   }
 
   // Restores FIFO stock consumed by the given transaction_items (reverses
@@ -302,6 +331,18 @@ function RiwayatTransaksiContent() {
       setEditError('Transaksi harus memiliki minimal satu barang.')
       return
     }
+
+    if (!editingTrx.is_initial_transformation) {
+      for (const item of editItems) {
+        const err = stockErrorFor(item.product_id, item.qty, item.originalQty)
+        if (err) { setEditError(`Stok ${item.product_name} tidak cukup. ${err}`); return }
+      }
+      for (const item of newEditItems) {
+        const err = stockErrorFor(item.product_id, item.qty, 0)
+        if (err) { setEditError(`Stok ${item.product_name} tidak cukup. ${err}`); return }
+      }
+    }
+
     setSaving(true)
     setEditError(null)
 
@@ -328,24 +369,47 @@ function RiwayatTransaksiContent() {
     }
 
     for (const item of editItems) {
-      const { error: itemErr } = await supabase
-        .from('transaction_items')
-        .update({ qty: item.qty, price_sold: item.price_sold, discount: item.discount })
-        .eq('id', item.id)
-      if (itemErr) { setEditError(itemErr.message); setSaving(false); return }
+      if (editingTrx.is_initial_transformation) {
+        const { error: itemErr } = await supabase
+          .from('transaction_items')
+          .update({ qty: item.qty, price_sold: item.price_sold, discount: item.discount })
+          .eq('id', item.id)
+        if (itemErr) { setEditError(itemErr.message); setSaving(false); return }
+      } else {
+        const { error: syncErr } = await supabase.rpc('sync_transaction_item_stock', {
+          p_transaction_item_id: item.id,
+          p_qty: item.qty,
+          p_price_sold: item.price_sold,
+          p_discount: item.discount,
+        })
+        if (syncErr) { setEditError(syncErr.message); setSaving(false); return }
+      }
     }
 
     for (const item of newEditItems) {
-      const { error: itemErr } = await supabase
+      const { data: newRow, error: itemErr } = await supabase
         .from('transaction_items')
         .insert({ transaction_id: editingTrx.id, product_id: item.product_id, qty: item.qty, price_sold: item.price_sold, cogs: 0, discount: item.discount })
-      if (itemErr) { setEditError(itemErr.message); setSaving(false); return }
+        .select('id')
+        .single()
+      if (itemErr || !newRow) { setEditError(itemErr?.message ?? 'Gagal menambah produk.'); setSaving(false); return }
+
+      if (!editingTrx.is_initial_transformation) {
+        const { error: syncErr } = await supabase.rpc('sync_transaction_item_stock', {
+          p_transaction_item_id: (newRow as { id: number }).id,
+          p_qty: item.qty,
+          p_price_sold: item.price_sold,
+          p_discount: item.discount,
+        })
+        if (syncErr) { setEditError(syncErr.message); setSaving(false); return }
+      }
     }
 
     setSaving(false)
     setShowEditConfirm(false)
     setEditingTrx(null)
     setRemovedItems([])
+    setProducts([])
     fetchData(page, dateFrom, dateTo, productFilter, initFilter)
   }
 
@@ -705,6 +769,7 @@ function RiwayatTransaksiContent() {
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Item</p>
                 {editItems.map((item, i) => {
                   const subtotal = item.price_sold - (item.discount ?? 0)
+                  const qtyErr = stockErrorFor(item.product_id, item.qty, item.originalQty)
                   return (
                     <div key={item.id} className="bg-gray-50 rounded-xl p-3 space-y-2">
                       <div className="flex items-center justify-between">
@@ -713,16 +778,7 @@ function RiwayatTransaksiContent() {
                           <FontAwesomeIcon icon={faTrash} className="w-3 h-3 text-gray-400 hover:text-red-400" />
                         </button>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="block text-[10px] text-gray-400 mb-1">Qty</label>
-                          <input type="number" min="1" value={item.qty}
-                            onChange={e => {
-                              const q = parseInt(e.target.value) || 1
-                              setEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, qty: q, price_sold: q * x.unitPrice } : x))
-                            }}
-                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
-                        </div>
+                      <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="block text-[10px] text-gray-400 mb-1">Harga Jual</label>
                           <input type="number" value={item.unitPrice} disabled
@@ -734,6 +790,36 @@ function RiwayatTransaksiContent() {
                             onChange={e => setEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, discount: parseFloat(e.target.value) || 0 } : x))}
                             className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
                         </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-1">Qty</label>
+                        <div className="flex items-center gap-2">
+                          <button type="button"
+                            onClick={() => setEditItems(prev => prev.map((x, idx) => {
+                              if (idx !== i) return x
+                              const q = Math.max(0.25, Math.round((x.qty - 0.25) * 100) / 100)
+                              return { ...x, qty: q, price_sold: q * x.unitPrice }
+                            }))}
+                            className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-400 hover:bg-red-500 text-white font-bold text-lg transition shrink-0">−</button>
+                          <input type="text" inputMode="numeric" value={item.qty}
+                            onChange={e => {
+                              const v = e.target.value
+                              if (v === '' || /^\d+$/.test(v)) {
+                                const q = v === '' ? 0 : parseInt(v)
+                                setEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, qty: q, price_sold: q * x.unitPrice } : x))
+                              }
+                            }}
+                            className={`flex-1 border rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#121358] ${qtyErr ? 'border-red-400' : 'border-gray-300'}`} />
+                          <button type="button"
+                            onClick={() => setEditItems(prev => prev.map((x, idx) => {
+                              if (idx !== i) return x
+                              const q = Math.round((x.qty + 0.25) * 100) / 100
+                              return { ...x, qty: q, price_sold: q * x.unitPrice }
+                            }))}
+                            className="w-9 h-9 flex items-center justify-center rounded-lg font-bold text-lg transition shrink-0"
+                            style={{ backgroundColor: '#ffc908', color: '#121358' }}>+</button>
+                        </div>
+                        {qtyErr && <p className="text-xs text-red-500 mt-1">{qtyErr}</p>}
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] text-gray-400">Subtotal</p>
@@ -750,6 +836,7 @@ function RiwayatTransaksiContent() {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Produk Baru</p>
                   {newEditItems.map((item, i) => {
                     const subtotal = item.price_sold - (item.discount ?? 0)
+                    const qtyErr = stockErrorFor(item.product_id, item.qty, 0)
                     return (
                       <div key={i} className="bg-blue-50 rounded-xl p-3 space-y-2">
                         <div className="flex items-center justify-between">
@@ -758,16 +845,7 @@ function RiwayatTransaksiContent() {
                             <FontAwesomeIcon icon={faXmark} className="w-3 h-3 text-gray-400 hover:text-red-400" />
                           </button>
                         </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <label className="block text-[10px] text-gray-400 mb-1">Qty</label>
-                            <input type="number" min="1" value={item.qty}
-                              onChange={e => {
-                                const q = parseInt(e.target.value) || 1
-                                setNewEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, qty: q, price_sold: q * x.unitPrice } : x))
-                              }}
-                              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
-                          </div>
+                        <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="block text-[10px] text-gray-400 mb-1">Harga Jual</label>
                             <input type="number" value={item.unitPrice} disabled
@@ -779,6 +857,36 @@ function RiwayatTransaksiContent() {
                               onChange={e => setNewEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, discount: parseFloat(e.target.value) || 0 } : x))}
                               className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
                           </div>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-400 mb-1">Qty</label>
+                          <div className="flex items-center gap-2">
+                            <button type="button"
+                              onClick={() => setNewEditItems(prev => prev.map((x, idx) => {
+                                if (idx !== i) return x
+                                const q = Math.max(0.25, Math.round((x.qty - 0.25) * 100) / 100)
+                                return { ...x, qty: q, price_sold: q * x.unitPrice }
+                              }))}
+                              className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-400 hover:bg-red-500 text-white font-bold text-lg transition shrink-0">−</button>
+                            <input type="text" inputMode="numeric" value={item.qty}
+                              onChange={e => {
+                                const v = e.target.value
+                                if (v === '' || /^\d+$/.test(v)) {
+                                  const q = v === '' ? 0 : parseInt(v)
+                                  setNewEditItems(prev => prev.map((x, idx) => idx === i ? { ...x, qty: q, price_sold: q * x.unitPrice } : x))
+                                }
+                              }}
+                              className={`flex-1 border rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#121358] ${qtyErr ? 'border-red-400' : 'border-gray-300'}`} />
+                            <button type="button"
+                              onClick={() => setNewEditItems(prev => prev.map((x, idx) => {
+                                if (idx !== i) return x
+                                const q = Math.round((x.qty + 0.25) * 100) / 100
+                                return { ...x, qty: q, price_sold: q * x.unitPrice }
+                              }))}
+                              className="w-9 h-9 flex items-center justify-center rounded-lg font-bold text-lg transition shrink-0"
+                              style={{ backgroundColor: '#ffc908', color: '#121358' }}>+</button>
+                          </div>
+                          {qtyErr && <p className="text-xs text-red-500 mt-1">{qtyErr}</p>}
                         </div>
                         <div className="text-right">
                           <p className="text-[10px] text-gray-400">Subtotal</p>
