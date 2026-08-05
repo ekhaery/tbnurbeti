@@ -24,8 +24,27 @@ export default function WarehouseInventoryPage() {
   useEffect(() => {
     supabase.from('warehouses').select('id, name, code').eq('is_active', true).order('name')
       .then(({ data }: { data: Warehouse[] | null }) => setWarehouses(data ?? []))
-    supabase.from('products').select('id, name, categories(name)').eq('is_deleted', false).eq('is_discontinued', false).order('name')
-      .then(({ data }: { data: Product[] | null }) => setProducts(data ?? []))
+
+    const fetchAllProducts = async () => {
+      const chunkSize = 1000
+      let from = 0
+      let all: Product[] = []
+      while (true) {
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, name, categories(name)')
+          .eq('is_deleted', false)
+          .eq('is_discontinued', false)
+          .order('name')
+          .range(from, from + chunkSize - 1)
+        if (error || !data || data.length === 0) break
+        all = [...all, ...(data as Product[])]
+        if (data.length < chunkSize) break
+        from += chunkSize
+      }
+      setProducts(all)
+    }
+    fetchAllProducts()
   }, [])
 
   useEffect(() => {
