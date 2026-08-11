@@ -24,7 +24,12 @@ type TransactionItem = {
 
 type EditItem = { id: number; product_id: number; product_name: string; qty: number; originalQty: number; unitPrice: number; price_sold: number; discount: number }
 type NewEditItem = { product_id: number; product_name: string; qty: number; unitPrice: number; price_sold: number; discount: number }
-type Product = { id: number; name: string; price: number; stock: number }
+type Product = { id: number; name: string; price: number; stock: number; categories: { name: string } | null }
+
+// Only Cat Oplos has a harga jual that varies by mixing machine — every other
+// category keeps a fixed price, set on the product itself.
+const MANUAL_PRICE_CATEGORY = 'Cat Oplos'
+const isManualPrice = (product: Product | undefined) => product?.categories?.name === MANUAL_PRICE_CATEGORY
 
 type Transaction = {
   id: number
@@ -208,7 +213,7 @@ function RiwayatTransaksiContent() {
     while (true) {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, price')
+        .select('id, name, price, categories(name)')
         .eq('is_deleted', false)
         .order('name')
         .range(from, from + chunkSize - 1)
@@ -330,6 +335,13 @@ function RiwayatTransaksiContent() {
     if (editItems.length + newEditItems.length === 0) {
       setEditError('Transaksi harus memiliki minimal satu barang.')
       return
+    }
+
+    for (const item of [...editItems, ...newEditItems]) {
+      if (isManualPrice(products.find(p => p.id === item.product_id)) && !(item.unitPrice > 0)) {
+        setEditError(`Isi harga jual untuk ${item.product_name}.`)
+        return
+      }
     }
 
     if (!editingTrx.is_initial_transformation) {
@@ -770,6 +782,7 @@ function RiwayatTransaksiContent() {
                 {editItems.map((item, i) => {
                   const subtotal = item.price_sold - (item.discount ?? 0)
                   const qtyErr = stockErrorFor(item.product_id, item.qty, item.originalQty)
+                  const manualPrice = isManualPrice(products.find(p => p.id === item.product_id))
                   return (
                     <div key={item.id} className="bg-gray-50 rounded-xl p-3 space-y-2">
                       <div className="flex items-center justify-between">
@@ -781,8 +794,18 @@ function RiwayatTransaksiContent() {
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="block text-[10px] text-gray-400 mb-1">Harga Jual</label>
-                          <input type="number" value={item.unitPrice} disabled
-                            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-100 text-gray-500 cursor-not-allowed" />
+                          {manualPrice ? (
+                            <input type="number" min="0" value={item.unitPrice}
+                              onChange={e => setEditItems(prev => prev.map((x, idx) => {
+                                if (idx !== i) return x
+                                const up = parseFloat(e.target.value) || 0
+                                return { ...x, unitPrice: up, price_sold: x.qty * up }
+                              }))}
+                              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                          ) : (
+                            <input type="number" value={item.unitPrice} disabled
+                              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-100 text-gray-500 cursor-not-allowed" />
+                          )}
                         </div>
                         <div>
                           <label className="block text-[10px] text-gray-400 mb-1">Diskon</label>
@@ -837,6 +860,7 @@ function RiwayatTransaksiContent() {
                   {newEditItems.map((item, i) => {
                     const subtotal = item.price_sold - (item.discount ?? 0)
                     const qtyErr = stockErrorFor(item.product_id, item.qty, 0)
+                    const manualPrice = isManualPrice(products.find(p => p.id === item.product_id))
                     return (
                       <div key={i} className="bg-blue-50 rounded-xl p-3 space-y-2">
                         <div className="flex items-center justify-between">
@@ -848,8 +872,18 @@ function RiwayatTransaksiContent() {
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="block text-[10px] text-gray-400 mb-1">Harga Jual</label>
-                            <input type="number" value={item.unitPrice} disabled
-                              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-blue-100 text-gray-500 cursor-not-allowed" />
+                            {manualPrice ? (
+                              <input type="number" min="0" value={item.unitPrice}
+                                onChange={e => setNewEditItems(prev => prev.map((x, idx) => {
+                                  if (idx !== i) return x
+                                  const up = parseFloat(e.target.value) || 0
+                                  return { ...x, unitPrice: up, price_sold: x.qty * up }
+                                }))}
+                                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
+                            ) : (
+                              <input type="number" value={item.unitPrice} disabled
+                                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-blue-100 text-gray-500 cursor-not-allowed" />
+                            )}
                           </div>
                           <div>
                             <label className="block text-[10px] text-gray-400 mb-1">Diskon</label>
