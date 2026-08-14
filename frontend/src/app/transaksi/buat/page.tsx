@@ -16,6 +16,11 @@ type Product = {
   categories: { name: string } | null
 }
 
+// Only Cat Oplos has a harga jual that varies by mixing machine — every other
+// category keeps a fixed price, set on the product itself.
+const MANUAL_PRICE_CATEGORY = 'Cat Oplos'
+const isManualPrice = (product: Product | undefined) => product?.categories?.name === MANUAL_PRICE_CATEGORY
+
 type ItemRow = {
   product_id: number | ''
   query: string
@@ -136,6 +141,8 @@ export default function BuatTransaksiPage() {
 
   const addItem = () => {
     if (!current.product_id || !current.qty) return
+    const product = products.find(p => p.id === Number(current.product_id))
+    if (isManualPrice(product) && !(parseFloat(current.price_sold) > 0)) return
     setItems(prev => [...prev, current])
     setCurrent(emptyItem())
     setAutocomplete({ open: false, focused: -1 })
@@ -202,6 +209,10 @@ export default function BuatTransaksiPage() {
       if (!product) { setError('Produk tidak ditemukan.'); return }
       if (parseFloat(row.qty) > product.stock) {
         setError(`Stok ${product.name} tidak cukup. Tersedia: ${product.stock}`)
+        return
+      }
+      if (isManualPrice(product) && !(parseFloat(row.price_sold) > 0)) {
+        setError(`Isi harga jual untuk ${product.name}.`)
         return
       }
     }
@@ -440,7 +451,12 @@ export default function BuatTransaksiPage() {
                   )}
                   {selectedProduct && (
                     <p className="text-xs mt-1" style={{ color: '#ffc908' }}>
-                      <span className="font-normal">Harga jual:</span> <span className="font-semibold">Rp {fmt(selectedProduct.price)}</span>
+                      {isManualPrice(selectedProduct) ? (
+                        <span className="font-normal">Harga oplos berbeda-beda &mdash; isi manual di bawah</span>
+                      ) : (
+                        <span className="font-normal">Harga jual:</span>
+                      )}
+                      {!isManualPrice(selectedProduct) && <> <span className="font-semibold">Rp {fmt(selectedProduct.price)}</span></>}
                       <span className="mx-1">·</span>
                       <span className="font-normal">Stok:</span> <span className="font-semibold">{selectedProduct.stock}</span>
                     </p>
@@ -452,8 +468,15 @@ export default function BuatTransaksiPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-white/80 mb-1">Harga Jual</label>
-                      <input type="number" value={current.price_sold} disabled placeholder="0"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white text-gray-400 cursor-not-allowed" />
+                      {isManualPrice(selectedProduct) ? (
+                        <input type="number" value={current.price_sold}
+                          onChange={e => updateCurrent('price_sold', e.target.value)}
+                          placeholder="0" min="0"
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white" />
+                      ) : (
+                        <input type="number" value={current.price_sold} disabled placeholder="0"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white text-gray-400 cursor-not-allowed" />
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs text-white/80 mb-1">Diskon</label>
@@ -493,7 +516,7 @@ export default function BuatTransaksiPage() {
                   <button
                     type="button"
                     onClick={addItem}
-                    disabled={!current.product_id || !current.qty}
+                    disabled={!current.product_id || !current.qty || (isManualPrice(selectedProduct) && !(parseFloat(current.price_sold) > 0))}
                     className="w-full rounded-xl py-2.5 md:py-12 text-sm font-semibold text-[#121358] disabled:opacity-40 disabled:cursor-not-allowed transition hover:brightness-105"
                     style={{ backgroundColor: '#ffc908' }}
                   >

@@ -9,7 +9,7 @@ import { faChevronLeft, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { toTitleCase } from '@/lib/utils'
 import { nowWIB } from '@/lib/date'
 
-type Category = { id: number; name: string }
+type Category = { id: number; name: string; is_price_required: boolean }
 type Supplier = { id: number; name: string }
 type UnitOfMeasurement = { id: number; name: string; abbreviation: string }
 
@@ -46,7 +46,7 @@ export default function EditProductPage() {
   const [hasBatches, setHasBatches] = useState(false)
 
   useEffect(() => {
-    supabase.from('categories').select('id, name').order('name').then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
+    supabase.from('categories').select('id, name, is_price_required').order('name').then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
 
     supabase.from('unit_of_measurements').select('id, name, abbreviation').order('name').then(({ data }: { data: UnitOfMeasurement[] | null }) => setUnitOfMeasurements(data ?? []))
 
@@ -158,6 +158,8 @@ export default function EditProductPage() {
   }
 
   const selectedUnit = unitOfMeasurements.find(u => String(u.id) === form.unit_of_measurement_id) ?? null
+  const selectedCategory = categories.find(c => String(c.id) === form.category_id)
+  const isPriceRequired = selectedCategory?.is_price_required ?? true
 
   if (loading || fetching) {
     return (
@@ -292,12 +294,15 @@ export default function EditProductPage() {
               </div>
             )}
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Harga Jual <span className="text-red-500">*</span></label>
+              <label className="block text-xs text-gray-500 mb-1">
+                Harga Jual {isPriceRequired && <span className="text-red-500">*</span>}
+              </label>
               <input
                 type="number"
                 value={form.price}
                 onChange={(e) => setForm({ ...form, price: e.target.value })}
-                required
+                required={isPriceRequired}
+                placeholder={isPriceRequired ? undefined : 'Harga bervariasi, isi manual saat transaksi'}
                 min="0"
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#121358]"
               />
