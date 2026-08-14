@@ -16,6 +16,10 @@ type OutflowRow = {
   purchasing_id: number | null
 }
 
+type CashOpening = {
+  amount: number
+} | null
+
 const fmt = (n: number) => n.toLocaleString('id-ID')
 
 const firstOfMonth = () => {
@@ -29,12 +33,13 @@ export default function ArusKeuanganPage() {
   const [dateTo, setDateTo] = useState(localDateStr())
   const [inflows, setInflows] = useState<InflowRow[]>([])
   const [outflows, setOutflows] = useState<OutflowRow[]>([])
+  const [kasAwal, setKasAwal] = useState<CashOpening>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true)
-      const [{ data: trx }, { data: out }] = await Promise.all([
+      const [{ data: trx }, { data: out }, { data: opening }] = await Promise.all([
         supabase
           .from('transactions')
           .select('id, transaction_items(price_sold, profit)')
@@ -45,9 +50,15 @@ export default function ArusKeuanganPage() {
           .select('id, amount, purchasing_id')
           .gte('date', dateFrom)
           .lte('date', dateTo),
+        supabase
+          .from('cash_openings')
+          .select('amount')
+          .eq('date', dateFrom)
+          .maybeSingle(),
       ])
       setInflows((trx as InflowRow[]) ?? [])
       setOutflows((out as OutflowRow[]) ?? [])
+      setKasAwal((opening as CashOpening) ?? null)
       setLoading(false)
     }
     fetchData()
@@ -59,6 +70,7 @@ export default function ArusKeuanganPage() {
   const totalPurchasing = outflows.filter(r => r.purchasing_id !== null).reduce((sum, r) => sum + (r.amount ?? 0), 0)
   const totalOperasional = outflows.filter(r => r.purchasing_id === null).reduce((sum, r) => sum + (r.amount ?? 0), 0)
   const net = totalIn - totalOut
+  const kasAkhir = (kasAwal?.amount ?? 0) + totalIn - totalOut
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -85,6 +97,24 @@ export default function ArusKeuanganPage() {
             </div>
           </div>
         </div>
+
+        {/* Kas Awal / Kas Akhir */}
+        {!loading && (
+          <div className="bg-white rounded-2xl shadow-sm px-4 py-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Kas Awal</p>
+              {kasAwal ? (
+                <p className="text-sm font-bold text-gray-800">Rp {fmt(kasAwal.amount)}</p>
+              ) : (
+                <Link href="/arus-kas" className="text-xs text-[#121358] font-semibold hover:underline">Belum diisi →</Link>
+              )}
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Kas Akhir</p>
+              <p className="text-sm font-bold text-gray-800">Rp {fmt(kasAkhir)}</p>
+            </div>
+          </div>
+        )}
 
         {/* Summary cards */}
         {loading ? (
