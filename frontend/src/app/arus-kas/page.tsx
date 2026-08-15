@@ -41,6 +41,7 @@ export default function ArusKasPage() {
   const [kasAwal, setKasAwal] = useState<CashOpening>(null)
   const [kasAwalInput, setKasAwalInput] = useState('')
   const [savingKasAwal, setSavingKasAwal] = useState(false)
+  const [kasAwalError, setKasAwalError] = useState<string | null>(null)
 
   // Outflow list
   const [rows, setRows] = useState<OutflowRow[]>([])
@@ -84,12 +85,13 @@ export default function ArusKasPage() {
 
   const handleSaveKasAwal = async () => {
     if (!kasAwalInput) return
-    setSavingKasAwal(true)
-    await supabase.from('cash_openings').upsert(
+    setSavingKasAwal(true); setKasAwalError(null)
+    const { error } = await supabase.from('cash_openings').upsert(
       { date: selectedDate, amount: parseFloat(kasAwalInput) || 0, created_by: appUser?.id ?? null },
       { onConflict: 'date' }
     )
     setSavingKasAwal(false)
+    if (error) { setKasAwalError(error.message); return }
     fetchData()
   }
 
@@ -167,6 +169,7 @@ export default function ArusKasPage() {
             </button>
           </div>
           {kasAwal && <p className="text-[10px] text-gray-400">Tersimpan: Rp {fmt(kasAwal.amount)}</p>}
+          {kasAwalError && <p className="text-xs text-red-500">⚠️ {kasAwalError}</p>}
         </div>
 
         {/* Total + Add button */}
