@@ -14,6 +14,7 @@ type Product = {
   id: number
   code: string
   name: string
+  category_id: number
   base_price: number
   price: number
   stock: number
@@ -96,6 +97,8 @@ export default function ProductListPage() {
   const [editBatchQty, setEditBatchQty] = useState('')
   const [editBatchPrice, setEditBatchPrice] = useState('')
   const [savingBatch, setSavingBatch] = useState(false)
+  const [creatingOpname, setCreatingOpname] = useState(false)
+  const [opnameError, setOpnameError] = useState<string | null>(null)
 
 
   const handleDelete = async () => {
@@ -106,6 +109,36 @@ export default function ProductListPage() {
     setDeleteTarget(null)
     setDeleteInput('')
     setDeleting(false)
+  }
+
+  const handleStartOpname = async (product: Product) => {
+    if (!appUser) return
+    setOpnameError(null)
+    setCreatingOpname(true)
+
+    const { data: session, error: sessionErr } = await supabase
+      .from('stock_opname_sessions')
+      .insert({ category_id: product.category_id, created_by: appUser.id })
+      .select('id')
+      .single()
+
+    if (sessionErr || !session) {
+      setOpnameError(sessionErr?.message ?? 'Gagal membuat sesi stock opname.')
+      setCreatingOpname(false)
+      return
+    }
+
+    const { error: itemErr } = await supabase
+      .from('stock_opname_items')
+      .insert({ session_id: (session as { id: number }).id, product_id: product.id })
+
+    setCreatingOpname(false)
+    if (itemErr) {
+      setOpnameError(itemErr.message)
+      return
+    }
+
+    router.push(`/stok-opname/${(session as { id: number }).id}`)
   }
 
   useEffect(() => {
@@ -125,7 +158,7 @@ export default function ProductListPage() {
       while (true) {
         const { data, error } = await supabase
           .from('products')
-          .select('id, code, name, base_price, price, updated_at, is_deleted, is_discontinued, categories(name), unit_of_measurements(abbreviation)')
+          .select('id, code, name, category_id, base_price, price, updated_at, is_deleted, is_discontinued, categories(name), unit_of_measurements(abbreviation)')
           .eq('is_deleted', false)
           .range(from, from + chunkSize - 1)
         if (error || !data || data.length === 0) break
@@ -306,6 +339,7 @@ export default function ProductListPage() {
             {paginated.map((p) => {
               const openView = async () => {
                 setViewProduct(p)
+                setOpnameError(null)
                 setViewBatches([])
                 setFetchingBatches(true)
                 setViewSuppliers([])
@@ -707,7 +741,17 @@ export default function ProductListPage() {
                 )}
               </div>
             </div>
-            <div className="px-5 py-3 border-t border-gray-100">
+            <div className="px-5 py-3 border-t border-gray-100 space-y-2">
+              {opnameError && (
+                <p className="text-xs text-red-500">{opnameError}</p>
+              )}
+              <button
+                onClick={() => handleStartOpname(viewProduct)}
+                disabled={creatingOpname}
+                className="w-full py-2.5 rounded-xl border border-[#121358] text-[#121358] text-sm font-semibold hover:bg-[#121358]/5 disabled:opacity-40 transition"
+              >
+                {creatingOpname ? 'Membuat sesi...' : 'Stock Opname'}
+              </button>
               <button
                 onClick={() => { setViewProduct(null); router.push(`/products/edit/${viewProduct.id}`) }}
                 className="w-full py-2.5 rounded-xl bg-[#121358] text-white text-sm font-semibold hover:bg-[#1a1c6e] transition"
