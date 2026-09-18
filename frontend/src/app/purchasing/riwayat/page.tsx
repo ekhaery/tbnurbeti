@@ -10,7 +10,8 @@ import { getArrivalStatus, ARRIVAL_STATUS } from '@/lib/arrivalStatus'
 import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
 import { useAuth } from '@/context/AuthContext'
 import { PURCHASING_STATUS } from '@/lib/purchasingStatus'
-import { localDateStr, nowWIB } from '@/lib/date'
+import { localDateStr } from '@/lib/date'
+import ReceiveDeliveryOrderModal from '@/components/ReceiveDeliveryOrderModal'
 
 type StockBatch = { id: number; is_available: boolean }
 type Warehouse = { id: number; name: string; code: string }
@@ -46,7 +47,6 @@ export default function RiwayatPurchasingPage() {
   const [list, setList] = useState<Purchasing[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
-  const [tandaiTibaWarehouseId, setTandaiTibaWarehouseId] = useState<number | ''>('')
   const [fetching, setFetching] = useState(true)
 
   // Arrival modal
@@ -78,7 +78,7 @@ export default function RiwayatPurchasingPage() {
   const [productModal, setProductModal] = useState<Purchasing | null>(null)
   const [productModalItems, setProductModalItems] = useState<{ id: number; qty: number; base_price: number; products: { name: string } | null }[]>([])
   const [loadingItems, setLoadingItems] = useState(false)
-  const [tandaiTibaConfirming, setTandaiTibaConfirming] = useState(false)
+  const [receiving, setReceiving] = useState<Purchasing | null>(null)
 
   const openProductModal = async (p: Purchasing) => {
     setProductModal(p)
@@ -91,14 +91,6 @@ export default function RiwayatPurchasingPage() {
     setLoadingItems(false)
   }
 
-  const handleTandaiTibaFromModal = async () => {
-    if (!productModal) return
-    setTandaiTibaConfirming(true)
-    await handleTandaiTiba(productModal, tandaiTibaWarehouseId || null)
-    setTandaiTibaConfirming(false)
-    setProductModal(null)
-    setTandaiTibaWarehouseId('')
-  }
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [productSearch, setProductSearch] = useState('')
@@ -247,55 +239,6 @@ export default function RiwayatPurchasingPage() {
   }
 
   const arrivalStatus = selected ? getArrivalStatus(selected.purchasing_items) : null
-
-  // Tandai Tiba for 'created' status
-  const handleTandaiTiba = async (p: Purchasing, wId: number | null = null) => {
-    const { data: piData } = await supabase
-      .from('purchasing_items')
-      .select('id, product_id, qty, base_price')
-      .eq('purchasing_id', p.id)
-    if (piData && piData.length > 0) {
-      const items = piData as { id: number; product_id: number; qty: number; base_price: number }[]
-
-      // Create stock_batches if not exist, then set is_available = true
-      await supabase.from('stock_batches').upsert(
-        items.map(pi => ({
-          purchasing_item_id: pi.id,
-          product_id: pi.product_id,
-          qty_remaining: pi.qty,
-          base_price: pi.base_price,
-          received_at: p.date,
-          is_available: true,
-        })),
-        { onConflict: 'purchasing_item_id' }
-      )
-
-      // Update products.base_price with latest purchase price (only if > 0)
-      for (const pi of items) {
-        if (pi.base_price > 0) {
-          await supabase.from('products')
-            .update({ base_price: pi.base_price, updated_at: nowWIB() })
-            .eq('id', pi.product_id)
-        }
-      }
-
-      // Increment product_warehouse.stock for selected warehouse
-      if (wId) {
-        for (const pi of items) {
-          await supabase.rpc('add_to_warehouse_stock', {
-            p_product_id: pi.product_id,
-            p_warehouse_id: wId,
-            p_qty: pi.qty,
-          })
-        }
-      }
-
-      // Mark purchasing as completed
-      await supabase.from('purchasing').update({ status: 'completed' }).eq('id', p.id)
-    }
-    showToast('Barang ditandai tiba. Stok diupdate.')
-    fetchData()
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -527,26 +470,11 @@ export default function RiwayatPurchasingPage() {
 
             <div className="px-5 py-4 border-t border-gray-100 space-y-2">
               {productModal.status === 'created' && (
-                <>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Warehouse tujuan (opsional)</label>
-                    <select
-                      value={tandaiTibaWarehouseId}
-                      onChange={e => setTandaiTibaWarehouseId(e.target.value ? Number(e.target.value) : '')}
-                      className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#121358]"
-                    >
-                      <option value="">-- Pilih Warehouse --</option>
-                      {warehouses.map(w => (
-                        <option key={w.id} value={w.id}>{w.name} ({w.code})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <button onClick={handleTandaiTibaFromModal} disabled={tandaiTibaConfirming}
-                    className="w-full py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white text-sm font-semibold flex items-center justify-center gap-2 transition">
-                    <FontAwesomeIcon icon={faBoxOpen} className="w-3.5 h-3.5" style={{ color: '#9FA1FF' }} />
-                    {tandaiTibaConfirming ? 'Menyimpan...' : 'Tandai Tiba & Update Stok'}
-                  </button>
-                </>
+                <button onClick={() => { setReceiving(productModal); setProductModal(null) }}
+                  className="w-full py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] text-white text-sm font-semibold flex items-center justify-center gap-2 transition">
+                  <FontAwesomeIcon icon={faBoxOpen} className="w-3.5 h-3.5" style={{ color: '#9FA1FF' }} />
+                  Barang Diterima
+                </button>
               )}
               {productModal.status !== 'completed' && (
                 <button
@@ -562,6 +490,16 @@ export default function RiwayatPurchasingPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Barang Diterima modal */}
+      {receiving && (
+        <ReceiveDeliveryOrderModal
+          purchasing={receiving}
+          warehouses={warehouses}
+          onClose={() => setReceiving(null)}
+          onReceived={() => { showToast('Barang diterima. Stok diupdate.'); fetchData() }}
+        />
       )}
 
       {/* Toast */}

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck, faFileInvoiceDollar, faHandHoldingDollar, faMoneyCheckDollar, faReceipt, faUserGroup, faArrowTrendUp, faMoneyBillWave, faChartBar, faIdCard, faHouse, faWarehouse, faWallet } from '@fortawesome/free-solid-svg-icons'
+import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck, faFileInvoiceDollar, faHandHoldingDollar, faMoneyCheckDollar, faReceipt, faUserGroup, faArrowTrendUp, faMoneyBillWave, faChartBar, faChartPie, faIdCard, faHouse, faWarehouse, faWallet } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
@@ -24,6 +24,7 @@ export default function Navbar() {
   const [transaksiOpen, setTransaksiOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const [activityCount, setActivityCount] = useState(0)
+  const [orderCount, setOrderCount] = useState(0)
   const [showProdukAlert, setShowProdukAlert] = useState(false)
   const [produkAlerts, setProdukAlerts] = useState<{ id: number; name: string; base_price: number; price: number }[]>([])
   const [loadingAlerts, setLoadingAlerts] = useState(false)
@@ -46,6 +47,11 @@ export default function Navbar() {
       .select('id', { count: 'exact', head: true })
       .gte('created_at', today)
       .then(({ count }: { count: number | null }) => setActivityCount(count ?? 0))
+    supabase
+      .from('purchasing')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'created')
+      .then(({ count }: { count: number | null }) => setOrderCount(count ?? 0))
   }, [appUser])
 
   // Detect desktop
@@ -223,6 +229,16 @@ export default function Navbar() {
               </Link>
             )}
 
+            {/* Order link */}
+            <Link href="/order" className={`${linkClass(pathname.startsWith('/order'))} relative`}>
+              Order
+              {orderCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {orderCount > 99 ? '99+' : orderCount}
+                </span>
+              )}
+            </Link>
+
             {/* Transaksi dropdown */}
             <div className="relative">
               <button
@@ -365,6 +381,17 @@ export default function Navbar() {
             >
               <FontAwesomeIcon icon={faChartBar} className="w-4 h-4 text-gray-400" />
               Laporan Tagihan Hutang
+            </Link>
+            <Link
+              href="/laporan-penjualan-produk"
+              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                pathname.startsWith('/laporan-penjualan-produk')
+                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FontAwesomeIcon icon={faChartPie} className="w-4 h-4 text-gray-400" />
+              Laporan Penjualan Produk
             </Link>
           </div>
 
