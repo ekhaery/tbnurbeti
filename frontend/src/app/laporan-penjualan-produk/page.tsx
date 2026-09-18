@@ -43,6 +43,7 @@ export default function LaporanPenjualanProdukPage() {
   const [stockMap, setStockMap] = useState<Record<number, number>>({})
   const [deadStock, setDeadStock] = useState<DeadStockRow[]>([])
   const [fetching, setFetching] = useState(true)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   const now = new Date()
   const isCurrentMonth = calMonth.getFullYear() === now.getFullYear() && calMonth.getMonth() === now.getMonth()
@@ -50,6 +51,7 @@ export default function LaporanPenjualanProdukPage() {
   useEffect(() => {
     const fetchData = async () => {
       setFetching(true)
+      setSelectedCategory(null)
       const y = calMonth.getFullYear()
       const m = calMonth.getMonth()
       const from = `${y}-${String(m + 1).padStart(2, '0')}-01`
@@ -113,6 +115,7 @@ export default function LaporanPenjualanProdukPage() {
   }, [calMonth])
 
   const totalRevenue = rows.reduce((s, r) => s + r.total_revenue, 0)
+  const toggleCategory = (name: string) => setSelectedCategory(prev => (prev === name ? null : name))
   const totalQty = rows.reduce((s, r) => s + r.total_qty, 0)
   const best = rows[0]
 
@@ -140,6 +143,11 @@ export default function LaporanPenjualanProdukPage() {
     },
     []
   )
+
+  const selectedArc = arcs.find(a => a.name === selectedCategory) ?? null
+  const detailRows = selectedCategory
+    ? rows.filter(r => (r.category_name ?? 'Tanpa Kategori') === selectedCategory)
+    : rows
 
   // Products that sold this month but have less than half a month's worth of stock left.
   const restockCandidates = rows
@@ -210,19 +218,38 @@ export default function LaporanPenjualanProdukPage() {
                       strokeDasharray={`${a.length} ${CIRCUMFERENCE - a.length}`}
                       strokeDashoffset={-a.offset}
                       strokeLinecap="round"
+                      className="cursor-pointer transition-opacity"
+                      opacity={selectedCategory && selectedCategory !== a.name ? 0.35 : 1}
+                      onClick={() => toggleCategory(a.name)}
                     />
                   ))}
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
-                  <p className="text-[10px] text-gray-500">Total Penjualan</p>
-                  <p className="text-base font-bold text-[#121358] mt-0.5">Rp {fmt(totalRevenue)}</p>
+                  {selectedArc ? (
+                    <button onClick={() => setSelectedCategory(null)} className="flex flex-col items-center">
+                      <p className="text-[10px] text-gray-500">{Math.round(selectedArc.pct)}%</p>
+                      <p className="text-sm font-semibold text-gray-800 truncate max-w-[8rem]">{selectedArc.name}</p>
+                      <p className="text-base font-bold text-[#121358] mt-0.5">Rp {fmt(selectedArc.value)}</p>
+                    </button>
+                  ) : (
+                    <>
+                      <p className="text-[10px] text-gray-500">Total Penjualan</p>
+                      <p className="text-base font-bold text-[#121358] mt-0.5">Rp {fmt(totalRevenue)}</p>
+                    </>
+                  )}
                 </div>
               </div>
 
               {/* Legend */}
               <div className="space-y-1.5 mt-5">
                 {arcs.map(seg => (
-                  <div key={seg.name} className="flex items-center justify-between text-xs">
+                  <button
+                    key={seg.name}
+                    onClick={() => toggleCategory(seg.name)}
+                    className={`w-full flex items-center justify-between text-xs px-1.5 py-1 rounded-lg transition-colors ${
+                      selectedCategory === seg.name ? 'bg-[#121358]/8' : 'hover:bg-gray-50'
+                    }`}
+                  >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
                       <span className="text-gray-700 truncate">{seg.name}</span>
@@ -231,7 +258,7 @@ export default function LaporanPenjualanProdukPage() {
                       <span className="text-gray-400 mr-2">{Math.round(seg.pct)}%</span>
                       <span className="font-semibold text-gray-700">Rp {fmt(seg.value)}</span>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
 
@@ -283,8 +310,20 @@ export default function LaporanPenjualanProdukPage() {
             {/* Detail table */}
             {rows.length > 0 && (
             <div id="detail-produk" className="scroll-mt-20 space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">Detail Per Produk</p>
-              {rows.map(r => {
+              <div className="flex items-center justify-between px-1">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Detail Per Produk{selectedCategory ? ` — ${selectedCategory}` : ''}
+                </p>
+                {selectedCategory && (
+                  <button
+                    onClick={() => setSelectedCategory(null)}
+                    className="text-xs font-semibold text-[#121358] hover:underline"
+                  >
+                    Tampilkan semua
+                  </button>
+                )}
+              </div>
+              {detailRows.map(r => {
                 const stock = stockMap[r.product_id] ?? 0
                 const needsRestock = r.total_qty > 0 && stock < r.total_qty * 0.5
                 const isSlowMoving = overstockIds.has(r.product_id)
