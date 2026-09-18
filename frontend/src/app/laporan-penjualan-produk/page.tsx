@@ -56,17 +56,30 @@ export default function LaporanPenjualanProdukPage() {
       const lastDay = new Date(y, m + 1, 0).getDate()
       const to = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
 
-      const [{ data: salesData }, { data: stockData }] = await Promise.all([
+      const [{ data: salesData }] = await Promise.all([
         supabase.rpc('get_product_sales_report', { p_date_from: from, p_date_to: to }),
-        supabase.from('stock_batches').select('product_id, qty_remaining').eq('is_available', true),
       ])
 
       const sales = (salesData as SalesRow[]) ?? []
       setRows(sales)
 
+      // Fetch all available stock_batches in chunks — a single unpaginated query
+      // silently truncates at Supabase's default row cap.
+      const chunkSize = 1000
       const map: Record<number, number> = {}
-      for (const b of (stockData ?? []) as { product_id: number; qty_remaining: number }[]) {
-        map[b.product_id] = (map[b.product_id] ?? 0) + b.qty_remaining
+      let from2 = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('stock_batches')
+          .select('product_id, qty_remaining')
+          .eq('is_available', true)
+          .range(from2, from2 + chunkSize - 1)
+        if (error || !data || data.length === 0) break
+        for (const b of data as { product_id: number; qty_remaining: number }[]) {
+          map[b.product_id] = (map[b.product_id] ?? 0) + b.qty_remaining
+        }
+        if (data.length < chunkSize) break
+        from2 += chunkSize
       }
       setStockMap(map)
 
