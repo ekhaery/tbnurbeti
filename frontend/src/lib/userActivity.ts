@@ -10,6 +10,12 @@ export const USER_ACTIVITY = {
 
   EDIT_PURCHASING: (userName: string, code: string, total: number) =>
     `${userName} telah mengubah data purchasing ${code}, Rp ${total.toLocaleString('id-ID')}`,
+
+  CREATE_DELIVERY_ORDER: (userName: string, supplierName: string) =>
+    `${userName} telah membuat delivery order baru dari ${supplierName}`,
+
+  RECEIVE_DELIVERY_ORDER: (userName: string, code: string, supplierName: string, total: number) =>
+    `${userName} menandai barang diterima untuk ${code} dari ${supplierName}, Rp ${total.toLocaleString('id-ID')}`,
 }
 
 // Log an activity

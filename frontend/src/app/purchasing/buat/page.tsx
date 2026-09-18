@@ -50,8 +50,8 @@ export default function BuatPurchasingPage() {
   const [jatuhTempo, setJatuhTempo] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem()])
   const [autocomplete, setAutocomplete] = useState<AutocompleteState[]>([{ open: false, focused: -1 }])
-  const [transformationPhase, setTransformationPhase] = useState(true)
-  const [barangReady, setBarangReady] = useState<boolean | null>(null)
+  const [transformationPhase, setTransformationPhase] = useState(false)
+  const [barangReady, setBarangReady] = useState<boolean | null>(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -190,7 +190,11 @@ export default function BuatPurchasingPage() {
   const periodCalc = calcPeriod()
   const periodWeeks = periodCalc?.weeks ?? 0
 
-  const validItems = items.filter(r => r.product_id && r.qty && r.base_price)
+  // Default flow: record a Delivery Order (date + supplier + products/qty only, no price yet).
+  // Price is filled in later by whoever confirms receipt ("Barang Diterima").
+  const isDeliveryOrderMode = !transformationPhase && barangReady === false
+
+  const validItems = items.filter(r => r.product_id && r.qty && (isDeliveryOrderMode || r.base_price))
   const total = validItems.reduce((sum, r) => sum + (parseFloat(r.base_price) || 0) * (parseInt(r.qty) || 0), 0)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -203,8 +207,8 @@ export default function BuatPurchasingPage() {
 
     const totalValue = validItems.reduce((sum, r) => sum + (parseFloat(r.base_price) || 0) * (parseInt(r.qty) || 0), 0)
 
-    // Check for duplicate (skip if user confirmed)
-    if (!skipDupCheck) {
+    // Check for duplicate (skip if user confirmed, or in Delivery Order mode where total is always 0)
+    if (!skipDupCheck && !isDeliveryOrderMode) {
       let dupQuery = supabase
         .from('purchasing')
         .select('id, code, date, total, due_date, suppliers(name)')
@@ -263,7 +267,7 @@ export default function BuatPurchasingPage() {
       purchasing_id: pur.id,
       product_id: Number(r.product_id),
       qty: parseInt(r.qty),
-      base_price: parseFloat(r.base_price),
+      base_price: parseFloat(r.base_price) || 0,
     }))
 
     const { data: insertedItems, error: itemsErr } = await supabase
@@ -335,9 +339,15 @@ export default function BuatPurchasingPage() {
     }
 
     setSubmitting(false)
-    setSuccess(`Purchasing ${code} berhasil disimpan.${periodVal > 0 ? ` ${periodVal} tagihan dibuat.` : ''} `)
-    await logActivity(supabase, appUser?.id,
-      USER_ACTIVITY.ADD_NEW_PURCHASING(appUser?.name ?? 'User', selectedSupplier!.name, totalValue))
+    if (isDeliveryOrderMode) {
+      setSuccess(`Delivery Order ${code} berhasil disimpan. Menunggu barang diterima.`)
+      await logActivity(supabase, appUser?.id,
+        USER_ACTIVITY.CREATE_DELIVERY_ORDER(appUser?.name ?? 'User', selectedSupplier!.name))
+    } else {
+      setSuccess(`Purchasing ${code} berhasil disimpan.${periodVal > 0 ? ` ${periodVal} tagihan dibuat.` : ''} `)
+      await logActivity(supabase, appUser?.id,
+        USER_ACTIVITY.ADD_NEW_PURCHASING(appUser?.name ?? 'User', selectedSupplier!.name, totalValue))
+    }
     setSupplierId('')
     setNotes('')
     setJatuhTempo('')
@@ -353,8 +363,12 @@ export default function BuatPurchasingPage() {
         </button>
 
         <div>
-          <h2 className="text-lg font-bold text-gray-800">Buat Purchasing</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Catat pembelian stok dari supplier.</p>
+          <h2 className="text-lg font-bold text-gray-800">{isDeliveryOrderMode ? 'Buat Delivery Order' : 'Buat Purchasing'}</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {isDeliveryOrderMode
+              ? 'Catat pesanan ke supplier. Harga diisi nanti saat barang diterima.'
+              : 'Catat pembelian stok dari supplier.'}
+          </p>
         </div>
 
         {success && (
@@ -369,12 +383,12 @@ export default function BuatPurchasingPage() {
           <div className="p-3 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-[#121358]">
-                Transformation Phase
+                Transformation Phase (Override)
               </p>
               <p className="text-xs mt-0.5 text-[#121358]/70">
                 {transformationPhase
-                  ? 'ON — hanya mencatat tagihan, stok tidak diupdate.'
-                  : 'OFF — stok akan diupdate saat barang tiba.'}
+                  ? 'ON — hanya mencatat tagihan langsung, tanpa Delivery Order.'
+                  : 'OFF — alur normal: buat Delivery Order, atau tandai barang sudah ready untuk update stok langsung.'}
               </p>
             </div>
             <button
@@ -398,7 +412,7 @@ export default function BuatPurchasingPage() {
                   </button>
                   <button type="button" onClick={() => setBarangReady(false)}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${barangReady === false ? 'bg-[#121358] text-white' : 'bg-white/60 text-[#121358] hover:bg-white/80'}`}>
-                    Belum
+                    Belum (Delivery Order)
                   </button>
                 </div>
               </div>
@@ -486,22 +500,24 @@ export default function BuatPurchasingPage() {
               />
             </div>
 
-            {/* Jatuh Tempo */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Jatuh Tempo</label>
-              <input
-                type="date"
-                value={jatuhTempo}
-                min={date}
-                onChange={e => setJatuhTempo(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
-              />
-              {periodCalc && (
-                <p className="text-xs text-gray-400 mt-1">
-                  {periodCalc.weeks} minggu&nbsp;|&nbsp;{periodCalc.months} bulan
-                </p>
-              )}
-            </div>
+            {/* Jatuh Tempo — entered later at receipt for Delivery Orders */}
+            {!isDeliveryOrderMode && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Jatuh Tempo</label>
+                <input
+                  type="date"
+                  value={jatuhTempo}
+                  min={date}
+                  onChange={e => setJatuhTempo(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                />
+                {periodCalc && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {periodCalc.weeks} minggu&nbsp;|&nbsp;{periodCalc.months} bulan
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Notes */}
             <div>
@@ -633,7 +649,7 @@ export default function BuatPurchasingPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className={isDeliveryOrderMode ? '' : 'grid grid-cols-2 gap-3'}>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Qty <span className="text-red-500">*</span></label>
                     <input
@@ -645,20 +661,22 @@ export default function BuatPurchasingPage() {
                       className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Harga Beli <span className="text-red-500">*</span></label>
-                    <input
-                      type="number"
-                      value={row.base_price}
-                      onChange={e => updateItem(i, 'base_price', e.target.value)}
-                      placeholder="0"
-                      min="0"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
-                    />
-                  </div>
+                  {!isDeliveryOrderMode && (
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Harga Beli <span className="text-red-500">*</span></label>
+                      <input
+                        type="number"
+                        value={row.base_price}
+                        onChange={e => updateItem(i, 'base_price', e.target.value)}
+                        placeholder="0"
+                        min="0"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                      />
+                    </div>
+                  )}
                 </div>
 
-                {row.qty && row.base_price && (
+                {!isDeliveryOrderMode && row.qty && row.base_price && (
                   <p className="text-xs text-gray-400 text-right">
                     Subtotal: <span className="font-semibold text-gray-700">Rp {fmt((parseInt(row.qty) || 0) * (parseFloat(row.base_price) || 0))}</span>
                   </p>
@@ -688,7 +706,7 @@ export default function BuatPurchasingPage() {
             disabled={submitting}
             className="w-full bg-[#121358] hover:bg-[#1a1c6e] disabled:bg-[#121358]/40 text-white font-semibold py-3 rounded-xl transition text-sm"
           >
-            {submitting ? 'Menyimpan...' : 'Simpan Purchasing'}
+            {submitting ? 'Menyimpan...' : isDeliveryOrderMode ? 'Simpan Delivery Order' : 'Simpan Purchasing'}
           </button>
         </form>
       </div>

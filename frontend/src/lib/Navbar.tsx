@@ -24,6 +24,7 @@ export default function Navbar() {
   const [transaksiOpen, setTransaksiOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const [activityCount, setActivityCount] = useState(0)
+  const [orderCount, setOrderCount] = useState(0)
   const [showProdukAlert, setShowProdukAlert] = useState(false)
   const [produkAlerts, setProdukAlerts] = useState<{ id: number; name: string; base_price: number; price: number }[]>([])
   const [loadingAlerts, setLoadingAlerts] = useState(false)
@@ -46,6 +47,11 @@ export default function Navbar() {
       .select('id', { count: 'exact', head: true })
       .gte('created_at', today)
       .then(({ count }: { count: number | null }) => setActivityCount(count ?? 0))
+    supabase
+      .from('purchasing')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'created')
+      .then(({ count }: { count: number | null }) => setOrderCount(count ?? 0))
   }, [appUser])
 
   // Detect desktop
@@ -222,6 +228,16 @@ export default function Navbar() {
                 Produk
               </Link>
             )}
+
+            {/* Order link */}
+            <Link href="/order" className={`${linkClass(pathname.startsWith('/order'))} relative`}>
+              Order
+              {orderCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {orderCount > 99 ? '99+' : orderCount}
+                </span>
+              )}
+            </Link>
 
             {/* Transaksi dropdown */}
             <div className="relative">

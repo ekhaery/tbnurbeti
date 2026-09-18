@@ -6,7 +6,7 @@ export const PURCHASING_STATUS: Record<PurchasingStatus, { label: string; classN
     className: 'bg-orange-100 text-orange-500',
   },
   created: {
-    label: 'created',
+    label: 'Delivery Order',
     className: 'bg-blue-100 text-blue-600',
   },
   completed: {
