@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faChevronLeft, faPen, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faChevronLeft, faPen, faPlus, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
 
 type Session = {
   id: number
@@ -41,6 +41,12 @@ export default function StokOpnameDetailPage() {
   const [addWarehouseId, setAddWarehouseId] = useState<number | ''>('')
   const [addSaving, setAddSaving] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
+
+  const [showDeleteWarehouse, setShowDeleteWarehouse] = useState(false)
+  const [deleteProductId, setDeleteProductId] = useState<number | ''>('')
+  const [deleteWarehouseId, setDeleteWarehouseId] = useState<number | ''>('')
+  const [deletingWarehouse, setDeletingWarehouse] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const [editingItem, setEditingItem] = useState<Item | null>(null)
   const [editStock, setEditStock] = useState('')
@@ -199,6 +205,54 @@ export default function StokOpnameDetailPage() {
     setShowAddWarehouse(false)
   }
 
+  const openDeleteWarehouse = () => {
+    setDeleteError(null)
+    const defaultProductId = items.length === 1 ? (items[0].products?.id ?? '') : ''
+    setDeleteProductId(defaultProductId)
+    setDeleteWarehouseId(
+      defaultProductId && (productWarehouseMap[defaultProductId as number] ?? []).includes(selectedWarehouseId ?? -1)
+        ? (selectedWarehouseId as number)
+        : ''
+    )
+    setShowDeleteWarehouse(true)
+  }
+
+  const linkedWarehousesForDelete = deleteProductId
+    ? warehouses.filter(w => (productWarehouseMap[deleteProductId as number] ?? []).includes(w.id))
+    : []
+
+  const handleDeleteWarehouseSave = async () => {
+    if (!deleteProductId || !deleteWarehouseId) return
+    setDeletingWarehouse(true)
+    setDeleteError(null)
+
+    const { error } = await supabase
+      .from('product_warehouse')
+      .delete()
+      .eq('product_id', deleteProductId)
+      .eq('warehouse_id', deleteWarehouseId)
+
+    setDeletingWarehouse(false)
+    if (error) { setDeleteError(error.message); return }
+
+    const newMap = {
+      ...productWarehouseMap,
+      [deleteProductId as number]: (productWarehouseMap[deleteProductId as number] ?? []).filter(w => w !== deleteWarehouseId),
+    }
+    setProductWarehouseMap(newMap)
+
+    const stillLinked = items.some(item => item.products && (newMap[item.products.id] ?? []).includes(deleteWarehouseId as number))
+    if (!stillLinked) {
+      setWarehouses(prev => prev.filter(w => w.id !== deleteWarehouseId))
+      if (selectedWarehouseId === deleteWarehouseId) {
+        const remaining = warehouses.filter(w => w.id !== deleteWarehouseId)
+        setSelectedWarehouseId(remaining.length > 0 ? remaining[0].id : null)
+      }
+    }
+
+    setShowDeleteWarehouse(false)
+  }
+
   const handleConfirm = async () => {
     if (!session || session.status === 'confirmed') return
     setConfirming(true)
@@ -287,13 +341,22 @@ export default function StokOpnameDetailPage() {
               )
             })}
             {session.status !== 'confirmed' && (
-              <button
-                onClick={openAddWarehouse}
-                title="Tambah Warehouse"
-                className="flex-shrink-0 w-9 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 transition-colors"
-              >
-                <FontAwesomeIcon icon={faPlus} className="w-3.5 h-3.5" />
-              </button>
+              <>
+                <button
+                  onClick={openAddWarehouse}
+                  title="Tambah Warehouse"
+                  className="flex-shrink-0 w-9 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 transition-colors"
+                >
+                  <FontAwesomeIcon icon={faPlus} className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={openDeleteWarehouse}
+                  title="Hapus Warehouse"
+                  className="flex-shrink-0 w-9 flex items-center justify-center rounded-xl text-slate-500 hover:bg-red-50 hover:text-red-500 transition-colors"
+                >
+                  <FontAwesomeIcon icon={faTrash} className="w-3.5 h-3.5" />
+                </button>
+              </>
             )}
           </div>
         ) : session.status !== 'confirmed' ? (
@@ -472,6 +535,64 @@ export default function StokOpnameDetailPage() {
               className="w-full bg-[#121358] text-white font-semibold py-3 rounded-xl text-sm disabled:opacity-40 transition"
             >
               {addSaving ? 'Menyimpan...' : 'Simpan'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showDeleteWarehouse && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-5 space-y-4">
+            <div className="flex items-start justify-between">
+              <h2 className="text-sm font-bold text-gray-800">Hapus Warehouse</h2>
+              <button onClick={() => setShowDeleteWarehouse(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                <FontAwesomeIcon icon={faXmark} className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-400">Untuk kasus salah pilih warehouse. Produk akan dihapus dari warehouse yang dipilih.</p>
+
+            {items.length > 1 && (
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Produk</label>
+                <select
+                  value={deleteProductId}
+                  onChange={e => { setDeleteProductId(Number(e.target.value)); setDeleteWarehouseId('') }}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                >
+                  <option value="">Pilih produk</option>
+                  {items.map(item => (
+                    <option key={item.id} value={item.products?.id ?? ''}>{item.products?.name ?? '-'}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Warehouse</label>
+              <select
+                value={deleteWarehouseId}
+                onChange={e => setDeleteWarehouseId(Number(e.target.value))}
+                disabled={!deleteProductId}
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#121358] disabled:opacity-50"
+              >
+                <option value="">Pilih warehouse</option>
+                {linkedWarehousesForDelete.map(w => (
+                  <option key={w.id} value={w.id}>{w.name} ({w.code})</option>
+                ))}
+              </select>
+              {deleteProductId && linkedWarehousesForDelete.length === 0 && (
+                <p className="text-xs text-gray-400 mt-1">Produk ini belum terhubung ke warehouse manapun.</p>
+              )}
+            </div>
+
+            {deleteError && <p className="text-xs text-red-500">{deleteError}</p>}
+
+            <button
+              onClick={handleDeleteWarehouseSave}
+              disabled={deletingWarehouse || !deleteProductId || !deleteWarehouseId}
+              className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white font-semibold py-3 rounded-xl text-sm transition"
+            >
+              {deletingWarehouse ? 'Menghapus...' : 'Hapus'}
             </button>
           </div>
         </div>
