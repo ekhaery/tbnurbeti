@@ -283,7 +283,7 @@ export default function BuatPurchasingPage() {
         qty_remaining: item.qty,
         base_price: item.base_price,
         received_at: date,
-        is_available: false,
+        is_available: true,
       }))
 
       const { error: batchErr } = await supabase.from('stock_batches').insert(batches)
