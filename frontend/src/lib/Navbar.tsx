@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck, faFileInvoiceDollar, faHandHoldingDollar, faMoneyCheckDollar, faReceipt, faUserGroup, faArrowTrendUp, faMoneyBillWave, faChartBar, faChartPie, faIdCard, faHouse, faWarehouse, faWallet } from '@fortawesome/free-solid-svg-icons'
+import { faBars, faRightFromBracket, faXmark, faGear, faUsers, faCartShopping, faTruck, faFileInvoiceDollar, faHandHoldingDollar, faMoneyCheckDollar, faReceipt, faUserGroup, faArrowTrendUp, faMoneyBillWave, faChartBar, faChartPie, faIdCard, faHouse, faWarehouse, faWallet, faRulerHorizontal } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
@@ -13,6 +13,7 @@ import { localDateStr } from '@/lib/date'
 
 const settingsLinks = [
   { label: 'Category', href: '/settings/categories', icon: faGear },
+  { label: 'Unit', href: '/settings/units', icon: faRulerHorizontal },
   { label: 'Users', href: '/settings/users', icon: faUsers },
 ]
 

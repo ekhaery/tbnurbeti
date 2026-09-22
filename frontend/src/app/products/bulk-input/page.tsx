@@ -14,6 +14,12 @@ type Category = {
   is_price_required: boolean
 }
 
+type Unit = {
+  id: number
+  name: string
+  abbreviation: string
+}
+
 type ProductRow = {
   name: string
   base_price: string
@@ -24,6 +30,7 @@ type ProductRow = {
 type Payload = {
   name: string
   category_id: number | ''
+  unit_of_measurement_id: number | ''
   base_price: number
   price: number
   is_discontinued: boolean
@@ -44,8 +51,10 @@ export default function BulkInputPage() {
   const router = useRouter()
 
   const [categories, setCategories] = useState<Category[]>([])
+  const [units, setUnits] = useState<Unit[]>([])
   const [existingNames, setExistingNames] = useState<string[]>([])
   const [categoryId, setCategoryId] = useState<number | ''>('')
+  const [unitId, setUnitId] = useState<number | ''>('')
   const [rows, setRows] = useState<ProductRow[]>([emptyRow()])
   const [submitting, setSubmitting] = useState(false)
   const [successCount, setSuccessCount] = useState<number | null>(null)
@@ -57,6 +66,8 @@ export default function BulkInputPage() {
   const [openSuggestion, setOpenSuggestion] = useState<number | null>(null)
   const [categoryQuery, setCategoryQuery] = useState('')
   const [categoryDropdown, setCategoryDropdown] = useState(false)
+  const [unitQuery, setUnitQuery] = useState('')
+  const [unitDropdown, setUnitDropdown] = useState(false)
 
   const isAdmin = appUser?.role === 'admin'
 
@@ -67,6 +78,12 @@ export default function BulkInputPage() {
       .select('id, name, is_price_required')
       .order('name')
       .then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
+
+    supabase
+      .from('unit_of_measurements')
+      .select('id, name, abbreviation')
+      .order('name')
+      .then(({ data }: { data: Unit[] | null }) => setUnits(data ?? []))
 
     // Fetch all product names in chunks to bypass 1000-row limit
     const fetchAllNames = async () => {
@@ -108,6 +125,11 @@ export default function BulkInputPage() {
       return
     }
 
+    if (!unitId) {
+      setError('Pilih unit terlebih dahulu.')
+      return
+    }
+
     const validRows = rows.filter((r) => isPriceRequired ? (r.name.trim() && r.price) : r.name.trim())
     if (validRows.length === 0) {
       setError('Isi minimal satu produk.')
@@ -125,6 +147,7 @@ export default function BulkInputPage() {
     const payload: Payload[] = validRows.map((r) => ({
       name: toTitleCase(r.name.trim()),
       category_id: categoryId,
+      unit_of_measurement_id: unitId,
       base_price: parseFloat(r.base_price) || 0,
       price: isPriceRequired ? parseFloat(r.price) : (parseFloat(r.price) || 0),
       is_discontinued: r.is_discontinued,
@@ -152,6 +175,7 @@ export default function BulkInputPage() {
       }
       setRows([emptyRow()])
       setCategoryId('')
+      setUnitId('')
       setPendingPayload([])
     }
   }
@@ -159,6 +183,8 @@ export default function BulkInputPage() {
   const selectedCategory = categories.find((c) => c.id === categoryId)
   const categoryName = selectedCategory?.name ?? '-'
   const isPriceRequired = selectedCategory?.is_price_required ?? true
+  const selectedUnit = units.find((u) => u.id === unitId)
+  const unitName = selectedUnit?.name ?? '-'
 
   if (loading) {
     return (
@@ -218,6 +244,38 @@ export default function BulkInputPage() {
                         onMouseDown={() => { setCategoryId(cat.id); setCategoryQuery(cat.name); setCategoryDropdown(false) }}
                         className={`w-full text-left px-4 py-2.5 text-sm transition ${categoryId === cat.id ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
                         {cat.name}
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Unit selector */}
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+              Unit <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={unitQuery}
+                onChange={e => { setUnitQuery(e.target.value); setUnitId(''); setUnitDropdown(true) }}
+                onFocus={() => setUnitDropdown(true)}
+                onBlur={() => setTimeout(() => setUnitDropdown(false), 150)}
+                placeholder="Cari atau pilih unit..."
+                autoComplete="off"
+                className={`w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] bg-white ${unitId !== '' ? 'border-[#121358]/40 bg-[#121358]/5' : 'border-gray-300'}`}
+              />
+              {unitDropdown && (
+                <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                  {units
+                    .filter(u => u.name.toLowerCase().includes(unitQuery.toLowerCase()))
+                    .map(u => (
+                      <button key={u.id} type="button"
+                        onMouseDown={() => { setUnitId(u.id); setUnitQuery(u.name); setUnitDropdown(false) }}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition ${unitId === u.id ? 'bg-[#121358] text-white' : 'text-gray-700 hover:bg-gray-50'}`}>
+                        {u.name} <span className="text-xs opacity-60">({u.abbreviation})</span>
                       </button>
                     ))}
                 </div>
@@ -355,6 +413,8 @@ export default function BulkInputPage() {
               <h3 className="text-base font-bold text-gray-800">Konfirmasi Simpan</h3>
               <p className="text-xs text-gray-500 mt-0.5">
                 Kategori: <span className="font-medium text-gray-600">{categoryName}</span>
+                {' · '}
+                Unit: <span className="font-medium text-gray-600">{unitName}</span>
                 {' · '}
                 <span className="font-medium text-gray-600">{pendingPayload.length} produk</span>
               </p>
