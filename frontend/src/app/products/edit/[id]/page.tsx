@@ -12,6 +12,15 @@ import { nowWIB } from '@/lib/date'
 type Category = { id: number; name: string; is_price_required: boolean }
 type Supplier = { id: number; name: string }
 type UnitOfMeasurement = { id: number; name: string; abbreviation: string }
+type ConversionContext = 'purchase' | 'sale' | 'both'
+type UnitConversion = {
+  id?: number
+  unit_of_measurement_id: number
+  factor_to_base: string
+  context: ConversionContext
+  price_override: string
+}
+const contextLabel: Record<ConversionContext, string> = { purchase: 'Beli', sale: 'Jual', both: 'Beli & Jual' }
 
 export default function EditProductPage() {
   const supabase = createClient()
@@ -30,6 +39,17 @@ export default function EditProductPage() {
   const [supplierDropdown, setSupplierDropdown] = useState(false)
   const [unitQuery, setUnitQuery] = useState('')
   const [unitDropdown, setUnitDropdown] = useState(false)
+  const [hasAltUnit, setHasAltUnit] = useState(false)
+  const [conversions, setConversions] = useState<UnitConversion[]>([])
+  const [originalConversionIds, setOriginalConversionIds] = useState<number[]>([])
+  const [newConvUnitId, setNewConvUnitId] = useState('')
+  const [newConvUnitQuery, setNewConvUnitQuery] = useState('')
+  const [newConvUnitDropdown, setNewConvUnitDropdown] = useState(false)
+  const [newConvDirection, setNewConvDirection] = useState<'alt_to_base' | 'base_to_alt'>('alt_to_base')
+  const [newConvFactor, setNewConvFactor] = useState('')
+  const [newConvContext, setNewConvContext] = useState<ConversionContext>('sale')
+  const [newConvPriceOverride, setNewConvPriceOverride] = useState('')
+  const [convError, setConvError] = useState<string | null>(null)
   const [form, setForm] = useState({
     code: '',
     name: '',
@@ -63,6 +83,23 @@ export default function EditProductPage() {
       })
 
     supabase
+      .from('product_unit_conversions')
+      .select('id, unit_of_measurement_id, factor_to_base, context, price_override')
+      .eq('product_id', id)
+      .then(({ data }: { data: { id: number; unit_of_measurement_id: number; factor_to_base: number; context: ConversionContext; price_override: number | null }[] | null }) => {
+        const list = (data ?? []).map(r => ({
+          id: r.id,
+          unit_of_measurement_id: r.unit_of_measurement_id,
+          factor_to_base: String(r.factor_to_base),
+          context: r.context,
+          price_override: r.price_override !== null ? String(r.price_override) : '',
+        }))
+        setConversions(list)
+        setOriginalConversionIds(list.map(c => c.id!))
+        setHasAltUnit(list.length > 0)
+      })
+
+    supabase
       .from('products')
       .select('id, code, name, category_id, unit_of_measurement_id, base_price, price, is_discontinued')
       .eq('id', id)
@@ -88,6 +125,47 @@ export default function EditProductPage() {
       .eq('product_id', id)
       .then(({ count }: { count: number | null }) => setHasBatches((count ?? 0) > 0))
   }, [id])
+
+  // Natural-language sentence for a factor_to_base value, always phrased with whole
+  // numbers where possible (e.g. "1 Kubik = 83 Biji" instead of "1 Biji = 0,012 Kubik").
+  const conversionSentence = (factorToBase: number, altLabel: string, baseLabel: string) => {
+    if (factorToBase >= 1) {
+      const n = Number.isInteger(factorToBase) ? factorToBase : Math.round(factorToBase * 1000) / 1000
+      return `1 ${altLabel} = ${n} ${baseLabel}`
+    }
+    const inverse = Math.round((1 / factorToBase) * 1000) / 1000
+    return `1 ${baseLabel} = ${inverse} ${altLabel}`
+  }
+
+  const addConversion = () => {
+    setConvError(null)
+    if (!newConvUnitId) { setConvError('Pilih unit terlebih dahulu.'); return }
+    const input = parseFloat(newConvFactor)
+    if (!(input > 0)) { setConvError('Jumlahnya harus lebih dari 0.'); return }
+    const unitId = Number(newConvUnitId)
+    if (conversions.some(c => c.unit_of_measurement_id === unitId && c.context === newConvContext)) {
+      setConvError('Unit + context ini sudah ditambahkan.')
+      return
+    }
+    // factor_to_base = berapa unit dasar setara 1 unit alternatif
+    const factor = newConvDirection === 'alt_to_base' ? input : 1 / input
+    setConversions(prev => [...prev, {
+      unit_of_measurement_id: unitId,
+      factor_to_base: String(factor),
+      context: newConvContext,
+      price_override: newConvPriceOverride,
+    }])
+    setNewConvUnitId('')
+    setNewConvUnitQuery('')
+    setNewConvDirection('alt_to_base')
+    setNewConvFactor('')
+    setNewConvContext('sale')
+    setNewConvPriceOverride('')
+  }
+
+  const removeConversion = (idx: number) => {
+    setConversions(prev => prev.filter((_, i) => i !== idx))
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -132,6 +210,31 @@ export default function EditProductPage() {
       await supabase.from('product_supplier').insert(toAdd.map(sid => ({ product_id: Number(id), supplier_id: sid, is_primary: false })))
     }
     setOriginalSupplierIds(currentIds)
+
+    // Sync product_unit_conversions: toggle off = remove all; otherwise diff by id
+    if (!hasAltUnit) {
+      if (originalConversionIds.length > 0) {
+        await supabase.from('product_unit_conversions').delete().eq('product_id', id)
+      }
+      setOriginalConversionIds([])
+    } else {
+      const keepIds = conversions.filter(c => c.id).map(c => c.id!)
+      const toDeleteIds = originalConversionIds.filter(cid => !keepIds.includes(cid))
+      const toInsert = conversions.filter(c => !c.id)
+      if (toDeleteIds.length > 0) {
+        await supabase.from('product_unit_conversions').delete().in('id', toDeleteIds)
+      }
+      if (toInsert.length > 0) {
+        await supabase.from('product_unit_conversions').insert(toInsert.map(c => ({
+          product_id: Number(id),
+          unit_of_measurement_id: c.unit_of_measurement_id,
+          factor_to_base: parseFloat(c.factor_to_base),
+          context: c.context,
+          price_override: c.price_override ? parseFloat(c.price_override) : null,
+        })))
+      }
+      setOriginalConversionIds(keepIds)
+    }
 
     const { error: updateError } = await supabase
       .from('products')
@@ -352,6 +455,202 @@ export default function EditProductPage() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Unit Alternatif toggle */}
+          <div className="border-t border-gray-100 pt-4">
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <p className="text-sm text-gray-700 font-medium">Unit Alternatif</p>
+                <p className="text-xs text-gray-400">
+                  Aktifkan kalau produk ini bisa dijual/dibeli dalam satuan lain, mis.
+                  Bata Hebel per Kubik bisa dijual per Biji, atau Kuas per Pcs dibeli per Dus.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHasAltUnit(v => !v)}
+                className={`relative w-10 h-5 rounded-full shrink-0 transition-colors duration-200 focus:outline-none ${
+                  hasAltUnit ? 'bg-[#121358]' : 'bg-gray-200'
+                }`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                  hasAltUnit ? 'translate-x-5' : 'translate-x-0'
+                }`} />
+              </button>
+            </div>
+
+            {hasAltUnit && (
+              <div className="mt-3 space-y-3">
+                {convError && (
+                  <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
+                    ⚠️ {convError}
+                  </div>
+                )}
+
+                {conversions.length > 0 && (
+                  <div className="space-y-1.5">
+                    {conversions.map((c, i) => {
+                      const unit = unitOfMeasurements.find(u => u.id === c.unit_of_measurement_id)
+                      const factor = parseFloat(c.factor_to_base) || 0
+                      const sentence = unit && factor > 0
+                        ? conversionSentence(factor, unit.abbreviation, selectedUnit?.abbreviation ?? 'unit dasar')
+                        : '-'
+                      return (
+                        <div key={i} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs">
+                          <span className="font-medium text-gray-700">{sentence}</span>
+                          <span className="ml-auto px-2 py-0.5 rounded-full bg-[#121358]/10 text-[#121358] font-medium shrink-0">
+                            {contextLabel[c.context]}
+                          </span>
+                          {c.price_override && (
+                            <span className="text-gray-400 shrink-0">Rp {parseFloat(c.price_override).toLocaleString('id-ID')}</span>
+                          )}
+                          <button type="button" onClick={() => removeConversion(i)} className="text-gray-400 hover:text-red-500 shrink-0">
+                            <FontAwesomeIcon icon={faXmark} className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-3">
+                  {/* Step 1: pick the alternate unit */}
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">Unit alternatif</label>
+                    {newConvUnitId ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-[#121358] text-white px-2.5 py-1.5 rounded-lg">
+                          {unitOfMeasurements.find(u => u.id === Number(newConvUnitId))?.name}
+                          <button type="button" onClick={() => { setNewConvUnitId(''); setNewConvUnitQuery('') }} className="opacity-70 hover:opacity-100">
+                            <FontAwesomeIcon icon={faXmark} className="w-2.5 h-2.5" />
+                          </button>
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={newConvUnitQuery}
+                          onChange={e => { setNewConvUnitQuery(e.target.value); setNewConvUnitDropdown(true) }}
+                          onFocus={() => setNewConvUnitDropdown(true)}
+                          onBlur={() => setTimeout(() => setNewConvUnitDropdown(false), 150)}
+                          placeholder="Cari unit (mis. Biji, Dus, Meter)..."
+                          autoComplete="off"
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                        />
+                        {newConvUnitDropdown && (
+                          <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                            {unitOfMeasurements
+                              .filter(u => u.id !== Number(form.unit_of_measurement_id))
+                              .filter(u => u.name.toLowerCase().includes(newConvUnitQuery.toLowerCase()) || u.abbreviation.toLowerCase().includes(newConvUnitQuery.toLowerCase()))
+                              .map(u => (
+                                <button key={u.id} type="button"
+                                  onMouseDown={() => { setNewConvUnitId(String(u.id)); setNewConvUnitQuery('') }}
+                                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
+                                  {u.name} ({u.abbreviation})
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step 2: state the ratio in whichever direction reads naturally */}
+                  {newConvUnitId && (() => {
+                    const altUnit = unitOfMeasurements.find(u => u.id === Number(newConvUnitId))
+                    const baseLabel = selectedUnit?.name ?? 'unit dasar'
+                    const altLabel = altUnit?.name ?? 'unit ini'
+                    return (
+                      <div>
+                        <label className="block text-[11px] text-gray-500 mb-1">Berapa perbandingannya?</label>
+                        <div className="grid grid-cols-2 gap-1.5 mb-1.5">
+                          <button type="button"
+                            onClick={() => setNewConvDirection('base_to_alt')}
+                            className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition ${
+                              newConvDirection === 'base_to_alt' ? 'bg-[#121358] text-white border-[#121358]' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                            }`}>
+                            1 {baseLabel} = ? {altLabel}
+                          </button>
+                          <button type="button"
+                            onClick={() => setNewConvDirection('alt_to_base')}
+                            className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition ${
+                              newConvDirection === 'alt_to_base' ? 'bg-[#121358] text-white border-[#121358]' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                            }`}>
+                            1 {altLabel} = ? {baseLabel}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500 shrink-0">
+                            1 {newConvDirection === 'base_to_alt' ? baseLabel : altLabel} =
+                          </span>
+                          <input
+                            type="number"
+                            value={newConvFactor}
+                            onChange={e => setNewConvFactor(e.target.value)}
+                            placeholder="jumlah"
+                            min="0"
+                            step="any"
+                            className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                          />
+                          <span className="text-xs text-gray-500">
+                            {newConvDirection === 'base_to_alt' ? altLabel : baseLabel}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Step 3: where this alternate unit can be used */}
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">Dipakai untuk</label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(['sale', 'purchase', 'both'] as ConversionContext[]).map(ctx => (
+                        <button key={ctx} type="button"
+                          onClick={() => setNewConvContext(ctx)}
+                          className={`py-1.5 rounded-lg text-[11px] font-medium border transition ${
+                            newConvContext === ctx ? 'bg-[#121358] text-white border-[#121358]' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                          }`}>
+                          {contextLabel[ctx]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">Harga khusus untuk unit ini (opsional)</label>
+                    <input
+                      type="number"
+                      value={newConvPriceOverride}
+                      onChange={e => setNewConvPriceOverride(e.target.value)}
+                      placeholder="Kosongkan jika hitung otomatis dari harga jual"
+                      min="0"
+                      className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                    />
+                  </div>
+
+                  {newConvUnitId && newConvFactor && parseFloat(newConvFactor) > 0 && (() => {
+                    const altUnit = unitOfMeasurements.find(u => u.id === Number(newConvUnitId))
+                    const input = parseFloat(newConvFactor)
+                    const factor = newConvDirection === 'alt_to_base' ? input : 1 / input
+                    return (
+                      <p className="text-[11px] text-gray-400 italic">
+                        Akan disimpan sebagai: {conversionSentence(factor, altUnit?.abbreviation ?? '', selectedUnit?.abbreviation ?? 'unit dasar')}
+                      </p>
+                    )
+                  })()}
+
+                  <button
+                    type="button"
+                    onClick={addConversion}
+                    className="w-full py-2 rounded-lg bg-[#121358] hover:bg-[#1a1c6e] text-white text-xs font-semibold transition"
+                  >
+                    + Tambah Unit Alternatif
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Discontinued toggle */}

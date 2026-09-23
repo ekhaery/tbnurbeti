@@ -13,12 +13,14 @@ import { localDateStr, nowWIB } from '@/lib/date'
 
 type Supplier = { id: number; name: string }
 type Category = { id: number; name: string }
-type Product = { id: number; name: string; categories: { name: string } | null }
-type ItemRow = { product_id: number | ''; query: string; qty: string; base_price: string }
+type Product = { id: number; name: string; categories: { name: string } | null; unit_of_measurement_id: number | null }
+type ItemRow = { product_id: number | ''; query: string; qty: string; base_price: string; unit_id: number | '' }
 type Warehouse = { id: number; name: string; code: string }
+type UnitOfMeasurement = { id: number; name: string; abbreviation: string }
+type UnitConversion = { product_id: number; unit_of_measurement_id: number; factor_to_base: number; context: 'purchase' | 'sale' | 'both' }
 type AutocompleteState = { open: boolean; focused: number }
 
-const emptyItem = (): ItemRow => ({ product_id: '', query: '', qty: '', base_price: '' })
+const emptyItem = (): ItemRow => ({ product_id: '', query: '', qty: '', base_price: '', unit_id: '' })
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
 
@@ -37,6 +39,8 @@ export default function BuatPurchasingPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [unitOfMeasurements, setUnitOfMeasurements] = useState<UnitOfMeasurement[]>([])
+  const [conversions, setConversions] = useState<UnitConversion[]>([])
   const [warehouseId, setWarehouseId] = useState<number | ''>('')
   // New product inline
   const [newProductIdx, setNewProductIdx] = useState<number | null>(null)
@@ -86,6 +90,11 @@ export default function BuatPurchasingPage() {
       .then(({ data }: { data: Category[] | null }) => setCategories(data ?? []))
     supabase.from('warehouses').select('id, name, code').eq('is_active', true).order('name')
       .then(({ data }: { data: Warehouse[] | null }) => setWarehouses(data ?? []))
+    supabase.from('unit_of_measurements').select('id, name, abbreviation').order('name')
+      .then(({ data }: { data: UnitOfMeasurement[] | null }) => setUnitOfMeasurements(data ?? []))
+    supabase.from('product_unit_conversions').select('product_id, unit_of_measurement_id, factor_to_base, context')
+      .in('context', ['purchase', 'both'])
+      .then(({ data }: { data: UnitConversion[] | null }) => setConversions(data ?? []))
     // Chunked fetch to bypass Supabase's 1000-row default limit
     ;(async () => {
       const chunkSize = 1000
@@ -94,7 +103,7 @@ export default function BuatPurchasingPage() {
       while (true) {
         const { data, error } = await supabase
           .from('products')
-          .select('id, name, categories(name)')
+          .select('id, name, categories(name), unit_of_measurement_id')
           .eq('is_deleted', false)
           .order('name')
           .range(from, from + chunkSize - 1)
@@ -106,6 +115,31 @@ export default function BuatPurchasingPage() {
       setProducts(all)
     })()
   }, [])
+
+  // Unit options for a product: base unit (factor 1) + purchase/both conversions
+  const unitOptionsFor = (productId: number | ''): { id: number; label: string; factor: number }[] => {
+    if (!productId) return []
+    const product = products.find(p => p.id === productId)
+    const options: { id: number; label: string; factor: number }[] = []
+    if (product?.unit_of_measurement_id) {
+      const base = unitOfMeasurements.find(u => u.id === product.unit_of_measurement_id)
+      if (base) options.push({ id: base.id, label: `${base.name} (${base.abbreviation})`, factor: 1 })
+    }
+    for (const c of conversions.filter(c => c.product_id === productId)) {
+      const u = unitOfMeasurements.find(u => u.id === c.unit_of_measurement_id)
+      if (u) options.push({ id: u.id, label: `${u.name} (${u.abbreviation})`, factor: c.factor_to_base })
+    }
+    return options
+  }
+
+  const factorFor = (row: ItemRow): number => {
+    if (!row.unit_id) return 1
+    const opts = unitOptionsFor(row.product_id)
+    return opts.find(o => o.id === row.unit_id)?.factor ?? 1
+  }
+
+  // Base-unit qty actually persisted to purchasing_items/stock_batches
+  const baseQty = (row: ItemRow): number => (parseFloat(row.qty) || 0) * factorFor(row)
 
   const updateItem = (i: number, field: keyof ItemRow, value: string | number) => {
     setItems(prev => prev.map((row, idx) => idx === i ? { ...row, [field]: value } : row))
@@ -122,7 +156,7 @@ export default function BuatPurchasingPage() {
 
   const selectProduct = (i: number, product: Product) => {
     setItems(prev => prev.map((row, idx) => idx === i
-      ? { ...row, product_id: product.id, query: product.name }
+      ? { ...row, product_id: product.id, query: product.name, unit_id: product.unit_of_measurement_id ?? '' }
       : row
     ))
     setAutocomplete(prev => prev.map((s, idx) => idx === i ? { open: false, focused: -1 } : s))
@@ -195,7 +229,11 @@ export default function BuatPurchasingPage() {
   const isDeliveryOrderMode = !transformationPhase && barangReady === false
 
   const validItems = items.filter(r => r.product_id && r.qty && (isDeliveryOrderMode || r.base_price))
-  const total = validItems.reduce((sum, r) => sum + (parseFloat(r.base_price) || 0) * (parseInt(r.qty) || 0), 0)
+  // "Harga Beli" is entered per the unit the staff picked (e.g. per Dus), matching
+  // how a supplier invoice states it — so total cost is just displayQty × displayPrice.
+  // Only when persisting to purchasing_items/stock_batches (always per base unit) does
+  // the price get divided by the conversion factor.
+  const total = validItems.reduce((sum, r) => sum + (parseFloat(r.qty) || 0) * (parseFloat(r.base_price) || 0), 0)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -205,7 +243,18 @@ export default function BuatPurchasingPage() {
     if (!supplierId) { setError('Pilih supplier terlebih dahulu.'); return }
     if (validItems.length === 0) { setError('Isi minimal satu produk.'); return }
 
-    const totalValue = validItems.reduce((sum, r) => sum + (parseFloat(r.base_price) || 0) * (parseInt(r.qty) || 0), 0)
+    // Unit conversion must land on a whole number of base units (purchasing_items.qty is integer)
+    const fractionalRow = validItems.find(r => {
+      const bq = baseQty(r)
+      return Math.abs(bq - Math.round(bq)) > 1e-6
+    })
+    if (fractionalRow) {
+      const p = products.find(pr => pr.id === fractionalRow.product_id)
+      setError(`Qty ${p?.name ?? 'produk'} menghasilkan pecahan (${baseQty(fractionalRow)}) setelah dikonversi ke unit dasar. Ubah qty atau unit-nya.`)
+      return
+    }
+
+    const totalValue = validItems.reduce((sum, r) => sum + (parseFloat(r.qty) || 0) * (parseFloat(r.base_price) || 0), 0)
 
     // Check for duplicate (skip if user confirmed, or in Delivery Order mode where total is always 0)
     if (!skipDupCheck && !isDeliveryOrderMode) {
@@ -266,8 +315,15 @@ export default function BuatPurchasingPage() {
     const purItems = validItems.map(r => ({
       purchasing_id: pur.id,
       product_id: Number(r.product_id),
-      qty: parseInt(r.qty),
-      base_price: parseFloat(r.base_price) || 0,
+      qty: Math.round(baseQty(r)),
+      // Convert the per-selected-unit price down to per-base-unit for storage,
+      // since stock_batches.base_price (and later COGS) always operate in base units.
+      base_price: (parseFloat(r.base_price) || 0) / factorFor(r),
+      // Keep the originally-selected unit + qty so a later Delivery Order
+      // receive step can show/re-enter amounts in the same unit as the
+      // supplier's invoice instead of only the converted base-unit number.
+      unit_of_measurement_id: r.unit_id || null,
+      entered_qty: parseFloat(r.qty) || null,
     }))
 
     const { data: insertedItems, error: itemsErr } = await supabase
@@ -652,18 +708,39 @@ export default function BuatPurchasingPage() {
                 <div className={isDeliveryOrderMode ? '' : 'grid grid-cols-2 gap-3'}>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Qty <span className="text-red-500">*</span></label>
-                    <input
-                      type="number"
-                      value={row.qty}
-                      onChange={e => updateItem(i, 'qty', e.target.value)}
-                      placeholder="0"
-                      min="1"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
-                    />
+                    <div className="flex gap-1.5">
+                      <input
+                        type="number"
+                        value={row.qty}
+                        onChange={e => updateItem(i, 'qty', e.target.value)}
+                        placeholder="0"
+                        min="1"
+                        step="any"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                      />
+                      {unitOptionsFor(row.product_id).length > 1 && (
+                        <select
+                          value={row.unit_id}
+                          onChange={e => updateItem(i, 'unit_id', e.target.value ? Number(e.target.value) : '')}
+                          className="border border-gray-300 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#121358] shrink-0"
+                        >
+                          {unitOptionsFor(row.product_id).map(o => (
+                            <option key={o.id} value={o.id}>{o.label}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    {factorFor(row) !== 1 && row.qty && (
+                      <p className="text-[11px] text-gray-400 mt-1">= {baseQty(row)} {unitOfMeasurements.find(u => u.id === products.find(p => p.id === row.product_id)?.unit_of_measurement_id)?.abbreviation}</p>
+                    )}
                   </div>
                   {!isDeliveryOrderMode && (
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Harga Beli <span className="text-red-500">*</span></label>
+                      <label className="block text-xs text-gray-500 mb-1">
+                        Harga Beli {unitOptionsFor(row.product_id).length > 1 && (
+                          <span className="text-gray-400 font-normal">(per {unitOptionsFor(row.product_id).find(o => o.id === row.unit_id)?.label ?? 'unit'})</span>
+                        )} <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="number"
                         value={row.base_price}
@@ -672,13 +749,18 @@ export default function BuatPurchasingPage() {
                         min="0"
                         className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]"
                       />
+                      {factorFor(row) !== 1 && row.base_price && (
+                        <p className="text-[11px] text-gray-400 mt-1">
+                          = Rp {fmt((parseFloat(row.base_price) || 0) / factorFor(row))} / {unitOfMeasurements.find(u => u.id === products.find(p => p.id === row.product_id)?.unit_of_measurement_id)?.abbreviation}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
 
                 {!isDeliveryOrderMode && row.qty && row.base_price && (
                   <p className="text-xs text-gray-400 text-right">
-                    Subtotal: <span className="font-semibold text-gray-700">Rp {fmt((parseInt(row.qty) || 0) * (parseFloat(row.base_price) || 0))}</span>
+                    Subtotal: <span className="font-semibold text-gray-700">Rp {fmt((parseFloat(row.qty) || 0) * (parseFloat(row.base_price) || 0))}</span>
                   </p>
                 )}
               </div>
