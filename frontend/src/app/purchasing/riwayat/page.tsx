@@ -20,8 +20,21 @@ type PurchasingItem = {
   id: number
   qty: number
   base_price: number
-  products: { name: string } | null
+  unit_of_measurement_id: number | null
+  entered_qty: number | null
+  receipt_id: number | null
+  products: { name: string; unit_of_measurement_id: number | null; unit_of_measurements: { abbreviation: string } | null } | null
+  unit_of_measurements: { abbreviation: string } | null
   stock_batches: StockBatch[]
+}
+
+type PurchasingReceipt = {
+  id: number
+  invoice_no: string | null
+  due_date: string | null
+  total: number
+  created_at: string
+  purchasing_items: { id: number }[]
 }
 
 type Purchasing = {
@@ -79,15 +92,21 @@ export default function RiwayatPurchasingPage() {
   const [productModalItems, setProductModalItems] = useState<{ id: number; qty: number; base_price: number; products: { name: string } | null }[]>([])
   const [loadingItems, setLoadingItems] = useState(false)
   const [receiving, setReceiving] = useState<Purchasing | null>(null)
+  const [receipts, setReceipts] = useState<PurchasingReceipt[]>([])
 
   const openProductModal = async (p: Purchasing) => {
     setProductModal(p)
     setLoadingItems(true)
-    const { data } = await supabase
-      .from('purchasing_items')
-      .select('id, qty, base_price, products(name)')
-      .eq('purchasing_id', p.id)
+    setReceipts([])
+    const [{ data }, { data: receiptData }] = await Promise.all([
+      supabase.from('purchasing_items').select('id, qty, base_price, products(name)').eq('purchasing_id', p.id),
+      supabase.from('purchasing_receipts')
+        .select('id, invoice_no, due_date, total, created_at, purchasing_items(id)')
+        .eq('purchasing_id', p.id)
+        .order('created_at'),
+    ])
     setProductModalItems((data ?? []) as { id: number; qty: number; base_price: number; products: { name: string } | null }[])
+    setReceipts((receiptData ?? []) as PurchasingReceipt[])
     setLoadingItems(false)
   }
 
@@ -103,7 +122,7 @@ export default function RiwayatPurchasingPage() {
   const fetchData = async () => {
     const { data } = await supabase
       .from('purchasing')
-      .select('id, code, date, due_date, notes, total, status, supplier_id, suppliers(name), purchasing_items(id, qty, base_price, products(name), stock_batches(id, is_available))')
+      .select('id, code, date, due_date, notes, total, status, supplier_id, suppliers(name), purchasing_items(id, qty, base_price, unit_of_measurement_id, entered_qty, receipt_id, products(name, unit_of_measurement_id, unit_of_measurements(abbreviation)), unit_of_measurements(abbreviation), stock_batches(id, is_available))')
       .order('id', { ascending: false })
     setList((data as Purchasing[]) ?? [])
     setFetching(false)
@@ -351,7 +370,10 @@ export default function RiwayatPurchasingPage() {
           <div className="space-y-2">
             {list.filter(p => {
               if (supplierFilter && p.suppliers?.name !== supplierFilter) return false
-              if (statusFilter !== 'all' && p.status !== statusFilter) return false
+              // 'partial' (some lines received, some still waiting on another faktur)
+              // is folded into the "Barang Dipesan" bucket — it still needs
+              // follow-up the same way a plain 'created' PO does.
+              if (statusFilter === 'created' ? !(p.status === 'created' || p.status === 'partial') : statusFilter !== 'all' && p.status !== statusFilter) return false
               if (dateFrom && p.date < dateFrom) return false
               if (dateTo && p.date > dateTo) return false
               if (productSearch) {
@@ -363,7 +385,8 @@ export default function RiwayatPurchasingPage() {
               const isInit = p.status === 'init'
               const canEdit = p.status !== 'completed'
               const isCreated = p.status === 'created'
-              const status = (!isInit && !isCreated) ? getArrivalStatus(p.purchasing_items) : null
+              const isPartial = p.status === 'partial'
+              const status = (!isInit && !isCreated && !isPartial) ? getArrivalStatus(p.purchasing_items) : null
               return (
                 <div key={p.id} className="relative bg-white rounded-xl shadow-sm">
                   <button
@@ -405,9 +428,9 @@ export default function RiwayatPurchasingPage() {
                           JT: {new Date(p.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </span>
                       )}
-                      {isInit || isCreated ? (
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PURCHASING_STATUS[p.status as 'init' | 'created'].className}`}>
-                          {PURCHASING_STATUS[p.status as 'init' | 'created'].label}
+                      {isInit || isCreated || isPartial ? (
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PURCHASING_STATUS[p.status as 'init' | 'created' | 'partial'].className}`}>
+                          {PURCHASING_STATUS[p.status as 'init' | 'created' | 'partial'].label}
                         </span>
                       ) : p.status === 'completed' ? (
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-600">
@@ -468,8 +491,25 @@ export default function RiwayatPurchasingPage() {
               <span className="text-sm font-bold text-[#121358]">Rp {fmt(productModal.total)}</span>
             </div>
 
+            {/* Receipt/faktur breakdown — only shows once at least one faktur has
+                been received; a PO with a single, un-split receiving stays quiet
+                here since there's nothing to break down yet. */}
+            {receipts.length > 0 && (
+              <div className="px-5 py-3 border-t border-gray-100 space-y-1.5">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Riwayat Faktur</p>
+                {receipts.map(r => (
+                  <div key={r.id} className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600 truncate">
+                      {r.invoice_no || '(tanpa no. faktur)'} · {new Date(r.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })} · {r.purchasing_items.length} produk
+                    </span>
+                    <span className="font-semibold text-gray-700 shrink-0 ml-2">Rp {fmt(r.total)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="px-5 py-4 border-t border-gray-100 space-y-2">
-              {productModal.status === 'created' && (
+              {(productModal.status === 'created' || productModal.status === 'partial') && (
                 <button onClick={() => { setReceiving(productModal); setProductModal(null) }}
                   className="w-full py-2.5 rounded-xl bg-[#121358] hover:bg-[#1a1c6e] text-white text-sm font-semibold flex items-center justify-center gap-2 transition">
                   <FontAwesomeIcon icon={faBoxOpen} className="w-3.5 h-3.5" style={{ color: '#9FA1FF' }} />

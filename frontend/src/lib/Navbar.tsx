@@ -51,7 +51,7 @@ export default function Navbar() {
     supabase
       .from('purchasing')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'created')
+      .in('status', ['created', 'partial'])
       .then(({ count }: { count: number | null }) => setOrderCount(count ?? 0))
   }, [appUser])
 
