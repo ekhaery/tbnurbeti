@@ -784,7 +784,7 @@ export default function BuatPurchasingPage() {
                     {factorFor(row) !== 1 && row.qty && (
                       <p className="text-[11px] text-gray-400 mt-1">= {baseQty(row)} {unitOfMeasurements.find(u => u.id === products.find(p => p.id === row.product_id)?.unit_of_measurement_id)?.abbreviation}</p>
                     )}
-                    {row.product_id && unitFormIdx !== i && (
+                    {row.product_id && unitFormIdx !== i && unitOptionsFor(row.product_id).length <= 1 && (
                       <button type="button" onClick={() => openUnitForm(i)}
                         className="mt-1 text-[11px] font-semibold text-[#121358] hover:underline">
                         + Tambah satuan beli (mis. Dus)
