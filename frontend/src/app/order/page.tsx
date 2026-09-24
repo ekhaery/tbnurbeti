@@ -4,7 +4,16 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import ReceiveDeliveryOrderModal from '@/components/ReceiveDeliveryOrderModal'
 
-type OrderItem = { id: number; qty: number; base_price: number; products: { name: string } | null }
+type OrderItem = {
+  id: number
+  qty: number
+  base_price: number
+  unit_of_measurement_id: number | null
+  entered_qty: number | null
+  receipt_id: number | null
+  products: { name: string; unit_of_measurement_id: number | null; unit_of_measurements: { abbreviation: string } | null } | null
+  unit_of_measurements: { abbreviation: string } | null
+}
 type Order = {
   id: number
   code: string
@@ -26,8 +35,8 @@ export default function OrderPage() {
   const fetchData = async () => {
     const { data } = await supabase
       .from('purchasing')
-      .select('id, code, date, supplier_id, suppliers(name), purchasing_items(id, qty, base_price, products(name))')
-      .eq('status', 'created')
+      .select('id, code, date, supplier_id, suppliers(name), purchasing_items(id, qty, base_price, unit_of_measurement_id, entered_qty, receipt_id, products(name, unit_of_measurement_id, unit_of_measurements(abbreviation)), unit_of_measurements(abbreviation))')
+      .in('status', ['created', 'partial'])
       .order('date', { ascending: true })
     setList((data as Order[]) ?? [])
     setFetching(false)

@@ -12,9 +12,13 @@ type Product = {
   id: number
   name: string
   price: number
-  stock: number // derived from stock_batches
+  stock: number // derived from stock_batches, in the product's base unit
   categories: { name: string } | null
+  unit_of_measurement_id: number | null
 }
+
+type UnitOfMeasurement = { id: number; name: string; abbreviation: string }
+type UnitConversion = { product_id: number; unit_of_measurement_id: number; factor_to_base: number; context: 'purchase' | 'sale' | 'both'; price_override: number | null }
 
 // Only Cat Oplos has a harga jual that varies by mixing machine — every other
 // category keeps a fixed price, set on the product itself.
@@ -27,6 +31,7 @@ type ItemRow = {
   qty: string
   price_sold: string
   discount: string
+  unit_id: number | ''
 }
 
 type AutocompleteState = {
@@ -36,7 +41,7 @@ type AutocompleteState = {
 
 type Customer = { id: number; name: string }
 
-const emptyItem = (): ItemRow => ({ product_id: '', query: '', qty: '', price_sold: '', discount: '' })
+const emptyItem = (): ItemRow => ({ product_id: '', query: '', qty: '', price_sold: '', discount: '', unit_id: '' })
 const fmt = (n: number) => n.toLocaleString('id-ID')
 
 function generateCode() {
@@ -51,6 +56,8 @@ export default function BuatTransaksiPage() {
   const { appUser } = useAuth()
 
   const [products, setProducts] = useState<Product[]>([])
+  const [unitOfMeasurements, setUnitOfMeasurements] = useState<UnitOfMeasurement[]>([])
+  const [conversions, setConversions] = useState<UnitConversion[]>([])
   const [date, setDate] = useState(localDateStr())
   const [notes, setNotes] = useState('')
   const [isHutang, setIsHutang] = useState(false)
@@ -88,7 +95,7 @@ export default function BuatTransaksiPage() {
     while (true) {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, price, categories(name)')
+        .select('id, name, price, categories(name), unit_of_measurement_id')
         .eq('is_discontinued', false)
         .eq('is_deleted', false)
         .order('name')
@@ -121,21 +128,69 @@ export default function BuatTransaksiPage() {
     fetchProducts()
     supabase.from('customers').select('id, name').order('name')
       .then(({ data }: { data: Customer[] | null }) => setCustomers(data ?? []))
+    supabase.from('unit_of_measurements').select('id, name, abbreviation').order('name')
+      .then(({ data }: { data: UnitOfMeasurement[] | null }) => setUnitOfMeasurements(data ?? []))
+    supabase.from('product_unit_conversions').select('product_id, unit_of_measurement_id, factor_to_base, context, price_override')
+      .in('context', ['sale', 'both'])
+      .then(({ data }: { data: UnitConversion[] | null }) => setConversions(data ?? []))
   }, [])
 
-  const updateCurrent = (field: keyof ItemRow, value: string) => {
+  // Unit options for a product: base unit (factor 1) + sale/both conversions
+  const unitOptionsFor = (productId: number | ''): { id: number; label: string; abbr: string; factor: number; priceOverride: number | null }[] => {
+    if (!productId) return []
+    const product = products.find(p => p.id === Number(productId))
+    const options: { id: number; label: string; abbr: string; factor: number; priceOverride: number | null }[] = []
+    if (product?.unit_of_measurement_id) {
+      const base = unitOfMeasurements.find(u => u.id === product.unit_of_measurement_id)
+      if (base) options.push({ id: base.id, label: `${base.name} (${base.abbreviation})`, abbr: base.abbreviation, factor: 1, priceOverride: null })
+    }
+    for (const c of conversions.filter(c => c.product_id === Number(productId))) {
+      const u = unitOfMeasurements.find(u => u.id === c.unit_of_measurement_id)
+      if (u) options.push({ id: u.id, label: `${u.name} (${u.abbreviation})`, abbr: u.abbreviation, factor: c.factor_to_base, priceOverride: c.price_override })
+    }
+    return options
+  }
+
+  const unitInfoFor = (row: ItemRow) => {
+    const opts = unitOptionsFor(row.product_id)
+    return opts.find(o => o.id === row.unit_id) ?? opts[0]
+  }
+
+  const factorFor = (row: ItemRow): number => unitInfoFor(row)?.factor ?? 1
+
+  // Qty actually sent to create_transaction_with_items / compared against stock (base unit)
+  const baseQty = (row: ItemRow): number => (parseFloat(row.qty) || 0) * factorFor(row)
+
+  const updateCurrent = (field: keyof ItemRow, value: string | number) => {
     setCurrent(prev => {
-      const updated = { ...prev, [field]: value }
+      const updated = { ...prev, [field]: value } as ItemRow
       if (field === 'product_id') {
         const product = products.find(p => p.id === Number(value))
-        if (product) updated.price_sold = String(product.price)
+        if (product) {
+          updated.price_sold = String(product.price)
+          updated.unit_id = product.unit_of_measurement_id ?? ''
+        }
+      }
+      if (field === 'unit_id') {
+        const info = unitOptionsFor(updated.product_id).find(o => o.id === Number(value))
+        const product = products.find(p => p.id === Number(updated.product_id))
+        if (info && !isManualPrice(product)) {
+          updated.price_sold = String(info.priceOverride ?? (product ? product.price * info.factor : 0))
+        }
       }
       return updated
     })
   }
 
   const selectProduct = (product: Product) => {
-    setCurrent(prev => ({ ...prev, product_id: product.id, query: product.name, price_sold: String(product.price), qty: prev.qty || '1' }))
+    setCurrent(prev => ({
+      ...prev,
+      product_id: product.id,
+      query: product.name,
+      price_sold: String(product.price),
+      qty: prev.qty || '1',
+      unit_id: product.unit_of_measurement_id ?? '',
+    }))
     setAutocomplete({ open: false, focused: -1 })
   }
 
@@ -193,7 +248,12 @@ export default function BuatTransaksiPage() {
     if (!current.product_id || !current.qty) return null
     const product = products.find(p => p.id === Number(current.product_id))
     if (!product) return null
-    if (parseFloat(current.qty) > product.stock) return `Stok tersedia: ${product.stock}`
+    const factor = factorFor(current)
+    if (baseQty(current) > product.stock) {
+      const available = factor !== 1 ? Math.floor((product.stock / factor) * 100) / 100 : product.stock
+      const unitAbbr = unitInfoFor(current)?.abbr ?? ''
+      return `Stok tersedia: ${available}${unitAbbr ? ' ' + unitAbbr : ''}`
+    }
     return null
   }
 
@@ -207,7 +267,7 @@ export default function BuatTransaksiPage() {
     for (const row of validItems) {
       const product = products.find(p => p.id === Number(row.product_id))
       if (!product) { setError('Produk tidak ditemukan.'); return }
-      if (parseFloat(row.qty) > product.stock) {
+      if (baseQty(row) > product.stock) {
         setError(`Stok ${product.name} tidak cukup. Tersedia: ${product.stock}`)
         return
       }
@@ -234,12 +294,15 @@ export default function BuatTransaksiPage() {
       p_created_by: appUser?.id ?? null,
       p_is_initial_transformation: false,
       p_items: validItems.map(row => {
-        const qty = parseFloat(row.qty)
+        // price_sold total uses the display qty (in the chosen unit); the qty sent
+        // to the RPC must be in the product's base unit, since that's what
+        // stock_batches FIFO consumption operates on.
+        const displayQty = parseFloat(row.qty)
         const discount = parseFloat(row.discount) || 0
         return {
           product_id: Number(row.product_id),
-          qty,
-          price_sold: (parseFloat(row.price_sold) || 0) * qty - discount,
+          qty: baseQty(row),
+          price_sold: (parseFloat(row.price_sold) || 0) * displayQty - discount,
           discount,
         }
       }),
@@ -255,12 +318,17 @@ export default function BuatTransaksiPage() {
     const pd = {
       code,
       date,
-      items: validItems.map(r => ({
-        name: products.find(p => p.id === Number(r.product_id))?.name ?? '-',
-        qty: parseFloat(r.qty),
-        price_sold: parseFloat(r.price_sold) || 0,
-        discount: parseFloat(r.discount) || 0,
-      })),
+      items: validItems.map(r => {
+        const baseName = products.find(p => p.id === Number(r.product_id))?.name ?? '-'
+        const unit = unitInfoFor(r)
+        const showUnit = factorFor(r) !== 1 && unit
+        return {
+          name: showUnit ? `${baseName} (${unit.abbr})` : baseName,
+          qty: parseFloat(r.qty),
+          price_sold: parseFloat(r.price_sold) || 0,
+          discount: parseFloat(r.discount) || 0,
+        }
+      }),
       total,
       notes: notes.trim(),
       isHutang,
@@ -502,6 +570,17 @@ export default function BuatTransaksiPage() {
                         className="w-9 h-9 flex items-center justify-center rounded-lg font-bold text-lg transition shrink-0"
                         style={{ backgroundColor: '#ffc908', color: '#121358' }}>+</button>
                     </div>
+                    {unitOptionsFor(current.product_id).length > 1 && (
+                      <select
+                        value={current.unit_id}
+                        onChange={e => updateCurrent('unit_id', e.target.value ? Number(e.target.value) : '')}
+                        className="mt-1.5 w-full border border-gray-300 rounded-lg px-2.5 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                      >
+                        {unitOptionsFor(current.product_id).map(o => (
+                          <option key={o.id} value={o.id}>{o.label}</option>
+                        ))}
+                      </select>
+                    )}
                     {sErr && <p className="text-xs text-red-300 mt-1">{sErr}</p>}
                   </div>
                 </div>
@@ -566,7 +645,9 @@ export default function BuatTransaksiPage() {
                             <div className="flex items-center gap-1.5">
                               <button type="button" onClick={() => updateItemQty(i, -0.25)}
                                 className="w-5 h-5 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-xs transition leading-none">−</button>
-                              <span className="font-bold text-white">{row.qty}</span>
+                              <span className="font-bold text-white">
+                                {row.qty}{factorFor(row) !== 1 && unitInfoFor(row) ? ` ${unitInfoFor(row)!.abbr}` : ''}
+                              </span>
                               <button type="button" onClick={() => updateItemQty(i, 0.25)}
                                 className="w-5 h-5 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-xs transition leading-none">+</button>
                               <span className="ml-1">× {fmt(parseFloat(row.price_sold) || 0)}{parseFloat(row.discount) > 0 ? ` − ${fmt(parseFloat(row.discount))}` : ''}</span>

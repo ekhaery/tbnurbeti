@@ -1,4 +1,4 @@
-export type PurchasingStatus = 'init' | 'created' | 'completed'
+export type PurchasingStatus = 'init' | 'created' | 'partial' | 'completed'
 
 export const PURCHASING_STATUS: Record<PurchasingStatus, { label: string; className: string }> = {
   init: {
@@ -8,6 +8,10 @@ export const PURCHASING_STATUS: Record<PurchasingStatus, { label: string; classN
   created: {
     label: 'Delivery Order',
     className: 'bg-blue-100 text-blue-600',
+  },
+  partial: {
+    label: 'Sebagian Diterima',
+    className: 'bg-purple-100 text-purple-600',
   },
   completed: {
     label: 'completed',
