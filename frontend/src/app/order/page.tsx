@@ -69,6 +69,16 @@ export default function OrderPage() {
   // orders can be deleted; pending lines of a partial order are removed via Edit.
   const hasReceived = (o: Order) => o.purchasing_items.some(i => i.receipt_id != null)
 
+  // "3 dus (72 biji)" when ordered in an alternate unit, else "72 biji" / "72"
+  const qtyLabel = (item: OrderItem) => {
+    const baseAbbr = item.products?.unit_of_measurements?.abbreviation ?? ''
+    const base = `${item.qty}${baseAbbr ? ' ' + baseAbbr : ''}`
+    const altAbbr = item.unit_of_measurements?.abbreviation
+    const isAlt = item.entered_qty != null && item.entered_qty > 0 && altAbbr
+      && item.unit_of_measurement_id !== item.products?.unit_of_measurement_id
+    return isAlt ? `${item.entered_qty} ${altAbbr} (${base})` : base
+  }
+
   const handleDelete = async () => {
     if (!deleting) return
     setConfirmingDelete(true)
@@ -117,7 +127,7 @@ export default function OrderPage() {
                   <div className="mt-2 space-y-0.5">
                     {p.purchasing_items.map(item => (
                       <p key={item.id} className="text-xs text-gray-600 truncate">
-                        · {item.products?.name ?? '-'} <span className="text-gray-400">({item.qty})</span>
+                        · {item.products?.name ?? '-'} <span className="text-gray-400">({qtyLabel(item)})</span>
                       </p>
                     ))}
                   </div>
