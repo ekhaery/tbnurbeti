@@ -48,6 +48,13 @@ export default function BuatPurchasingPage() {
   const [newProductCategoryId, setNewProductCategoryId] = useState<number | ''>('')
   const [newProductPrice, setNewProductPrice] = useState('')
   const [addingProduct, setAddingProduct] = useState(false)
+  // Inline "add unit" (e.g. 1 Dus = 12 Biji) for a product row
+  const [unitFormIdx, setUnitFormIdx] = useState<number | null>(null)
+  const [unitFormBaseId, setUnitFormBaseId] = useState<number | ''>('')
+  const [unitFormAltId, setUnitFormAltId] = useState<number | ''>('')
+  const [unitFormFactor, setUnitFormFactor] = useState('')
+  const [unitFormSaving, setUnitFormSaving] = useState(false)
+  const [unitFormError, setUnitFormError] = useState<string | null>(null)
   const [supplierId, setSupplierId] = useState<number | ''>('')
   const [date, setDate] = useState(localDateStr())
   const [notes, setNotes] = useState('')
@@ -93,7 +100,6 @@ export default function BuatPurchasingPage() {
     supabase.from('unit_of_measurements').select('id, name, abbreviation').order('name')
       .then(({ data }: { data: UnitOfMeasurement[] | null }) => setUnitOfMeasurements(data ?? []))
     supabase.from('product_unit_conversions').select('product_id, unit_of_measurement_id, factor_to_base, context')
-      .in('context', ['purchase', 'both'])
       .then(({ data }: { data: UnitConversion[] | null }) => setConversions(data ?? []))
     // Chunked fetch to bypass Supabase's 1000-row default limit
     ;(async () => {
@@ -116,7 +122,8 @@ export default function BuatPurchasingPage() {
     })()
   }, [])
 
-  // Unit options for a product: base unit (factor 1) + purchase/both conversions
+  // Unit options for a product: base unit (factor 1) + every conversion, one per unit
+  // (purchase/both rows preferred over sale-only when the same unit appears twice)
   const unitOptionsFor = (productId: number | ''): { id: number; label: string; factor: number }[] => {
     if (!productId) return []
     const product = products.find(p => p.id === productId)
@@ -125,7 +132,11 @@ export default function BuatPurchasingPage() {
       const base = unitOfMeasurements.find(u => u.id === product.unit_of_measurement_id)
       if (base) options.push({ id: base.id, label: `${base.name} (${base.abbreviation})`, factor: 1 })
     }
-    for (const c of conversions.filter(c => c.product_id === productId)) {
+    const productConversions = conversions
+      .filter(c => c.product_id === productId)
+      .sort((a, b) => Number(a.context === 'sale') - Number(b.context === 'sale'))
+    for (const c of productConversions) {
+      if (options.some(o => o.id === c.unit_of_measurement_id)) continue
       const u = unitOfMeasurements.find(u => u.id === c.unit_of_measurement_id)
       if (u) options.push({ id: u.id, label: `${u.name} (${u.abbreviation})`, factor: c.factor_to_base })
     }
@@ -152,6 +163,7 @@ export default function BuatPurchasingPage() {
   const removeItem = (i: number) => {
     setItems(prev => prev.filter((_, idx) => idx !== i))
     setAutocomplete(prev => prev.filter((_, idx) => idx !== i))
+    setUnitFormIdx(null)
   }
 
   const selectProduct = (i: number, product: Product) => {
@@ -189,6 +201,45 @@ export default function BuatPurchasingPage() {
     setNewProductName('')
     setNewProductCategoryId('')
     setNewProductPrice('')
+  }
+
+  const openUnitForm = (i: number) => {
+    const product = products.find(p => p.id === items[i]?.product_id)
+    setUnitFormIdx(i)
+    setUnitFormBaseId(product?.unit_of_measurement_id ?? '')
+    setUnitFormAltId('')
+    setUnitFormFactor('')
+    setUnitFormError(null)
+  }
+
+  // Saves the product's base unit (when it has none yet) + a purchase conversion,
+  // then switches the row to the new unit so qty can be entered in it right away.
+  const handleAddUnit = async (i: number) => {
+    const product = products.find(p => p.id === items[i]?.product_id)
+    if (!product) return
+    const factor = parseFloat(unitFormFactor)
+    if (!unitFormBaseId) { setUnitFormError('Pilih satuan dasar (satuan jual terkecil).'); return }
+    if (!unitFormAltId) { setUnitFormError('Pilih satuan beli.'); return }
+    if (unitFormAltId === unitFormBaseId) { setUnitFormError('Satuan beli harus berbeda dari satuan dasar.'); return }
+    if (!(factor > 0) || !Number.isInteger(factor)) { setUnitFormError('Isi berapa satuan dasar per satuan beli (bilangan bulat).'); return }
+    if (unitOptionsFor(product.id).some(o => o.id === unitFormAltId)) { setUnitFormError('Satuan ini sudah ada untuk produk ini.'); return }
+
+    setUnitFormSaving(true)
+    setUnitFormError(null)
+    if (!product.unit_of_measurement_id) {
+      const { error: baseErr } = await supabase.from('products')
+        .update({ unit_of_measurement_id: unitFormBaseId }).eq('id', product.id)
+      if (baseErr) { setUnitFormSaving(false); setUnitFormError(baseErr.message); return }
+    }
+    const newConv: UnitConversion = { product_id: product.id, unit_of_measurement_id: unitFormAltId, factor_to_base: factor, context: 'purchase' }
+    const { error: convErr } = await supabase.from('product_unit_conversions').insert({ ...newConv, price_override: null })
+    setUnitFormSaving(false)
+    if (convErr) { setUnitFormError(convErr.message); return }
+
+    setProducts(prev => prev.map(p => p.id === product.id ? { ...p, unit_of_measurement_id: unitFormBaseId } : p))
+    setConversions(prev => [...prev, newConv])
+    updateItem(i, 'unit_id', unitFormAltId)
+    setUnitFormIdx(null)
   }
 
   const handleAddSupplier = async () => {
@@ -733,6 +784,69 @@ export default function BuatPurchasingPage() {
                     {factorFor(row) !== 1 && row.qty && (
                       <p className="text-[11px] text-gray-400 mt-1">= {baseQty(row)} {unitOfMeasurements.find(u => u.id === products.find(p => p.id === row.product_id)?.unit_of_measurement_id)?.abbreviation}</p>
                     )}
+                    {row.product_id && unitFormIdx !== i && (
+                      <button type="button" onClick={() => openUnitForm(i)}
+                        className="mt-1 text-[11px] font-semibold text-[#121358] hover:underline">
+                        + Tambah satuan beli (mis. Dus)
+                      </button>
+                    )}
+                    {unitFormIdx === i && (() => {
+                      const product = products.find(p => p.id === row.product_id)
+                      const baseAbbr = unitOfMeasurements.find(u => u.id === unitFormBaseId)?.abbreviation ?? 'satuan dasar'
+                      const altAbbr = unitOfMeasurements.find(u => u.id === unitFormAltId)?.abbreviation ?? 'satuan beli'
+                      return (
+                        <div className="mt-2 p-3 rounded-xl space-y-2" style={{ backgroundColor: '#AEE2FF', border: '1.5px solid #9FA1FF' }}>
+                          <p className="text-xs font-bold text-[#121358]">+ Satuan Beli untuk {product?.name}</p>
+                          <div>
+                            <label className="block text-[11px] text-[#121358] mb-0.5">Satuan dasar (satuan jual terkecil)</label>
+                            <select
+                              value={unitFormBaseId}
+                              disabled={!!product?.unit_of_measurement_id}
+                              onChange={e => setUnitFormBaseId(e.target.value ? Number(e.target.value) : '')}
+                              className="w-full border border-[#9FA1FF] rounded-lg px-3 py-2 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                            >
+                              <option value="">-- Pilih (mis. Biji) --</option>
+                              {unitOfMeasurements.map(u => <option key={u.id} value={u.id}>{u.name} ({u.abbreviation})</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] text-[#121358] mb-0.5">Satuan beli dari supplier</label>
+                            <select
+                              value={unitFormAltId}
+                              onChange={e => setUnitFormAltId(e.target.value ? Number(e.target.value) : '')}
+                              className="w-full border border-[#9FA1FF] rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                            >
+                              <option value="">-- Pilih (mis. Dus) --</option>
+                              {unitOfMeasurements.filter(u => u.id !== unitFormBaseId).map(u => <option key={u.id} value={u.id}>{u.name} ({u.abbreviation})</option>)}
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-[#121358]">
+                            <span className="shrink-0">1 {altAbbr} =</span>
+                            <input
+                              type="number"
+                              value={unitFormFactor}
+                              onChange={e => setUnitFormFactor(e.target.value)}
+                              placeholder="12"
+                              min="1"
+                              step="1"
+                              className="w-full border border-[#9FA1FF] rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                            />
+                            <span className="shrink-0">{baseAbbr}</span>
+                          </div>
+                          {unitFormError && <p className="text-[11px] text-red-600">{unitFormError}</p>}
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => setUnitFormIdx(null)}
+                              className="flex-1 py-1.5 rounded-lg border border-[#9FA1FF] text-xs text-[#121358] hover:bg-white/50 transition">
+                              Batal
+                            </button>
+                            <button type="button" onClick={() => handleAddUnit(i)} disabled={unitFormSaving}
+                              className="flex-1 py-1.5 rounded-lg bg-[#121358] text-white text-xs font-semibold disabled:opacity-40 transition">
+                              {unitFormSaving ? '...' : 'Simpan Satuan'}
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                   {!isDeliveryOrderMode && (
                     <div>

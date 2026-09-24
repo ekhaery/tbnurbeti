@@ -50,6 +50,19 @@ const fmt = (n: number) => n.toLocaleString('id-ID')
 // never contradicts what actually gets stored.
 const netPrice = (gross: number, discountPercent: number) => Math.round(gross * (1 - discountPercent / 100) * 100) / 100
 
+// Supplier invoices often stack discounts ("15+3+6" = 15%, then 3% of the rest,
+// then 6%). Returns each step plus the single equivalent percent sent to the RPC,
+// or null when the input isn't a valid "a+b+c" list of 0–100 numbers.
+const parseDiscount = (input: string): { steps: number[]; effective: number } | null => {
+  const trimmed = input.replace(/\s+/g, '').replace(/,/g, '.')
+  if (trimmed === '') return { steps: [], effective: 0 }
+  const steps = trimmed.split('+').map(Number)
+  if (steps.some(d => !Number.isFinite(d) || d < 0 || d > 100)) return null
+  const remaining = steps.reduce((acc, d) => acc * (1 - d / 100), 1)
+  return { steps, effective: (1 - remaining) * 100 }
+}
+const discountOf = (input: string) => parseDiscount(input)?.effective ?? 0
+
 export default function ReceiveDeliveryOrderModal({
   purchasing,
   warehouses,
@@ -113,8 +126,7 @@ export default function ReceiveDeliveryOrderModal({
   // it per-unit first since it's a straight percentage.
   const total = includedItems.reduce((sum, i) => {
     const gross = (parseFloat(i.base_price) || 0) * (parseFloat(i.qty) || 0)
-    const disc = parseFloat(i.discountPercent) || 0
-    return sum + netPrice(gross, disc)
+    return sum + netPrice(gross, discountOf(i.discountPercent))
   }, 0)
   const baseQtyFor = (i: ItemInput) => (parseFloat(i.qty) || 0) * i.factor
 
@@ -143,6 +155,11 @@ export default function ReceiveDeliveryOrderModal({
       setError('Isi harga beli untuk setiap produk yang diterima.')
       return
     }
+    const badDiscount = includedItems.find(i => parseDiscount(i.discountPercent) === null)
+    if (badDiscount) {
+      setError(`Diskon ${badDiscount.name} tidak valid. Isi angka 0–100, atau bertingkat seperti 15+3+6.`)
+      return
+    }
     // stock_batches/purchasing_items.qty are stored in the base unit and must stay
     // whole numbers, same constraint as purchasing/buat — catch a fractional result
     // (e.g. typing 2.5 Dus) before it silently gets rounded away.
@@ -160,7 +177,7 @@ export default function ReceiveDeliveryOrderModal({
       purchasing_item_id: i.id,
       qty: Math.round(baseQtyFor(i)),
       gross_base_price: (parseFloat(i.base_price) || 0) / i.factor,
-      discount_percent: parseFloat(i.discountPercent) || 0,
+      discount_percent: discountOf(i.discountPercent),
     }))
 
     const { data: receiptId, error: rpcErr } = await supabase.rpc('receive_delivery_order', {
@@ -265,7 +282,8 @@ export default function ReceiveDeliveryOrderModal({
         <div className="max-h-[45vh] overflow-y-auto divide-y divide-gray-50 px-5 py-3 space-y-3">
           {items.map((item, idx) => {
             const gross = parseFloat(item.base_price) || 0
-            const disc = parseFloat(item.discountPercent) || 0
+            const parsedDisc = parseDiscount(item.discountPercent)
+            const disc = parsedDisc?.effective ?? 0
             return (
               <div key={item.id} className={`pt-3 first:pt-0 space-y-2 transition ${!item.included ? 'opacity-40' : ''}`}>
                 <label className="flex items-start gap-2 text-sm font-medium text-gray-700 cursor-pointer">
@@ -304,13 +322,18 @@ export default function ReceiveDeliveryOrderModal({
                   </div>
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">Diskon (%) <span className="font-normal">— opsional</span></label>
-                    <input type="number" value={item.discountPercent} min="0" max="100" step="0.01"
-                      placeholder="0"
-                      onChange={e => updateItem(idx, 'discountPercent', e.target.value)}
-                      className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] disabled:bg-gray-50" />
+                    <input type="text" inputMode="decimal" value={item.discountPercent}
+                      placeholder="0 atau 15+3+6"
+                      onChange={e => { const v = e.target.value; if (/^[\d.,+\s]*$/.test(v)) updateItem(idx, 'discountPercent', v) }}
+                      className={`w-36 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358] disabled:bg-gray-50 ${parsedDisc ? 'border-gray-300' : 'border-red-400'}`} />
+                    {!parsedDisc && (
+                      <p className="text-[11px] text-red-500 mt-1">Format diskon: angka 0–100, bertingkat pakai + (mis. 15+3+6)</p>
+                    )}
                     {disc > 0 && gross > 0 && (
                       <p className="text-[11px] text-gray-400 mt-1">
-                        Rp {fmt(gross)} → -{disc}% → Rp {fmt(netPrice(gross, disc))} {item.factor !== 1 ? `/ ${item.unitLabel}` : ''}
+                        Rp {fmt(gross)} → {parsedDisc!.steps.map(d => `-${fmt(d)}%`).join(' ')}
+                        {parsedDisc!.steps.length > 1 && ` (= ${fmt(Math.round(disc * 1000) / 1000)}%)`}
+                        {' '}→ Rp {fmt(netPrice(gross, disc))} {item.factor !== 1 ? `/ ${item.unitLabel}` : ''}
                       </p>
                     )}
                   </div>
