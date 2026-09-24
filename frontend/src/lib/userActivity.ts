@@ -11,6 +11,9 @@ export const USER_ACTIVITY = {
   EDIT_PURCHASING: (userName: string, code: string, total: number) =>
     `${userName} telah mengubah data purchasing ${code}, Rp ${total.toLocaleString('id-ID')}`,
 
+  DELETE_ORDER: (userName: string, code: string, supplierName: string) =>
+    `${userName} telah menghapus order ${code} dari ${supplierName}`,
+
   CREATE_DELIVERY_ORDER: (userName: string, supplierName: string) =>
     `${userName} telah membuat delivery order baru dari ${supplierName}`,
 
