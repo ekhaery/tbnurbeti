@@ -161,6 +161,20 @@ export default function BuatTransaksiPage() {
   // Qty actually sent to create_transaction_with_items / compared against stock (base unit)
   const baseQty = (row: ItemRow): number => (parseFloat(row.qty) || 0) * factorFor(row)
 
+  // Stock expressed in the row's chosen unit (stock_batches are in base unit)
+  const stockInUnit = (row: ItemRow, product: Product): string => {
+    const factor = factorFor(row)
+    const qty = factor !== 1 ? Math.floor((product.stock / factor) * 100) / 100 : product.stock
+    const abbr = unitInfoFor(row)?.abbr ?? ''
+    return `${qty}${abbr ? ' ' + abbr : ''}`
+  }
+
+  // Sale price for one of the row's chosen unit
+  const priceInUnit = (row: ItemRow, product: Product): number => {
+    const info = unitInfoFor(row)
+    return info?.priceOverride ?? product.price * (info?.factor ?? 1)
+  }
+
   const updateCurrent = (field: keyof ItemRow, value: string | number) => {
     setCurrent(prev => {
       const updated = { ...prev, [field]: value } as ItemRow
@@ -248,11 +262,8 @@ export default function BuatTransaksiPage() {
     if (!current.product_id || !current.qty) return null
     const product = products.find(p => p.id === Number(current.product_id))
     if (!product) return null
-    const factor = factorFor(current)
     if (baseQty(current) > product.stock) {
-      const available = factor !== 1 ? Math.floor((product.stock / factor) * 100) / 100 : product.stock
-      const unitAbbr = unitInfoFor(current)?.abbr ?? ''
-      return `Stok tersedia: ${available}${unitAbbr ? ' ' + unitAbbr : ''}`
+      return `Stok tersedia: ${stockInUnit(current, product)}`
     }
     return null
   }
@@ -268,7 +279,7 @@ export default function BuatTransaksiPage() {
       const product = products.find(p => p.id === Number(row.product_id))
       if (!product) { setError('Produk tidak ditemukan.'); return }
       if (baseQty(row) > product.stock) {
-        setError(`Stok ${product.name} tidak cukup. Tersedia: ${product.stock}`)
+        setError(`Stok ${product.name} tidak cukup. Tersedia: ${stockInUnit(row, product)}`)
         return
       }
       if (isManualPrice(product) && !(parseFloat(row.price_sold) > 0)) {
@@ -524,9 +535,9 @@ export default function BuatTransaksiPage() {
                       ) : (
                         <span className="font-normal">Harga jual:</span>
                       )}
-                      {!isManualPrice(selectedProduct) && <> <span className="font-semibold">Rp {fmt(selectedProduct.price)}</span></>}
+                      {!isManualPrice(selectedProduct) && <> <span className="font-semibold">Rp {fmt(priceInUnit(current, selectedProduct))}</span></>}
                       <span className="mx-1">·</span>
-                      <span className="font-normal">Stok:</span> <span className="font-semibold">{selectedProduct.stock}</span>
+                      <span className="font-normal">Stok:</span> <span className="font-semibold">{stockInUnit(current, selectedProduct)}</span>
                     </p>
                   )}
                   <div className="mt-6" />
