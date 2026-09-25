@@ -62,6 +62,9 @@ export default function HppTokoLainPage() {
   const [savingId, setSavingId] = useState<number | null>(null)
   const [errors, setErrors] = useState<Record<number, string>>({})
   const [printItem, setPrintItem] = useState<ExternalItem | null>(null)
+  const [printing, setPrinting] = useState(false)
+  const [printError, setPrintError] = useState<string | null>(null)
+  const [printedMsg, setPrintedMsg] = useState<string | null>(null)
 
   const queryItems = () => supabase
     .from('transaction_items')
@@ -139,21 +142,55 @@ export default function HppTokoLainPage() {
     applyItems(data, reloadErr)
   }
 
-  const handlePrint = (item: ExternalItem) => {
+  // Payload for print_jobs 'surat_jalan' — the thermal printer listeners
+  // (printer-listener/listener.js, /api/print) render it.
+  const suratJalanFor = (item: ExternalItem) => {
+    const f = formFor(item)
+    return {
+      no: `SJ-${localDateStr().replace(/-/g, '')}-${item.id}`,
+      date: localDateStr(),
+      store: suppliers.find(s => s.id === f.supplierId)?.name ?? '',
+      items: [{
+        name: item.products?.name ?? '-',
+        qty: Number(f.totalQty) || Math.ceil(item.external_qty),
+        unit: item.products?.unit_of_measurements?.abbreviation ?? '',
+      }],
+    }
+  }
+
+  const openPrintPreview = (item: ExternalItem) => {
+    if (!formFor(item).supplierId) {
+      setErrors(prev => ({ ...prev, [item.id]: 'Pilih toko asal dulu sebelum cetak surat jalan.' }))
+      return
+    }
+    setPrintError(null)
     setPrintItem(item)
-    // Let React render the surat jalan before opening the print dialog
-    setTimeout(() => window.print(), 100)
+  }
+
+  const handlePrint = async () => {
+    if (!printItem) return
+    setPrinting(true)
+    setPrintError(null)
+    const { error } = await supabase.from('print_jobs').insert({
+      type: 'surat_jalan',
+      payload: suratJalanFor(printItem),
+      created_by: appUser?.id ?? null,
+    })
+    setPrinting(false)
+    if (error) { setPrintError(error.message); return }
+    setPrintedMsg(`Surat jalan ${printItem.products?.name ?? ''} dikirim ke printer.`)
+    setPrintItem(null)
+    setTimeout(() => setPrintedMsg(null), 4000)
   }
 
   const formatDate = (d: string) =>
     new Date(d + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 
-  const printForm = printItem ? formFor(printItem) : null
-  const printSupplier = printForm ? suppliers.find(s => s.id === printForm.supplierId)?.name : undefined
+  const sj = printItem ? suratJalanFor(printItem) : null
 
   return (
     <>
-    <div className="min-h-screen bg-gray-50 print:hidden">
+    <div className="min-h-screen bg-gray-50">
       <div className="px-4 pt-3 pb-10 max-w-2xl mx-auto space-y-4">
 
         <div>
@@ -163,6 +200,10 @@ export default function HppTokoLainPage() {
             dan harga modalnya — kelebihan barang masuk stok, dan pembayaran bon masuk Tagihan Dagang.
           </p>
         </div>
+
+        {printedMsg && (
+          <div className="p-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm">✓ {printedMsg}</div>
+        )}
 
         <div className="bg-white rounded-2xl shadow-sm p-1 flex gap-1">
           {([['pending', 'Belum diisi', pending.length], ['done', 'Sudah diisi', done.length]] as [Tab, string, number][]).map(([key, label, count]) => (
@@ -261,7 +302,7 @@ export default function HppTokoLainPage() {
                       </span>
                     ) : null}
                     <button
-                      onClick={() => handlePrint(item)}
+                      onClick={() => openPrintPreview(item)}
                       className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#121358]/30 text-[#121358] font-semibold hover:bg-[#121358]/5 transition"
                     >
                       <FontAwesomeIcon icon={faPrint} className="w-3 h-3" />
@@ -403,55 +444,55 @@ export default function HppTokoLainPage() {
       </div>
     </div>
 
-    {/* Surat jalan — only visible when printing */}
-    {printItem && printForm && (
-      <div className="hidden print:block p-8 text-black text-sm">
-        <style>{`@page { size: A5 landscape; margin: 10mm; }`}</style>
-        <div className="flex items-start justify-between border-b-2 border-black pb-3">
-          <div>
-            <p className="text-lg font-bold">TB. NURBETI</p>
-            <p>Jl. KS. Tubun No. 46, Tegal</p>
-            <p>HP Admin: 0815-4806-4220</p>
+    {/* Surat jalan preview — same receipt layout the thermal printer prints */}
+    {printItem && sj && (
+      <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4" onClick={() => setPrintItem(null)}>
+        <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" style={{ maxHeight: '85vh' }} onClick={e => e.stopPropagation()}>
+          <div className="px-4 py-3 border-b border-gray-100">
+            <p className="text-sm font-bold text-gray-800">Cetak Surat Jalan</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Dicetak otomatis di printer thermal toko.</p>
           </div>
-          <div className="text-right">
-            <p className="text-lg font-bold">SURAT JALAN</p>
-            <p>No: SJ-{printItem.transactions?.code ?? ''}-{printItem.id}</p>
-            <p>Tanggal: {formatDate(localDateStr())}</p>
+          <div className="overflow-y-auto px-4 py-3" style={{ maxHeight: 'calc(85vh - 120px)' }}>
+            <div className="bg-white border border-dashed border-gray-300 rounded-xl px-3 py-3 font-mono text-[10px] text-gray-800 leading-relaxed">
+              <p className="text-center">{'================================'}</p>
+              <p className="text-center font-bold">TB. NURBETI</p>
+              <p className="text-center">Jl. KS. Tubun No. 46</p>
+              <p className="text-center">Tegal</p>
+              <p className="text-center">HP Admin: 0815-4806-4220</p>
+              <p className="text-center">{'================================'}</p>
+              <p className="text-center font-bold">SURAT JALAN</p>
+              <p>No. SJ&nbsp;&nbsp;: {sj.no}</p>
+              <p>Tanggal : {new Date(sj.date + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              <p>Toko&nbsp;&nbsp;&nbsp;&nbsp;: {sj.store}</p>
+              <p>{'--------------------------------'}</p>
+              <p className="whitespace-pre">{'Nama Barang                 Qty'}</p>
+              <p>{'--------------------------------'}</p>
+              {sj.items.map((it, i) => (
+                <div key={i}>
+                  <p className="font-semibold">{it.name}</p>
+                  <p className="pl-2">{it.qty} {it.unit}</p>
+                </div>
+              ))}
+              <p>{'--------------------------------'}</p>
+              <p>&nbsp;</p>
+              <p className="whitespace-pre">{'Pengambil         Toko Pemberi'}</p>
+              <p>&nbsp;</p>
+              <p>&nbsp;</p>
+              <p className="whitespace-pre">{'(__________)      (__________)'}</p>
+              <p>{'================================'}</p>
+            </div>
+            {printError && <p className="text-xs text-red-500 mt-2">{printError}</p>}
           </div>
-        </div>
-
-        <div className="mt-4 space-y-1">
-          <p>Kepada Yth: <span className="font-semibold">{printSupplier ?? '..................................................'}</span></p>
-          <p>Mohon diserahkan barang berikut kepada pembawa surat ini:</p>
-        </div>
-
-        <table className="w-full mt-3 border border-black border-collapse">
-          <thead>
-            <tr>
-              <th className="border border-black px-2 py-1 text-left w-10">No</th>
-              <th className="border border-black px-2 py-1 text-left">Nama Barang</th>
-              <th className="border border-black px-2 py-1 text-right w-28">Jumlah</th>
-              <th className="border border-black px-2 py-1 text-left w-24">Satuan</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td className="border border-black px-2 py-1">1</td>
-              <td className="border border-black px-2 py-1">{printItem.products?.name ?? '-'}</td>
-              <td className="border border-black px-2 py-1 text-right">{Number(printForm.totalQty) || Math.ceil(printItem.external_qty)}</td>
-              <td className="border border-black px-2 py-1">{printItem.products?.unit_of_measurements?.abbreviation ?? ''}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <p className="mt-3">
-          Keperluan: transaksi {printItem.transactions?.code ?? '-'} · Pembayaran: {printForm.payment === 'bon' ? `Bon (jatuh tempo ${formatDate(printForm.dueDate)})` : 'Cash'}
-        </p>
-
-        <div className="mt-10 grid grid-cols-3 text-center">
-          <div><p>Pengambil,</p><p className="mt-16">(......................)</p></div>
-          <div><p>Toko Pemberi,</p><p className="mt-16">(......................)</p></div>
-          <div><p>Mengetahui,</p><p className="mt-16">(......................)</p></div>
+          <div className="flex gap-2 px-4 py-3 border-t border-gray-100">
+            <button onClick={() => setPrintItem(null)}
+              className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">
+              Batal
+            </button>
+            <button onClick={handlePrint} disabled={printing}
+              className="flex-1 py-2.5 rounded-xl bg-[#121358] text-white text-sm font-semibold hover:bg-[#1a1c6e] disabled:opacity-40 transition">
+              {printing ? 'Mengirim...' : 'Cetak'}
+            </button>
+          </div>
         </div>
       </div>
     )}
