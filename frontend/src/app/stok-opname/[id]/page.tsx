@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faChevronLeft, faPen, faPlus, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
+import AltUnitForm, { contextLabel, conversionSentence, type ConversionContext, type NewConversion, type UnitOfMeasurement } from '@/components/AltUnitForm'
 
 type Session = {
   id: number
@@ -16,10 +17,11 @@ type Session = {
 
 type Item = {
   id: number
-  products: { id: number; name: string } | null
+  products: { id: number; name: string; unit_of_measurement_id: number | null } | null
 }
 
 type Warehouse = { id: number; name: string; code: string }
+type UnitConversion = { id: number; product_id: number; unit_of_measurement_id: number; factor_to_base: number; context: ConversionContext; price_override: number | null }
 
 export default function StokOpnameDetailPage() {
   const supabase = createClient()
@@ -50,10 +52,20 @@ export default function StokOpnameDetailPage() {
 
   const [editingItem, setEditingItem] = useState<Item | null>(null)
   const [editStock, setEditStock] = useState('')
+  const [editUnitId, setEditUnitId] = useState<number | ''>('')
   const [editLoading, setEditLoading] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
   const [editSaved, setEditSaved] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+
+  const [unitOfMeasurements, setUnitOfMeasurements] = useState<UnitOfMeasurement[]>([])
+  const [conversions, setConversions] = useState<UnitConversion[]>([])
+  const [altUnitItem, setAltUnitItem] = useState<Item | null>(null)
+  const [editingConvId, setEditingConvId] = useState<number | null>(null)
+  const [deletingConvId, setDeletingConvId] = useState<number | null>(null)
+  const [convListError, setConvListError] = useState<string | null>(null)
+  // Base unit chosen in the modal for a product that has none yet
+  const [altBaseUnitId, setAltBaseUnitId] = useState<number | ''>('')
 
   const [confirming, setConfirming] = useState(false)
   const [confirmError, setConfirmError] = useState<string | null>(null)
@@ -67,7 +79,7 @@ export default function StokOpnameDetailPage() {
         .single(),
       supabase
         .from('stock_opname_items')
-        .select('id, products(id, name)')
+        .select('id, products(id, name, unit_of_measurement_id)')
         .eq('session_id', id)
         .order('id'),
       supabase
@@ -84,14 +96,20 @@ export default function StokOpnameDetailPage() {
       const productIds = itemRows.map(i => i.products?.id).filter((v): v is number => v != null)
       const itemIds = itemRows.map(i => i.id)
 
-      const [{ data: links }, { data: counts }] = await Promise.all([
+      const [{ data: links }, { data: counts }, { data: convData }, { data: uomData }] = await Promise.all([
         productIds.length
           ? supabase.from('product_warehouse').select('product_id, warehouse_id, warehouses(id, name, code)').in('product_id', productIds)
           : Promise.resolve({ data: [] as { product_id: number; warehouse_id: number; warehouses: Warehouse }[] }),
         itemIds.length
           ? supabase.from('stock_opname_item_warehouses').select('item_id, warehouse_id, counted_stock').in('item_id', itemIds)
           : Promise.resolve({ data: [] as { item_id: number; warehouse_id: number; counted_stock: number }[] }),
+        productIds.length
+          ? supabase.from('product_unit_conversions').select('id, product_id, unit_of_measurement_id, factor_to_base, context, price_override').in('product_id', productIds)
+          : Promise.resolve({ data: [] as UnitConversion[] }),
+        supabase.from('unit_of_measurements').select('id, name, abbreviation').order('name'),
       ])
+      setConversions((convData as UnitConversion[]) ?? [])
+      setUnitOfMeasurements((uomData as UnitOfMeasurement[]) ?? [])
 
       const linkRows = (links ?? []) as { product_id: number; warehouse_id: number; warehouses: Warehouse }[]
 
@@ -124,9 +142,35 @@ export default function StokOpnameDetailPage() {
     })
   }, [id])
 
+  // Unit options for a product: base unit (factor 1) + every conversion. Opname is
+  // neither buying nor selling, so all contexts apply (deduped per unit).
+  const unitOptionsFor = (product: Item['products']): { id: number; label: string; factor: number }[] => {
+    if (!product) return []
+    const options: { id: number; label: string; factor: number }[] = []
+    if (product.unit_of_measurement_id) {
+      const base = unitOfMeasurements.find(u => u.id === product.unit_of_measurement_id)
+      if (base) options.push({ id: base.id, label: `${base.name} (${base.abbreviation})`, factor: 1 })
+    }
+    for (const c of conversions.filter(c => c.product_id === product.id)) {
+      if (options.some(o => o.id === c.unit_of_measurement_id)) continue
+      const u = unitOfMeasurements.find(u => u.id === c.unit_of_measurement_id)
+      if (u) options.push({ id: u.id, label: `${u.name} (${u.abbreviation})`, factor: c.factor_to_base })
+    }
+    return options
+  }
+
+  const baseAbbrFor = (product: Item['products']) =>
+    unitOfMeasurements.find(u => u.id === product?.unit_of_measurement_id)?.abbreviation ?? ''
+
+  const editUnitOptions = unitOptionsFor(editingItem?.products ?? null)
+  const editFactor = editUnitOptions.find(o => o.id === editUnitId)?.factor ?? 1
+  // counted_stock is always stored in the product's base unit
+  const editBaseQty = Math.round((parseFloat(editStock) || 0) * editFactor * 1e6) / 1e6
+
   const openEdit = async (item: Item) => {
     if (!selectedWarehouseId) return
     setEditingItem(item)
+    setEditUnitId(item.products?.unit_of_measurement_id ?? '')
     setEditLoading(true)
     setEditError(null)
     setEditSaved(false)
@@ -144,13 +188,23 @@ export default function StokOpnameDetailPage() {
 
   const handleEditSave = async () => {
     if (!editingItem || !selectedWarehouseId) return
-    setEditSaving(true)
     setEditError(null)
+
+    // A converted count must land on a whole number of base units (product_warehouse.stock is integer)
+    let counted = editBaseQty
+    if (editFactor !== 1) {
+      if (Math.abs(counted - Math.round(counted)) > 1e-6) {
+        setEditError(`Hasil konversi (${counted} ${baseAbbrFor(editingItem.products)}) harus bilangan bulat.`)
+        return
+      }
+      counted = Math.round(counted)
+    }
+    setEditSaving(true)
 
     const { error: upsertErr } = await supabase
       .from('stock_opname_item_warehouses')
       .upsert(
-        { item_id: editingItem.id, warehouse_id: selectedWarehouseId, counted_stock: parseFloat(editStock) || 0 },
+        { item_id: editingItem.id, warehouse_id: selectedWarehouseId, counted_stock: counted },
         { onConflict: 'item_id,warehouse_id' }
       )
 
@@ -159,7 +213,7 @@ export default function StokOpnameDetailPage() {
 
     setCountedStockMap(prev => ({
       ...prev,
-      [`${editingItem.id}_${selectedWarehouseId}`]: parseFloat(editStock) || 0,
+      [`${editingItem.id}_${selectedWarehouseId}`]: counted,
     }))
 
     setEditSaved(true)
@@ -251,6 +305,52 @@ export default function StokOpnameDetailPage() {
     }
 
     setShowDeleteWarehouse(false)
+  }
+
+  // Saves straight to product_unit_conversions (same table Edit Produk manages);
+  // a thrown error is shown inside AltUnitForm.
+  const handleAddAltUnit = async (conv: NewConversion) => {
+    const product = altUnitItem?.products
+    if (!product) return
+    // Product without a base unit: set the one picked in the modal first
+    if (!product.unit_of_measurement_id) {
+      if (!altBaseUnitId) throw new Error('Pilih unit dasar terlebih dahulu.')
+      const { error: prodErr } = await supabase.from('products').update({ unit_of_measurement_id: altBaseUnitId }).eq('id', product.id)
+      if (prodErr) throw new Error(prodErr.message)
+      setItems(prev => prev.map(it => it.products?.id === product.id
+        ? { ...it, products: { ...it.products, unit_of_measurement_id: altBaseUnitId } }
+        : it))
+    }
+    if (editingConvId !== null) {
+      const { error } = await supabase.from('product_unit_conversions').update(conv).eq('id', editingConvId)
+      if (error) throw new Error(error.message)
+      setConversions(prev => prev.map(c => c.id === editingConvId ? { ...c, ...conv } : c))
+      setEditingConvId(null)
+      return
+    }
+    const { data, error } = await supabase.from('product_unit_conversions')
+      .insert({ product_id: product.id, ...conv })
+      .select('id, product_id, unit_of_measurement_id, factor_to_base, context, price_override')
+      .single()
+    if (error || !data) throw new Error(error?.message ?? 'Gagal menyimpan unit alternatif.')
+    setConversions(prev => [...prev, data as UnitConversion])
+  }
+
+  const handleDeleteConv = async (convId: number) => {
+    setConvListError(null)
+    const { error } = await supabase.from('product_unit_conversions').delete().eq('id', convId)
+    if (error) { setConvListError(error.message); return }
+    setConversions(prev => prev.filter(c => c.id !== convId))
+    setDeletingConvId(null)
+    if (editingConvId === convId) setEditingConvId(null)
+  }
+
+  const openAltUnit = (item: Item) => {
+    setAltBaseUnitId('')
+    setEditingConvId(null)
+    setDeletingConvId(null)
+    setConvListError(null)
+    setAltUnitItem(item)
   }
 
   const handleConfirm = async () => {
@@ -394,13 +494,52 @@ export default function StokOpnameDetailPage() {
                     key={item.id}
                     className="flex items-center justify-between px-4 py-3"
                   >
-                    <p className="text-sm text-gray-700 flex-1 min-w-0 truncate">{item.products?.name ?? '-'}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700 truncate">{item.products?.name ?? '-'}</p>
+                      {(() => {
+                        const product = item.products
+                        if (!product) return null
+                        const productConvs = conversions.filter(c => c.product_id === product.id)
+                        const baseAbbr = unitOfMeasurements.find(u => u.id === product.unit_of_measurement_id)?.abbreviation ?? 'unit dasar'
+                        if (productConvs.length > 0) {
+                          return (
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <p className="text-[11px] text-gray-400 truncate">
+                                {productConvs.map(c => {
+                                  const alt = unitOfMeasurements.find(u => u.id === c.unit_of_measurement_id)
+                                  return `${conversionSentence(c.factor_to_base, alt?.abbreviation ?? '?', baseAbbr)} (${contextLabel[c.context]})`
+                                }).join(' · ')}
+                              </p>
+                              {!isConfirmed && (
+                                <button
+                                  onClick={() => openAltUnit(item)}
+                                  className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-[#121358] hover:underline"
+                                >
+                                  <FontAwesomeIcon icon={faPen} className="w-2.5 h-2.5" />
+                                  Ubah
+                                </button>
+                              )}
+                            </div>
+                          )
+                        }
+                        if (isConfirmed) return null
+                        return (
+                          <button
+                            onClick={() => openAltUnit(item)}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#121358] hover:underline mt-0.5"
+                          >
+                            <FontAwesomeIcon icon={faPlus} className="w-2.5 h-2.5" />
+                            Unit Alternatif
+                          </button>
+                        )
+                      })()}
+                    </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
                       <div className="text-right">
                         <p className={`text-sm font-semibold ${hasCounted ? 'text-gray-800' : 'text-gray-300'}`}>
                           {hasCounted ? counted : '-'}
                         </p>
-                        <p className="text-[10px] text-gray-400">stok</p>
+                        <p className="text-[10px] text-gray-400">stok{baseAbbrFor(item.products) ? ` (${baseAbbrFor(item.products)})` : ''}</p>
                       </div>
                       {!isConfirmed && (
                         <button
@@ -457,15 +596,33 @@ export default function StokOpnameDetailPage() {
               <p className="text-xs text-gray-400 text-center py-4">Memuat...</p>
             ) : (
               <>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={editStock}
-                  onChange={e => setEditStock(e.target.value)}
-                  placeholder="0"
-                  autoFocus
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#121358]"
-                />
+                <div>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={editStock}
+                      onChange={e => setEditStock(e.target.value)}
+                      placeholder="0"
+                      autoFocus
+                      className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                    />
+                    {editUnitOptions.length > 1 && (
+                      <select
+                        value={editUnitId}
+                        onChange={e => setEditUnitId(e.target.value ? Number(e.target.value) : '')}
+                        className="border border-gray-300 rounded-xl px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#121358] shrink-0"
+                      >
+                        {editUnitOptions.map(o => (
+                          <option key={o.id} value={o.id}>{o.label}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  {editFactor !== 1 && editStock && (
+                    <p className="text-[11px] text-gray-400 mt-1">= {editBaseQty} {baseAbbrFor(editingItem.products)}</p>
+                  )}
+                </div>
 
                 {editError && <p className="text-xs text-red-500">{editError}</p>}
                 {editSaved && <p className="text-xs text-green-600">✓ Tersimpan.</p>}
@@ -482,6 +639,107 @@ export default function StokOpnameDetailPage() {
           </div>
         </div>
       )}
+
+      {altUnitItem?.products && (() => {
+        const product = altUnitItem.products
+        const needsBaseUnit = !product.unit_of_measurement_id
+        const baseUnit = unitOfMeasurements.find(u => u.id === (product.unit_of_measurement_id ?? altBaseUnitId))
+        const productConvs = conversions.filter(c => c.product_id === product.id)
+        const editingConv = productConvs.find(c => c.id === editingConvId)
+        return (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+            <div className="bg-white rounded-2xl w-full max-w-md p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-sm font-bold text-gray-800">{productConvs.length > 0 ? 'Unit Alternatif' : 'Tambah Unit Alternatif'}</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {product.name}{!needsBaseUnit && baseUnit ? ` | Unit dasar: ${baseUnit.name} (${baseUnit.abbreviation})` : ''}
+                  </p>
+                </div>
+                <button onClick={() => setAltUnitItem(null)} className="text-gray-400 hover:text-gray-600 p-1">
+                  <FontAwesomeIcon icon={faXmark} className="w-4 h-4" />
+                </button>
+              </div>
+              {needsBaseUnit && (
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-1">
+                    Unit dasar <span className="text-gray-400">(produk ini belum punya — satuan stok yang dihitung)</span>
+                  </label>
+                  <select
+                    value={altBaseUnitId}
+                    onChange={e => setAltBaseUnitId(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#121358]"
+                  >
+                    <option value="">Pilih unit dasar...</option>
+                    {unitOfMeasurements.map(u => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.abbreviation})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {productConvs.length > 0 && (
+                <div className="space-y-1.5">
+                  {convListError && <p className="text-xs text-red-500">{convListError}</p>}
+                  {productConvs.map(c => {
+                    const alt = unitOfMeasurements.find(u => u.id === c.unit_of_measurement_id)
+                    const isEditing = c.id === editingConvId
+                    return (
+                      <div key={c.id} className={`flex items-center gap-2 border rounded-lg px-3 py-2 text-xs ${isEditing ? 'bg-[#121358]/5 border-[#121358]/40' : 'bg-gray-50 border-gray-200'}`}>
+                        <span className="font-medium text-gray-700">
+                          {conversionSentence(c.factor_to_base, alt?.abbreviation ?? '?', baseUnit?.abbreviation ?? 'unit dasar')}
+                        </span>
+                        <span className="ml-auto px-2 py-0.5 rounded-full bg-[#121358]/10 text-[#121358] font-medium shrink-0">
+                          {contextLabel[c.context]}
+                        </span>
+                        {c.price_override != null && (
+                          <span className="text-gray-400 shrink-0">Rp {c.price_override.toLocaleString('id-ID')}</span>
+                        )}
+                        {deletingConvId === c.id ? (
+                          <span className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-red-500">Hapus?</span>
+                            <button type="button" onClick={() => handleDeleteConv(c.id)} className="font-semibold text-red-600 hover:underline">Ya</button>
+                            <button type="button" onClick={() => setDeletingConvId(null)} className="text-gray-500 hover:underline">Batal</button>
+                          </span>
+                        ) : (
+                          <>
+                            <button type="button" title="Ubah" onClick={() => { setDeletingConvId(null); setEditingConvId(c.id) }}
+                              className="text-gray-400 hover:text-[#121358] shrink-0">
+                              <FontAwesomeIcon icon={faPen} className="w-3 h-3" />
+                            </button>
+                            <button type="button" title="Hapus" onClick={() => setDeletingConvId(c.id)}
+                              className="text-gray-400 hover:text-red-500 shrink-0">
+                              <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              {baseUnit && (
+                <div>
+                  {productConvs.length > 0 && (
+                    <p className="text-[11px] font-semibold text-gray-500 mb-1.5">
+                      {editingConv ? 'Ubah konversi' : 'Tambah unit lain'}
+                    </p>
+                  )}
+                  <AltUnitForm
+                    key={editingConv ? `edit-${editingConv.id}` : 'new'}
+                    units={unitOfMeasurements}
+                    baseUnit={baseUnit}
+                    existing={productConvs.filter(c => c.id !== editingConvId)}
+                    onAdd={handleAddAltUnit}
+                    initial={editingConv}
+                    onCancel={editingConv ? () => setEditingConvId(null) : undefined}
+                    submitLabel={editingConv ? 'Simpan Perubahan' : 'Simpan Unit Alternatif'}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {showAddWarehouse && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
