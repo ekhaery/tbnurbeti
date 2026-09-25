@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faTrash, faChevronLeft, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faTrash, faChevronLeft, faXmark, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
 import { localDateStr } from '@/lib/date'
 import { epsonPrint } from '@/lib/epsonPrint'
 
@@ -41,6 +41,14 @@ type AutocompleteState = {
 
 type Customer = { id: number; name: string }
 
+// Shown when the requested qty (plus what's already in the cart) exceeds stock.
+// target says where "Pakai Stok Maksimal" writes the max qty: the entry form or a cart row.
+// Per-warehouse stock from product_warehouse — informational only; sales consume
+// stock_batches (the total), which doesn't track warehouses.
+type WarehouseStock = { name: string; code: string; stock: number }
+
+type StockAlert ={ name: string; requested: number; available: number; unit: string; target: 'current' | number }
+
 const emptyItem = (): ItemRow => ({ product_id: '', query: '', qty: '', price_sold: '', discount: '', unit_id: '' })
 const fmt = (n: number) => n.toLocaleString('id-ID')
 
@@ -75,6 +83,8 @@ export default function BuatTransaksiPage() {
   const [autocomplete, setAutocomplete] = useState<AutocompleteState>({ open: false, focused: -1 })
   const [entryKey, setEntryKey] = useState(0)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [stockAlert, setStockAlert] = useState<StockAlert | null>(null)
+  const [warehouseStock, setWarehouseStock] = useState<Record<number, WarehouseStock[]>>({})
   const [previewCode, setPreviewCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -122,6 +132,24 @@ export default function BuatTransaksiPage() {
       from += chunkSize
     }
     setProducts(allProducts.map(p => ({ ...p, stock: stockMap[p.id] ?? 0 })))
+
+    from = 0
+    const whMap: Record<number, WarehouseStock[]> = {}
+    while (true) {
+      const { data, error } = await supabase
+        .from('product_warehouse')
+        .select('product_id, stock, warehouses(name, code, is_active)')
+        .range(from, from + chunkSize - 1)
+      if (error || !data || data.length === 0) break
+      for (const r of data as { product_id: number; stock: number; warehouses: { name: string; code: string; is_active: boolean } | null }[]) {
+        if (!r.warehouses?.is_active) continue
+        ;(whMap[r.product_id] ??= []).push({ name: r.warehouses.name, code: r.warehouses.code, stock: r.stock })
+      }
+      if (data.length < chunkSize) break
+      from += chunkSize
+    }
+    for (const list of Object.values(whMap)) list.sort((a, b) => b.stock - a.stock)
+    setWarehouseStock(whMap)
   }
 
   useEffect(() => {
@@ -194,10 +222,30 @@ export default function BuatTransaksiPage() {
     setAutocomplete({ open: false, focused: -1 })
   }
 
+  // Checks row against stock, counting the same product already in the cart
+  // (except the row being edited). Returns alert data when stock is short.
+  const checkStock = (row: ItemRow, target: 'current' | number): StockAlert | null => {
+    const product = products.find(p => p.id === Number(row.product_id))
+    if (!product) return null
+    const inCart = items.reduce((sum, r, idx) =>
+      idx !== target && r.product_id === row.product_id ? sum + baseQty(r) : sum, 0)
+    if (inCart + baseQty(row) <= product.stock) return null
+    const remaining = Math.max(0, product.stock - inCart)
+    return {
+      name: product.name,
+      requested: parseFloat(row.qty) || 0,
+      available: Math.floor((remaining / factorFor(row)) * 100) / 100,
+      unit: unitInfoFor(row)?.abbr ?? '',
+      target,
+    }
+  }
+
   const addItem = () => {
     if (!current.product_id || !current.qty) return
     const product = products.find(p => p.id === Number(current.product_id))
     if (isManualPrice(product) && !(parseFloat(current.price_sold) > 0)) return
+    const alert = checkStock(current, 'current')
+    if (alert) { setStockAlert(alert); return }
     setItems(prev => [...prev, current])
     setCurrent(emptyItem())
     setAutocomplete({ open: false, focused: -1 })
@@ -209,6 +257,11 @@ export default function BuatTransaksiPage() {
   }
 
   const updateItemQty = (i: number, delta: number) => {
+    if (delta > 0 && items[i]) {
+      const next = { ...items[i], qty: String(Math.round(((parseFloat(items[i].qty) || 0) + delta) * 100) / 100) }
+      const alert = checkStock(next, i)
+      if (alert) { setStockAlert(alert); return }
+    }
     setItems(prev => prev.map((row, idx) => {
       if (idx !== i) return row
       const newQty = Math.max(0.25, Math.round(((parseFloat(row.qty) || 0.25) + delta) * 100) / 100)
@@ -517,7 +570,10 @@ export default function BuatTransaksiPage() {
                       ))}
                     </div>
                   )}
-                  {selectedProduct && (
+                  {selectedProduct && (() => {
+                    const whList = warehouseStock[selectedProduct.id] ?? []
+                    const multiWh = whList.length >= 2
+                    return (<>
                     <p className="text-xs mt-1" style={{ color: '#ffc908' }}>
                       {isManualPrice(selectedProduct) ? (
                         <span className="font-normal">Harga oplos berbeda-beda &mdash; isi manual di bawah</span>
@@ -526,9 +582,20 @@ export default function BuatTransaksiPage() {
                       )}
                       {!isManualPrice(selectedProduct) && <> <span className="font-semibold">Rp {fmt(selectedProduct.price)}</span></>}
                       <span className="mx-1">·</span>
-                      <span className="font-normal">Stok:</span> <span className="font-semibold">{selectedProduct.stock}</span>
+                      <span className="font-normal">{multiWh ? 'Stok total:' : 'Stok:'}</span> <span className="font-semibold">{selectedProduct.stock}</span>
                     </p>
-                  )}
+                    {multiWh && (
+                      <p className="text-[11px] mt-0.5" style={{ color: '#ffc908' }}>
+                        {whList.map((w, idx) => (
+                          <span key={idx}>
+                            {idx > 0 && <span className="mx-1">·</span>}
+                            <span className="font-normal">{w.name || w.code}:</span> <span className="font-semibold">{w.stock}</span>
+                          </span>
+                        ))}
+                      </p>
+                    )}
+                    </>)
+                  })()}
                   <div className="mt-6" />
                 </div>
 
@@ -581,7 +648,6 @@ export default function BuatTransaksiPage() {
                         ))}
                       </select>
                     )}
-                    {sErr && <p className="text-xs text-red-300 mt-1">{sErr}</p>}
                   </div>
                 </div>
 
@@ -759,6 +825,50 @@ export default function BuatTransaksiPage() {
             </div>
             </div>
           </>
+        )}
+
+        {stockAlert && (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4" onClick={() => setStockAlert(null)}
+            onKeyDown={e => { if (e.key === 'Escape') setStockAlert(null) }}>
+            <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="px-5 pt-6 pb-4 text-center">
+                <div className="mx-auto w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-3">
+                  <FontAwesomeIcon icon={faTriangleExclamation} className="w-5 h-5 text-red-500" />
+                </div>
+                <p className="text-base font-bold text-gray-800">Stok Tidak Cukup</p>
+                <p className="text-sm text-gray-600 mt-2 font-semibold">{stockAlert.name}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-xl bg-gray-50 py-2">
+                    <p className="text-[11px] text-gray-400">Diminta</p>
+                    <p className="font-bold text-gray-800">{stockAlert.requested}{stockAlert.unit ? ` ${stockAlert.unit}` : ''}</p>
+                  </div>
+                  <div className="rounded-xl bg-red-50 py-2">
+                    <p className="text-[11px] text-red-400">Tersedia</p>
+                    <p className="font-bold text-red-600">{stockAlert.available}{stockAlert.unit ? ` ${stockAlert.unit}` : ''}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 px-4 py-3 border-t border-gray-100">
+                <button type="button" autoFocus onClick={() => setStockAlert(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">
+                  Tutup
+                </button>
+                {stockAlert.available > 0 && (
+                  <button type="button"
+                    onClick={() => {
+                      const qty = String(stockAlert.available)
+                      const target = stockAlert.target
+                      if (target === 'current') setCurrent(prev => ({ ...prev, qty }))
+                      else setItems(prev => prev.map((row, idx) => idx === target ? { ...row, qty } : row))
+                      setStockAlert(null)
+                    }}
+                    className="flex-1 py-2.5 rounded-xl bg-[#121358] text-white text-sm font-semibold hover:bg-[#1a1c6e] transition">
+                    Pakai Stok Maksimal
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         )}
 
         {showNewCustomer && (
