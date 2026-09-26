@@ -37,14 +37,17 @@ function sendRaw(data: Buffer): Promise<void> {
 }
 
 export async function POST(req: NextRequest) {
-  let body: { payload: PrintPayload }
+  let body: { type?: 'surat_jalan'; payload: PrintPayload | SuratJalanPayload }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const data = buildEscPos(body.payload)
+  // No type = sales receipt (the original payload shape)
+  const data = body.type === 'surat_jalan'
+    ? buildSuratJalan(body.payload as SuratJalanPayload)
+    : buildEscPos(body.payload as PrintPayload)
 
   try {
     await sendRaw(data)
@@ -145,6 +148,74 @@ function buildEscPos(payload: PrintPayload): Buffer {
   wide()
 
   // Feed and cut
+  push(LF, LF, LF)
+  push(GS, 0x56, 0x41, 0x03)
+
+  return Buffer.from(bytes)
+}
+
+// Surat jalan for fetching goods from another store (print_jobs type 'surat_jalan').
+// Keep in sync with buildSuratJalan in printer-listener/listener.js.
+type SuratJalanPayload = {
+  no: string
+  date: string
+  store: string
+  items: { name: string; qty: number; unit?: string }[]
+}
+
+function buildSuratJalan(payload: SuratJalanPayload): Buffer {
+  const bytes: number[] = []
+
+  const push = (...b: number[]) => bytes.push(...b)
+  const text = (s: string) => bytes.push(...Buffer.from(s, 'utf8'))
+  const line = (s = '') => { text(s); push(LF) }
+  const center = () => push(ESC, 0x61, 1)
+  const left = () => push(ESC, 0x61, 0)
+  const bold = (on: boolean) => push(ESC, 0x45, on ? 1 : 0)
+  const wide = () => line('================================')
+  const thin = () => line('--------------------------------')
+
+  push(ESC, 0x40)
+
+  center()
+  wide()
+  bold(true)
+  line('TB. NURBETI')
+  bold(false)
+  line('Jl. KS. Tubun No. 46')
+  line('Tegal')
+  line('HP Admin: 0815-4806-4220')
+  wide()
+  bold(true)
+  line('SURAT JALAN')
+  bold(false)
+
+  left()
+  const dateStr = new Date(payload.date + 'T00:00:00').toLocaleDateString('id-ID', {
+    day: 'numeric', month: 'long', year: 'numeric'
+  })
+  line(`No. SJ  : ${payload.no}`)
+  line(`Tanggal : ${dateStr}`)
+  line(`Toko    : ${payload.store}`)
+
+  thin()
+  line('Nama Barang                 Qty')
+  thin()
+
+  for (const item of payload.items ?? []) {
+    line(item.name)
+    line(`  ${item.qty} ${item.unit ?? ''}`.trimEnd())
+  }
+
+  thin()
+  line('')
+  line('Pengambil         Toko Pemberi')
+  line('')
+  line('')
+  line('')
+  line('(__________)      (__________)')
+  wide()
+
   push(LF, LF, LF)
   push(GS, 0x56, 0x41, 0x03)
 

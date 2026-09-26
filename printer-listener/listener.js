@@ -87,6 +87,62 @@ function buildEscPos(payload) {
   return Buffer.from(bytes)
 }
 
+// Surat jalan for fetching goods from another store (print_jobs type 'surat_jalan').
+// payload: { no, date, store, items: [{ name, qty, unit }] }
+function buildSuratJalan(payload) {
+  const bytes = []
+  const push  = (...b) => bytes.push(...b)
+  const text  = (s) => bytes.push(...Buffer.from(s, 'utf8'))
+  const line  = (s = '') => { text(s); push(LF) }
+  const center = () => push(ESC, 0x61, 1)
+  const left   = () => push(ESC, 0x61, 0)
+  const bold   = (on) => push(ESC, 0x45, on ? 1 : 0)
+  const wide   = () => line('================================')
+  const thin   = () => line('--------------------------------')
+
+  push(ESC, 0x40) // init
+
+  center()
+  wide()
+  bold(true);  line('TB. NURBETI');  bold(false)
+  line('Jl. KS. Tubun No. 46')
+  line('Tegal')
+  line('HP Admin: 0815-4806-4220')
+  wide()
+  bold(true);  line('SURAT JALAN');  bold(false)
+
+  left()
+  const dateStr = new Date(payload.date + 'T00:00:00').toLocaleDateString('id-ID', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  })
+  line(`No. SJ  : ${payload.no}`)
+  line(`Tanggal : ${dateStr}`)
+  line(`Toko    : ${payload.store}`)
+
+  thin()
+  line('Nama Barang                 Qty')
+  thin()
+
+  for (const item of payload.items ?? []) {
+    line(item.name)
+    line(`  ${item.qty} ${item.unit ?? ''}`.trimEnd())
+  }
+
+  thin()
+  line('')
+  line('Pengambil         Toko Pemberi')
+  line('')
+  line('')
+  line('')
+  line('(__________)      (__________)')
+  wide()
+
+  push(LF, LF, LF)
+  push(GS, 0x56, 0x41, 0x03) // full cut
+
+  return Buffer.from(bytes)
+}
+
 function sendRaw(data) {
   return new Promise((resolve, reject) => {
     const socket = new net.Socket()
@@ -147,6 +203,19 @@ async function printTransaction(transactionId) {
   }
 }
 
+async function printJob(job) {
+  if (!job || job.type !== 'surat_jalan') {
+    console.log(`[PRINT] Skipping print job ${job?.id}: unknown type ${job?.type}`)
+    return
+  }
+  try {
+    await sendRaw(buildSuratJalan(job.payload))
+    console.log(`[PRINT] ✓ Printed surat jalan ${job.payload?.no}`)
+  } catch (err) {
+    console.error(`[PRINT] ✗ Print failed for surat jalan ${job.payload?.no}:`, err.message)
+  }
+}
+
 function startListener() {
   console.log('[LISTENER] Connecting to Supabase Realtime...')
 
@@ -161,9 +230,18 @@ function startListener() {
         printTransaction(String(id))
       }
     )
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'print_jobs' },
+      (payload) => {
+        const job = payload.new
+        console.log(`[LISTENER] New print job: id=${job?.id} type=${job?.type}`)
+        printJob(job)
+      }
+    )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        console.log(`[LISTENER] ✓ Listening on transactions table`)
+        console.log(`[LISTENER] ✓ Listening on transactions and print_jobs tables`)
         console.log(`[LISTENER] Printer: ${PRINTER_IP}:${PRINTER_PORT}`)
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         console.error(`[LISTENER] Realtime error: ${status} — reconnecting in 5s...`)
