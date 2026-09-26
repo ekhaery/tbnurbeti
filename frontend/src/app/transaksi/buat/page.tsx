@@ -47,7 +47,7 @@ type WarehouseStock = { name: string; code: string; stock: number }
 
 // Shown when the requested qty (plus what's already in the cart) exceeds stock.
 // The cashier can still add it: the shortage is taken from another store and its
-// harga modal is filled in later (menu HPP Toko Lain). target: the entry form or a cart row index.
+// harga modal is filled in later (menu Pengambilan Barang). target: the entry form or a cart row index.
 type StockAlert = {
   name: string
   requested: number
@@ -281,7 +281,7 @@ export default function BuatTransaksiPage() {
   }
 
   // "Tetap Tambahkan": keep the full qty; the shortage comes from another store
-  // (recorded as external_qty by the RPC, costed later in HPP Toko Lain).
+  // (recorded as external_qty by the RPC, costed later in Pengambilan Barang).
   const confirmExternalStock = () => {
     if (!stockAlert) return
     const row = stockAlert.row
@@ -899,7 +899,7 @@ export default function BuatTransaksiPage() {
                 <div className="mt-4 text-left rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
                   <p className="text-xs text-amber-800">
                     Tetap jual? Kekurangan <span className="font-bold">{stockAlert.shortage}{stockAlert.unit ? ` ${stockAlert.unit}` : ''}</span> diambil dari toko lain.
-                    Harga modalnya diisi nanti di menu <span className="font-semibold">HPP Toko Lain</span>.
+                    Harga modalnya diisi nanti di menu <span className="font-semibold">Pengambilan Barang</span>.
                   </p>
                 </div>
               </div>

@@ -2,7 +2,7 @@
 --
 -- A sale may now ask for more than stock_batches can cover: FIFO consumes what
 -- exists and the uncovered qty is recorded as external_qty. Later, in menu
--- "HPP Toko Lain", receive_external_stock records what was actually taken from the
+-- "Pengambilan Barang", receive_external_stock records what was actually taken from the
 -- other store as a normal purchase (the store becomes the supplier): the sold part
 -- is FIFO-consumed from that new batch (so cogs is correct), any extra goes into
 -- stock + a warehouse, and a bill is created when it was taken on credit (bon).
@@ -218,7 +218,7 @@ begin
 end;
 $$;
 
--- Menu "HPP Toko Lain": record what was taken from another store for an item's
+-- Menu "Pengambilan Barang": record what was taken from another store for an item's
 -- external_qty. p_total_qty (>= the sold external qty) is bought from p_supplier_id
 -- at p_unit_cost per base unit; the sold part is consumed from the new batch, the
 -- rest stays as stock in p_warehouse_id. p_due_date not null = taken on credit
