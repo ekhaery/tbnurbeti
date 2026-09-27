@@ -101,7 +101,7 @@ export default function BuatTransaksiPage() {
   const [printData, setPrintData] = useState<{
     code: string
     date: string
-    items: { name: string; qty: number; price_sold: number; discount: number }[]
+    items: { name: string; qty: number; unit: string; price_sold: number; discount: number }[]
     total: number
     notes: string
     isHutang: boolean
@@ -421,12 +421,11 @@ export default function BuatTransaksiPage() {
       code,
       date,
       items: validItems.map(r => {
-        const baseName = products.find(p => p.id === Number(r.product_id))?.name ?? '-'
-        const unit = unitInfoFor(r)
-        const showUnit = factorFor(r) !== 1 && unit
         return {
-          name: showUnit ? `${baseName} (${unit.abbr})` : baseName,
+          name: products.find(p => p.id === Number(r.product_id))?.name ?? '-',
           qty: parseFloat(r.qty),
+          // Unit the qty was entered in; products without a unit print as pcs
+          unit: unitInfoFor(r)?.abbr || 'pcs',
           price_sold: parseFloat(r.price_sold) || 0,
           discount: parseFloat(r.discount) || 0,
         }
@@ -851,7 +850,7 @@ export default function BuatTransaksiPage() {
                         <p className="font-semibold truncate">{product?.name ?? '—'}</p>
                         <p className="pl-2 text-gray-600">
                           {disc > 0 && <span>Disc: Rp {fmt(disc)}{'\n'}</span>}
-                          {qty} pcs &nbsp;&nbsp; Rp {fmt(sub)}
+                          {qty} {unitInfoFor(row)?.abbr || 'pcs'} &nbsp;&nbsp; Rp {fmt(sub)}
                         </p>
                       </div>
                     )
@@ -1028,7 +1027,7 @@ export default function BuatTransaksiPage() {
                 <div key={i} style={{ marginBottom: 4 }}>
                   <div style={{ fontWeight: 600 }}>{item.name}</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{item.qty} × Rp {(item.price_sold).toLocaleString('id-ID')}</span>
+                    <span>{item.qty} {item.unit} × Rp {(item.price_sold).toLocaleString('id-ID')}</span>
                     <span>Rp {(item.qty * item.price_sold - item.discount).toLocaleString('id-ID')}</span>
                   </div>
                   {item.discount > 0 && (

@@ -68,11 +68,13 @@ type PrintItem = {
   qty: number
   price_sold: number
   discount: number
+  unit?: string
 }
 
 type PrintPayload = {
   code: string
   date: string
+  cashier?: string
   items: PrintItem[]
   total: number
   notes: string
@@ -113,6 +115,7 @@ function buildEscPos(payload: PrintPayload): Buffer {
   })
   line(`No. Invoice : ${payload.code}`)
   line(`Tanggal     : ${dateStr}`)
+  if (payload.cashier) line(`Kasir       : ${payload.cashier}`)
 
   // Items
   thin()
@@ -122,7 +125,7 @@ function buildEscPos(payload: PrintPayload): Buffer {
   for (const item of payload.items) {
     const perUnit = item.qty > 0 ? Math.round(item.price_sold / item.qty) : item.price_sold
     line(item.name)
-    line(`  ${item.qty} pcs @${fmt(perUnit)}  | Rp ${fmt(item.price_sold)}`)
+    line(`  ${item.qty} ${item.unit || 'pcs'} @${fmt(perUnit)}  | Rp ${fmt(item.price_sold)}`)
   }
 
   thin()

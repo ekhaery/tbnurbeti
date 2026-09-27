@@ -11,6 +11,13 @@ type LogEntry = {
   message?: string
 }
 
+type PrintJob = {
+  id: number
+  transaction_id?: number | null
+  type?: string | null
+  payload?: { no?: string } | null
+}
+
 export default function PrintListenerPage() {
   const supabase = createClient()
   const [connected, setConnected] = useState(false)
@@ -25,17 +32,18 @@ export default function PrintListenerPage() {
     setLog(prev => prev.map(e => e.id === id ? { ...e, ...update } : e))
   }
 
-  async function printTransaction(trxId: string) {
-    if (processedIds.current.has(trxId)) return
-    processedIds.current.add(trxId)
+  // entryId defaults to the transaction id (new sale); reprints pass their own
+  // so a transaction can be printed again after its first print.
+  async function printTransaction(trxId: string, entryId = trxId) {
+    if (processedIds.current.has(entryId)) return
+    processedIds.current.add(entryId)
 
-    const entryId = trxId
     const time = new Date().toLocaleTimeString('id-ID')
 
     // Fetch transaction header
     const { data: trx, error: trxErr } = await supabase
       .from('transactions')
-      .select('id, code, date, notes')
+      .select('id, code, date, notes, users(name)')
       .eq('id', trxId)
       .single()
 
@@ -44,10 +52,10 @@ export default function PrintListenerPage() {
       return
     }
 
-    // Fetch items with product names
+    // Fetch items with product names and base unit (qty is stored in the base unit)
     const { data: items, error: itemsErr } = await supabase
       .from('transaction_items')
-      .select('qty, price_sold, discount, products(name)')
+      .select('qty, price_sold, discount, products(name, unit_of_measurements(abbreviation))')
       .eq('transaction_id', trxId)
 
     if (itemsErr || !items) {
@@ -61,11 +69,14 @@ export default function PrintListenerPage() {
       code: trx.code,
       date: trx.date,
       notes: trx.notes ?? '',
+      cashier: (trx as any).users?.name ?? '',
       total,
       items: items.map((it: any) => ({
         name: it.products?.name ?? '-',
         qty: it.qty,
-        price_sold: it.price_sold / (it.qty || 1),
+        unit: it.products?.unit_of_measurements?.abbreviation || 'pcs',
+        // Line total; /api/print derives the per-unit price from it
+        price_sold: it.price_sold,
         discount: it.discount ?? 0,
       })),
     }
@@ -89,9 +100,13 @@ export default function PrintListenerPage() {
     }
   }
 
-  // Non-receipt documents queued in print_jobs (currently only surat jalan)
-  async function printJob(job: { id: number; type: string; payload: { no?: string } }) {
+  // Documents queued in print_jobs: receipt reprints ({ transaction_id }) and surat jalan
+  async function printJob(job: PrintJob) {
     const entryId = `job-${job.id}`
+    if (job.transaction_id) {
+      printTransaction(String(job.transaction_id), entryId)
+      return
+    }
     if (processedIds.current.has(entryId)) return
     processedIds.current.add(entryId)
     const time = new Date().toLocaleTimeString('id-ID')
@@ -132,7 +147,7 @@ export default function PrintListenerPage() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'print_jobs' },
-        (payload: { new: { id: number; type: string; payload: { no?: string } } }) => {
+        (payload: { new: PrintJob }) => {
           console.log('[PrintListener] New print job:', payload.new)
           printJob(payload.new)
         }
