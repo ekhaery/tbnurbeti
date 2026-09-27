@@ -89,6 +89,35 @@ export default function PrintListenerPage() {
     }
   }
 
+  // Non-receipt documents queued in print_jobs (currently only surat jalan)
+  async function printJob(job: { id: number; type: string; payload: { no?: string } }) {
+    const entryId = `job-${job.id}`
+    if (processedIds.current.has(entryId)) return
+    processedIds.current.add(entryId)
+    const time = new Date().toLocaleTimeString('id-ID')
+    const code = `SJ ${job.payload?.no ?? job.id}`
+    if (job.type !== 'surat_jalan') {
+      addLog({ id: entryId, time, code, status: 'error', message: `Tipe tidak dikenal: ${job.type}` })
+      return
+    }
+    addLog({ id: entryId, time, code, status: 'printing' })
+    try {
+      const res = await fetch('/api/print', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: job.type, payload: job.payload }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        updateLog(entryId, { status: 'error', message: body.error ?? `HTTP ${res.status}` })
+      } else {
+        updateLog(entryId, { status: 'ok' })
+      }
+    } catch (err: unknown) {
+      updateLog(entryId, { status: 'error', message: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
   useEffect(() => {
     const channel = supabase
       .channel('print-listener')
@@ -98,6 +127,14 @@ export default function PrintListenerPage() {
         (payload: { new: { id: string | number } }) => {
           console.log('[PrintListener] New transaction:', payload.new)
           printTransaction(String(payload.new.id))
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'print_jobs' },
+        (payload: { new: { id: number; type: string; payload: { no?: string } } }) => {
+          console.log('[PrintListener] New print job:', payload.new)
+          printJob(payload.new)
         }
       )
       .subscribe((status: string) => {
@@ -128,7 +165,7 @@ export default function PrintListenerPage() {
         {/* Info card */}
         <div className="bg-white/10 rounded-2xl p-4 text-sm text-white/80 space-y-1">
           <p>Halaman ini harus dibuka di <span className="text-[#ffc908] font-semibold">Mac yang terhubung ke printer</span> via <code className="text-xs bg-white/10 px-1 rounded">localhost:3000</code>.</p>
-          <p className="text-xs text-white/50 mt-2">Setiap transaksi baru akan otomatis dicetak.</p>
+          <p className="text-xs text-white/50 mt-2">Setiap transaksi baru dan surat jalan akan otomatis dicetak.</p>
         </div>
 
         {/* Log */}
