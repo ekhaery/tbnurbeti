@@ -422,15 +422,15 @@ export default function Navbar() {
               Tagihan Dagang
             </Link>
             <Link
-              href="/hpp-toko-lain"
+              href="/pengambilan-barang"
               className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
-                pathname.startsWith('/hpp-toko-lain')
+                pathname.startsWith('/pengambilan-barang')
                   ? 'text-[#121358] bg-[#121358]/8 font-semibold'
                   : 'text-gray-700 hover:bg-gray-50'
               }`}
             >
               <FontAwesomeIcon icon={faStore} className="w-4 h-4 text-gray-400" />
-              HPP Toko Lain
+              Pengambilan Barang
             </Link>
           </div>
 

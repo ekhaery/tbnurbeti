@@ -47,7 +47,7 @@ type WarehouseStock = { name: string; code: string; stock: number }
 
 // Shown when the requested qty (plus what's already in the cart) exceeds stock.
 // The cashier can still add it: the shortage is taken from another store and its
-// harga modal is filled in later (menu HPP Toko Lain). target: the entry form or a cart row index.
+// harga modal is filled in later (menu Pengambilan Barang). target: the entry form or a cart row index.
 type StockAlert = {
   name: string
   requested: number
@@ -101,7 +101,7 @@ export default function BuatTransaksiPage() {
   const [printData, setPrintData] = useState<{
     code: string
     date: string
-    items: { name: string; qty: number; price_sold: number; discount: number }[]
+    items: { name: string; qty: number; unit: string; price_sold: number; discount: number }[]
     total: number
     notes: string
     isHutang: boolean
@@ -295,7 +295,7 @@ export default function BuatTransaksiPage() {
   }
 
   // "Tetap Tambahkan": keep the full qty; the shortage comes from another store
-  // (recorded as external_qty by the RPC, costed later in HPP Toko Lain).
+  // (recorded as external_qty by the RPC, costed later in Pengambilan Barang).
   const confirmExternalStock = () => {
     if (!stockAlert) return
     const row = stockAlert.row
@@ -421,12 +421,11 @@ export default function BuatTransaksiPage() {
       code,
       date,
       items: validItems.map(r => {
-        const baseName = products.find(p => p.id === Number(r.product_id))?.name ?? '-'
-        const unit = unitInfoFor(r)
-        const showUnit = factorFor(r) !== 1 && unit
         return {
-          name: showUnit ? `${baseName} (${unit.abbr})` : baseName,
+          name: products.find(p => p.id === Number(r.product_id))?.name ?? '-',
           qty: parseFloat(r.qty),
+          // Unit the qty was entered in; products without a unit print as pcs
+          unit: unitInfoFor(r)?.abbr || 'pcs',
           price_sold: parseFloat(r.price_sold) || 0,
           discount: parseFloat(r.discount) || 0,
         }
@@ -851,7 +850,7 @@ export default function BuatTransaksiPage() {
                         <p className="font-semibold truncate">{product?.name ?? '—'}</p>
                         <p className="pl-2 text-gray-600">
                           {disc > 0 && <span>Disc: Rp {fmt(disc)}{'\n'}</span>}
-                          {qty} pcs &nbsp;&nbsp; Rp {fmt(sub)}
+                          {qty} {unitInfoFor(row)?.abbr || 'pcs'} &nbsp;&nbsp; Rp {fmt(sub)}
                         </p>
                       </div>
                     )
@@ -910,7 +909,7 @@ export default function BuatTransaksiPage() {
                 <div className="mt-4 text-left rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
                   <p className="text-xs text-amber-800">
                     Tetap jual? Kekurangan <span className="font-bold">{stockAlert.shortage}{stockAlert.unit ? ` ${stockAlert.unit}` : ''}</span> diambil dari toko lain.
-                    Harga modalnya diisi nanti di menu <span className="font-semibold">HPP Toko Lain</span>.
+                    Harga modalnya diisi nanti di menu <span className="font-semibold">Pengambilan Barang</span>.
                   </p>
                 </div>
               </div>
@@ -1028,7 +1027,7 @@ export default function BuatTransaksiPage() {
                 <div key={i} style={{ marginBottom: 4 }}>
                   <div style={{ fontWeight: 600 }}>{item.name}</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{item.qty} × Rp {(item.price_sold).toLocaleString('id-ID')}</span>
+                    <span>{item.qty} {item.unit} × Rp {(item.price_sold).toLocaleString('id-ID')}</span>
                     <span>Rp {(item.qty * item.price_sold - item.discount).toLocaleString('id-ID')}</span>
                   </div>
                   {item.discount > 0 && (

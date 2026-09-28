@@ -53,16 +53,17 @@ function buildEscPos(payload) {
   })
   line(`No. Invoice : ${payload.code}`)
   line(`Tanggal     : ${dateStr}`)
+  if (payload.cashier) line(`Kasir       : ${payload.cashier}`)
 
   thin()
   line('Nama Barang      Qty      Total')
   thin()
 
+  // price_sold is the line total (after discount), as stored in transaction_items
   for (const item of payload.items) {
-    const subtotal = item.price_sold * item.qty - item.discount
+    const perUnit = item.qty > 0 ? Math.round(item.price_sold / item.qty) : item.price_sold
     line(item.name)
-    if (item.discount > 0) line(`  Disc: Rp ${fmt(item.discount)}`)
-    line(`  ${item.qty} pcs        Rp ${fmt(subtotal)}`)
+    line(`  ${item.qty} ${item.unit || 'pcs'} @${fmt(perUnit)}  | Rp ${fmt(item.price_sold)}`)
   }
 
   thin()
@@ -169,9 +170,10 @@ async function printTransaction(transactionId) {
     .from('transactions')
     .select(`
       id, code, date, total, notes,
+      users ( name ),
       transaction_items (
         qty, price_sold, discount,
-        products ( name )
+        products ( name, unit_of_measurements ( abbreviation ) )
       )
     `)
     .eq('id', transactionId)
@@ -187,9 +189,12 @@ async function printTransaction(transactionId) {
     date:  trx.date,
     total: trx.total,
     notes: trx.notes ?? '',
+    cashier: trx.users?.name ?? '',
     items: (trx.transaction_items ?? []).map((i) => ({
       name:       i.products?.name ?? 'Produk',
       qty:        i.qty,
+      // qty is stored in the product's base unit; no unit set -> pcs
+      unit:       i.products?.unit_of_measurements?.abbreviation || 'pcs',
       price_sold: i.price_sold,
       discount:   i.discount ?? 0,
     })),
@@ -204,6 +209,11 @@ async function printTransaction(transactionId) {
 }
 
 async function printJob(job) {
+  // Reprint from Riwayat Transaksi: row only carries transaction_id
+  if (job?.transaction_id) {
+    console.log(`[PRINT] Reprint requested for transaction ${job.transaction_id}`)
+    return printTransaction(String(job.transaction_id))
+  }
   if (!job || job.type !== 'surat_jalan') {
     console.log(`[PRINT] Skipping print job ${job?.id}: unknown type ${job?.type}`)
     return

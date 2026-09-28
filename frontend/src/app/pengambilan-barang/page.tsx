@@ -48,7 +48,7 @@ type FormState = {
 const fmt = (n: number) => Math.round(n).toLocaleString('id-ID')
 const plusDays = (days: number) => localDateStr(new Date(Date.now() + days * 24 * 60 * 60 * 1000))
 
-export default function HppTokoLainPage() {
+export default function PengambilanBarangPage() {
   const supabase = createClient()
   const { appUser } = useAuth()
   const [items, setItems] = useState<ExternalItem[]>([])
@@ -194,7 +194,7 @@ export default function HppTokoLainPage() {
       <div className="px-4 pt-3 pb-10 max-w-2xl mx-auto space-y-4">
 
         <div>
-          <h2 className="text-lg font-bold text-gray-800">HPP Toko Lain</h2>
+          <h2 className="text-lg font-bold text-gray-800">Pengambilan Barang</h2>
           <p className="text-xs text-gray-500 mt-0.5">
             Barang yang terjual saat stok toko kosong dan diambil dari toko lain. Catat toko asal, jumlah yang diambil
             dan harga modalnya — kelebihan barang masuk stok, dan pembayaran bon masuk Tagihan Dagang.
