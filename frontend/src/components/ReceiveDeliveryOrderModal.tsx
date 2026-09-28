@@ -43,6 +43,9 @@ type ItemInput = {
   // (receipt_id null) so a supplier that splits one PO across multiple
   // invoices can be received in separate passes.
   included: boolean
+  // Destination warehouse for this line. One PO often mixes products stored in
+  // different warehouses, so it's chosen per line rather than per faktur.
+  warehouseId: number | ''
 }
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
@@ -102,18 +105,21 @@ export default function ReceiveDeliveryOrderModal({
         base_price: i.base_price ? String(i.base_price * factor) : '',
         discountPercent: '',
         included: true,
+        warehouseId: warehouses.length === 1 ? warehouses[0].id : '',
       }
     })
   )
   const [invoiceNo, setInvoiceNo] = useState('')
   const [dueDate, setDueDate] = useState('')
-  const [warehouseId, setWarehouseId] = useState<number | ''>('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pendingAfterSubmit, setPendingAfterSubmit] = useState<string[] | null>(null)
 
   const updateItem = (idx: number, field: 'qty' | 'base_price' | 'discountPercent', value: string) => {
     setItems(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row))
+  }
+  const setItemWarehouse = (idx: number, value: number | '') => {
+    setItems(prev => prev.map((row, i) => i === idx ? { ...row, warehouseId: value } : row))
   }
   const toggleIncluded = (idx: number) => {
     setItems(prev => prev.map((row, i) => i === idx ? { ...row, included: !row.included } : row))
@@ -160,6 +166,11 @@ export default function ReceiveDeliveryOrderModal({
       setError(`Diskon ${badDiscount.name} tidak valid. Isi angka 0–100, atau bertingkat seperti 15+3+6.`)
       return
     }
+    const noWarehouse = includedItems.find(i => (parseFloat(i.qty) || 0) > 0 && !i.warehouseId)
+    if (noWarehouse) {
+      setError(`Pilih warehouse tujuan untuk ${noWarehouse.name}.`)
+      return
+    }
     // stock_batches/purchasing_items.qty are stored in the base unit and must stay
     // whole numbers, same constraint as purchasing/buat — catch a fractional result
     // (e.g. typing 2.5 Dus) before it silently gets rounded away.
@@ -178,6 +189,7 @@ export default function ReceiveDeliveryOrderModal({
       qty: Math.round(baseQtyFor(i)),
       gross_base_price: (parseFloat(i.base_price) || 0) / i.factor,
       discount_percent: discountOf(i.discountPercent),
+      warehouse_id: i.warehouseId || null,
     }))
 
     const { data: receiptId, error: rpcErr } = await supabase.rpc('receive_delivery_order', {
@@ -185,7 +197,7 @@ export default function ReceiveDeliveryOrderModal({
       p_items,
       p_invoice_no: invoiceNo.trim() || null,
       p_due_date: dueDate || null,
-      p_warehouse_id: warehouseId || null,
+      p_warehouse_id: null,
       p_created_by: appUser?.id ?? null,
     })
     if (rpcErr) { setError(rpcErr.message); setSubmitting(false); return }
@@ -337,6 +349,19 @@ export default function ReceiveDeliveryOrderModal({
                       </p>
                     )}
                   </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Warehouse tujuan</label>
+                    <select
+                      value={item.warehouseId}
+                      onChange={e => setItemWarehouse(idx, e.target.value ? Number(e.target.value) : '')}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#121358] disabled:bg-gray-50"
+                    >
+                      <option value="">-- Pilih Warehouse --</option>
+                      {warehouses.map(w => (
+                        <option key={w.id} value={w.id}>{w.name} ({w.code})</option>
+                      ))}
+                    </select>
+                  </div>
                 </fieldset>
               </div>
             )
@@ -358,19 +383,6 @@ export default function ReceiveDeliveryOrderModal({
             {periodWeeks > 0 && (
               <p className="text-xs text-gray-400 mt-1">{periodWeeks} minggu · tagihan akan dibuat otomatis</p>
             )}
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Warehouse tujuan</label>
-            <select
-              value={warehouseId}
-              onChange={e => setWarehouseId(e.target.value ? Number(e.target.value) : '')}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#121358]"
-            >
-              <option value="">-- Pilih Warehouse --</option>
-              {warehouses.map(w => (
-                <option key={w.id} value={w.id}>{w.name} ({w.code})</option>
-              ))}
-            </select>
           </div>
 
           {total > 0 && (
