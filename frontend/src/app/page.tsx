@@ -123,19 +123,6 @@ export default function HomePage() {
               </>
             )
 
-            if (card.label === 'Daftar Harga Barang') {
-              return (
-                <button
-                  key={card.label}
-                  onClick={() => { window.dispatchEvent(new CustomEvent('openProdukAlert')); router.push(card.href) }}
-                  className={cardClass}
-                  style={{ backgroundColor: card.bg }}
-                >
-                  {inner}
-                </button>
-              )
-            }
-
             return (
               <Link key={card.label} href={card.href} className={cardClass} style={{ backgroundColor: card.bg }}>
                 {inner}
