@@ -140,12 +140,13 @@ export default function EditProductPage() {
       return
     }
 
-    // Check name uniqueness (exclude self)
+    // Check name uniqueness (exclude self and soft-deleted products)
     const { data: existing } = await supabase
       .from('products')
       .select('id')
       .ilike('name', toTitleCase(form.name.trim()))
       .neq('id', id)
+      .eq('is_deleted', false)
       .limit(1)
     if (existing && existing.length > 0) {
       setError(`Nama produk "${toTitleCase(form.name.trim())}" sudah ada.`)
