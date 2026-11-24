@@ -3,11 +3,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import type { User } from '@supabase/supabase-js'
+import type { Role } from '@/lib/roles'
 
 type AppUser = {
   id: number
   name: string
-  role: 'admin' | 'user'
+  role: Role
 }
 
 type AuthContextType = {
@@ -41,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAppUser({
         id: data.id,
         name: data.name,
-        role: (data.roles as unknown as { name: string }).name as 'admin' | 'user',
+        role: (data.roles as unknown as { name: string }).name as Role,
       })
     }
   }

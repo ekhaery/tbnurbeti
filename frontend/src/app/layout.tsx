@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import Navbar from "@/lib/Navbar";
+import RoleGuard from "@/components/RoleGuard";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,7 +46,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <AuthProvider>
           <Navbar />
-          <div id="main-content" className="pt-20 bg-gray-50 min-h-screen">{children}</div>
+          <div id="main-content" className="pt-20 bg-gray-50 min-h-screen"><RoleGuard>{children}</RoleGuard></div>
         </AuthProvider>
       </body>
     </html>

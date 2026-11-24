@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPenToSquare, faTrash, faPlus, faCheck, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { hasAdminAccess } from '@/lib/roles'
 
 type Role = { id: number; name: string }
 type AppUser = {
@@ -214,7 +215,7 @@ export default function UsersPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-800">{u.name}</p>
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                        u.roles?.name === 'admin' ? 'bg-[#121358]/10 text-[#121358]' : 'bg-gray-100 text-gray-500'
+                        hasAdminAccess(u.roles?.name) ? 'bg-[#121358]/10 text-[#121358]' : 'bg-gray-100 text-gray-500'
                       }`}>
                         {u.roles?.name}
                       </span>

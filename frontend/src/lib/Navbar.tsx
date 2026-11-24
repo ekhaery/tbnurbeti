@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { faBell } from '@fortawesome/free-solid-svg-icons'
 import { localDateStr } from '@/lib/date'
+import { hasAdminAccess, canAccessPath, isOwner } from '@/lib/roles'
 
 const settingsLinks = [
   { label: 'Category', href: '/settings/categories', icon: faGear },
@@ -26,7 +27,10 @@ export default function Navbar() {
   const [isDesktop, setIsDesktop] = useState(false)
   const [activityCount, setActivityCount] = useState(0)
   const [orderCount, setOrderCount] = useState(0)
-  const isAdmin = appUser?.role === 'admin'
+  const isAdmin = hasAdminAccess(appUser?.role)
+  // Laporan, Tagihan Dagang, Pengambilan Barang, Finance and Users are owner-only.
+  const ownerView = isOwner(appUser?.role)
+  const visibleSettingsLinks = settingsLinks.filter(l => canAccessPath(appUser?.role, l.href))
   const supabase = createClient()
 
   useEffect(() => {
@@ -226,7 +230,8 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Laporan */}
+          {/* Laporan — owner only */}
+          {ownerView && (
           <div>
             <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Laporan</p>
             <Link
@@ -274,6 +279,7 @@ export default function Navbar() {
               Laporan Penjualan Produk
             </Link>
           </div>
+          )}
 
           {/* Purchasing */}
           <div>
@@ -289,6 +295,7 @@ export default function Navbar() {
               <FontAwesomeIcon icon={faCartShopping} className="w-4 h-4 text-gray-400" />
               Purchasing
             </Link>
+            {ownerView && (<>
             <Link
               href="/bills"
               className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
@@ -311,9 +318,11 @@ export default function Navbar() {
               <FontAwesomeIcon icon={faStore} className="w-4 h-4 text-gray-400" />
               Pengambilan Barang
             </Link>
+            </>)}
           </div>
 
-          {/* Finance */}
+          {/* Finance — owner only */}
+          {ownerView && (
           <div>
             <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Finance</p>
             <Link
@@ -361,6 +370,7 @@ export default function Navbar() {
               Piutang
             </Link>
           </div>
+          )}
 
           {/* Operational */}
           <div>
@@ -430,7 +440,7 @@ export default function Navbar() {
           {/* Settings */}
           <div>
             <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Settings</p>
-              {settingsLinks.map((item) => (
+              {visibleSettingsLinks.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { hasAdminAccess } from '@/lib/roles'
 
 export default function TransaksiTabs() {
   const pathname = usePathname()
@@ -11,7 +12,7 @@ export default function TransaksiTabs() {
   const tabs = [
     { label: 'Buat Transaksi', href: '/transaksi/buat' },
     { label: 'Riwayat', href: '/transaksi/riwayat' },
-    ...(appUser?.role === 'admin' ? [{ label: 'Setting', href: '/transaksi/setting' }] : []),
+    ...(hasAdminAccess(appUser?.role) ? [{ label: 'Setting', href: '/transaksi/setting' }] : []),
   ]
 
   return (

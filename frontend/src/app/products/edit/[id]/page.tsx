@@ -9,6 +9,7 @@ import { faChevronLeft, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { toTitleCase } from '@/lib/utils'
 import { nowWIB } from '@/lib/date'
 import AltUnitForm, { contextLabel, conversionSentence, type ConversionContext, type UnitOfMeasurement } from '@/components/AltUnitForm'
+import { hasAdminAccess } from '@/lib/roles'
 
 type Category = { id: number; name: string; is_price_required: boolean }
 type Supplier = { id: number; name: string }
@@ -26,7 +27,7 @@ export default function EditProductPage() {
   const router = useRouter()
   const { id } = useParams()
 
-  const isAdmin = appUser?.role === 'admin'
+  const isAdmin = hasAdminAccess(appUser?.role)
 
   const [categories, setCategories] = useState<Category[]>([])
   const [unitOfMeasurements, setUnitOfMeasurements] = useState<UnitOfMeasurement[]>([])

@@ -8,6 +8,7 @@ import { faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
 import ReceiveDeliveryOrderModal from '@/components/ReceiveDeliveryOrderModal'
 import EditOrderModal from '@/components/EditOrderModal'
 import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
+import { hasAdminAccess } from '@/lib/roles'
 
 type OrderItem = {
   id: number
@@ -33,7 +34,7 @@ type Warehouse = { id: number; name: string; code: string }
 export default function OrderPage() {
   const supabase = createClient()
   const { appUser } = useAuth()
-  const isAdmin = appUser?.role === 'admin'
+  const isAdmin = hasAdminAccess(appUser?.role)
   const [list, setList] = useState<Order[]>([])
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [fetching, setFetching] = useState(true)

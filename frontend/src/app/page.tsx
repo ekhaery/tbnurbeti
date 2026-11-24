@@ -6,6 +6,7 @@ import { useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faHandshake, faTag, faReceipt, faUserCheck, faLightbulb, faSackDollar, faBuildingColumns, faChartLine, faClipboardList } from '@fortawesome/free-solid-svg-icons'
+import { hasAdminAccess, canAccessPath } from '@/lib/roles'
 
 const primaryCards = [
   {
@@ -92,14 +93,14 @@ export default function HomePage() {
   const { appUser, loading } = useAuth()
 
   useEffect(() => {
-    if (!loading && appUser && appUser.role !== 'admin') {
+    if (!loading && appUser && !hasAdminAccess(appUser.role)) {
       router.replace('/products/list')
     }
   }, [loading, appUser])
 
   if (loading || !appUser) return null
 
-  if (appUser.role !== 'admin') return null
+  if (!hasAdminAccess(appUser.role)) return null
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -110,7 +111,7 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {primaryCards.map(card => {
+          {primaryCards.filter(card => canAccessPath(appUser.role, card.href)).map(card => {
             const inner = (
               <>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
@@ -136,7 +137,7 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {secondaryCards.map(card => {
+          {secondaryCards.filter(card => canAccessPath(appUser.role, card.href)).map(card => {
             const inner = (
               <>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>

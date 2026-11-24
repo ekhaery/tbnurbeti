@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faChevronLeft, faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 import Link from 'next/link'
+import { hasAdminAccess } from '@/lib/roles'
 
 const fmt = (n: number) => n.toLocaleString('id-ID')
 
@@ -30,7 +31,7 @@ export default function TransaksiSettingPage() {
     setPendingCount(count ?? 0)
   }
 
-  useEffect(() => { if (appUser?.role === 'admin') fetchPendingCount() }, [appUser])
+  useEffect(() => { if (hasAdminAccess(appUser?.role)) fetchPendingCount() }, [appUser])
 
   const addLog = (msg: string) => setLogs(prev => [...prev, msg])
 
@@ -163,7 +164,7 @@ export default function TransaksiSettingPage() {
 
   if (authLoading) return null
 
-  if (appUser?.role !== 'admin') {
+  if (!hasAdminAccess(appUser?.role)) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
