@@ -38,7 +38,9 @@ export default function LoginPage() {
     if (authError) {
       setError('Password salah.')
     } else {
-      router.push('/products/bulk-input')
+      // Land on Home (Aktifitas Harian). Home itself sends the "user" role on
+      // to the product list, since Home is for owner/admin only.
+      router.push('/')
       router.refresh()
     }
   }
