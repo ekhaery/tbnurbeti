@@ -34,3 +34,24 @@ textarea::placeholder {
   -webkit-text-fill-color: #4b5563;
   color: #4b5563;
 }
+
+/* Animated checkmark (components/AnimatedCheck): circle pops in, tick draws itself */
+@keyframes check-pop {
+  0% { transform: scale(0); }
+  70% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+@keyframes check-draw {
+  to { stroke-dashoffset: 0; }
+}
+.check-pop {
+  animation: check-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.check-draw {
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  animation: check-draw 0.3s ease-out 0.2s forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .check-pop, .check-draw { animation: none; stroke-dashoffset: 0; }
+}

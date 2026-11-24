@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
 import ReceiveDeliveryOrderModal from '@/components/ReceiveDeliveryOrderModal'
 import EditOrderModal from '@/components/EditOrderModal'
+import AnimatedCheck from '@/components/AnimatedCheck'
 import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
 import { hasAdminAccess } from '@/lib/roles'
 
@@ -141,17 +142,43 @@ export default function OrderPage() {
                       <p className="text-xs text-gray-500 mt-0.5">
                         {new Date(p.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
+                      {hasReceived(p) && (
+                        <p className="text-[11px] font-medium text-amber-600 mt-0.5">
+                          {p.purchasing_items.filter(i => i.receipt_id == null).length} dari {p.purchasing_items.length} barang belum diterima
+                        </p>
+                      )}
                     </div>
                     <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#121358]/10 text-[#121358] font-mono shrink-0">
                       {p.code}
                     </span>
                   </div>
                   <div className="mt-2 space-y-0.5">
-                    {p.purchasing_items.map(item => (
-                      <p key={item.id} className="text-xs text-gray-600 truncate">
-                        · {item.products?.name ?? '-'} <span className="text-gray-400">({qtyLabel(item)})</span>
-                      </p>
-                    ))}
+                    {hasReceived(p) ? (
+                      // Partially received: pending lines first, received ones ticked off below.
+                      // Delay is capped so long orders (30+ lines) still finish animating quickly.
+                      [...p.purchasing_items]
+                        .sort((a, b) => Number(a.receipt_id != null) - Number(b.receipt_id != null))
+                        .map((item, i) => item.receipt_id != null ? (
+                        <div key={item.id} className="flex items-center gap-1.5 text-xs text-gray-400 min-w-0">
+                          <AnimatedCheck delay={Math.min(i, 10) * 50} title="Sudah diterima" />
+                          <span className="truncate">{item.products?.name ?? '-'} ({qtyLabel(item)})</span>
+                        </div>
+                      ) : (
+                        <div key={item.id} className="flex items-center gap-1.5 text-xs min-w-0">
+                          <span className="w-3.5 h-3.5 rounded-full border-2 border-amber-400 shrink-0" aria-hidden="true" />
+                          <span className="truncate font-medium text-gray-800">
+                            {item.products?.name ?? '-'} <span className="font-normal text-gray-400">({qtyLabel(item)})</span>
+                          </span>
+                          <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Belum diterima</span>
+                        </div>
+                      ))
+                    ) : (
+                      p.purchasing_items.map(item => (
+                        <p key={item.id} className="text-xs text-gray-600 truncate">
+                          · {item.products?.name ?? '-'} <span className="text-gray-400">({qtyLabel(item)})</span>
+                        </p>
+                      ))
+                    )}
                   </div>
                 </button>
                 {isAdmin && (
