@@ -143,7 +143,7 @@ export default function OrderPage() {
                         {new Date(p.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
                       {hasReceived(p) && (
-                        <p className="text-[11px] font-medium text-amber-600 mt-0.5">
+                        <p className="text-[11px] font-semibold text-[#121358] mt-0.5">
                           {p.purchasing_items.filter(i => i.receipt_id == null).length} dari {p.purchasing_items.length} barang belum diterima
                         </p>
                       )}
@@ -165,11 +165,11 @@ export default function OrderPage() {
                         </div>
                       ) : (
                         <div key={item.id} className="flex items-center gap-1.5 text-xs min-w-0">
-                          <span className="w-3.5 h-3.5 rounded-full border-2 border-amber-400 shrink-0" aria-hidden="true" />
+                          <span className="w-3.5 h-3.5 rounded-full border-2 border-[#121358] shrink-0" aria-hidden="true" />
                           <span className="truncate font-medium text-gray-800">
                             {item.products?.name ?? '-'} <span className="font-normal text-gray-400">({qtyLabel(item)})</span>
                           </span>
-                          <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Belum diterima</span>
+                          <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#FCB7C7] text-[#121358]">Belum diterima</span>
                         </div>
                       ))
                     ) : (
