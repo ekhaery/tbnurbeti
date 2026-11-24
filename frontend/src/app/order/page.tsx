@@ -42,6 +42,7 @@ export default function OrderPage() {
   const [deleting, setDeleting] = useState<Order | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   const fetchData = async () => {
     const { data } = await supabase
@@ -79,6 +80,14 @@ export default function OrderPage() {
     return isAlt ? `${item.entered_qty} ${altAbbr} (${base})` : base
   }
 
+  // Matches the supplier (distributor) name or any product name in the order.
+  const q = search.trim().toLowerCase()
+  const filtered = q
+    ? list.filter(p =>
+        (p.suppliers?.name ?? '').toLowerCase().includes(q) ||
+        p.purchasing_items.some(i => (i.products?.name ?? '').toLowerCase().includes(q)))
+    : list
+
   const handleDelete = async () => {
     if (!deleting) return
     setConfirmingDelete(true)
@@ -98,16 +107,28 @@ export default function OrderPage() {
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
         <div>
           <h2 className="text-lg font-bold text-gray-800">Order</h2>
-          <p className="text-xs text-gray-500 mt-0.5">{fetching ? '...' : `${list.length} pesanan menunggu barang`}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{fetching ? '...' : `${list.length} pesanan menunggu barang${q ? ` · ${filtered.length} cocok` : ''}`}</p>
         </div>
+
+        {!fetching && list.length > 0 && (
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Cari nama distributor atau barang..."
+            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358] shadow-sm"
+          />
+        )}
 
         {fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
         ) : list.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-10">Tidak ada pesanan yang menunggu barang.</div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center text-sm text-gray-400 py-10">Tidak ada order yang cocok dengan &quot;{search.trim()}&quot;.</div>
         ) : (
           <div className="space-y-2">
-            {list.map(p => (
+            {filtered.map(p => (
               <div key={p.id} className="bg-white rounded-xl shadow-sm transition hover:bg-gray-50">
                 <button
                   onClick={() => setSelected(p)}
