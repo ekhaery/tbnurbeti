@@ -1,7 +1,8 @@
 // Role rules in one place.
 //   owner — everything.
 //   admin — everything except Laporan, Tagihan Dagang, Pengambilan Barang,
-//           Finance and Settings > Users.
+//           Finance, Gaji Karyawan and Settings > Users. Gets Pengeluaran
+//           Operasional Harian under Operational instead.
 //   user  — cashier view (no drawer, no admin-only actions).
 export type Role = 'owner' | 'admin' | 'user'
 
@@ -31,6 +32,8 @@ export const OWNER_ONLY_PATHS = [
   '/tagihan-debt-loan',
   '/debt-loan',
   '/piutang',
+  // Operational (admin gets /pengeluaran-operasional instead)
+  '/gaji-karyawan',
   // Settings > Users
   '/settings/users',
 ]

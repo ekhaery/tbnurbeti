@@ -375,6 +375,7 @@ export default function Navbar() {
           {/* Operational */}
           <div>
             <p className="px-5 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Operational</p>
+            {ownerView ? (
             <Link
               href="/gaji-karyawan"
               className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
@@ -386,6 +387,19 @@ export default function Navbar() {
                 <FontAwesomeIcon icon={faMoneyBillWave} className="w-4 h-4 text-gray-400" />
               Gaji Karyawan
             </Link>
+            ) : (
+            <Link
+              href="/pengeluaran-operasional"
+              className={`flex items-center gap-3 px-5 py-3 text-sm transition ${
+                pathname.startsWith('/pengeluaran-operasional')
+                  ? 'text-[#121358] bg-[#121358]/8 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FontAwesomeIcon icon={faWallet} className="w-4 h-4 text-gray-400" />
+              Pengeluaran Operasional Harian
+            </Link>
+            )}
           </div>
 
           {/* Masterdata */}
