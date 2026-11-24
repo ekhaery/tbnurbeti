@@ -53,7 +53,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4 -mt-20">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-6">
         <div className="mb-6 flex flex-col items-center text-center">
-          <Image src={logo} alt="Logo TB Nurbeti" width={88} height={80} priority className="mb-3" />
+          <Image src={logo} alt="Logo TB Nurbeti" width={120} height={109} priority className="mb-3" />
           <h1 className="text-2xl font-bold text-gray-900">Selamat datang</h1>
           <p className="text-sm text-gray-500 mt-1">Masuk ke akun Anda</p>
         </div>
