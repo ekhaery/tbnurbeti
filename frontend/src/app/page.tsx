@@ -6,7 +6,7 @@ import { useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faHandshake, faTag, faReceipt, faUserCheck, faLightbulb, faSackDollar, faBuildingColumns, faChartLine, faClipboardList } from '@fortawesome/free-solid-svg-icons'
-import { hasAdminAccess, canAccessPath } from '@/lib/roles'
+import { hasAdminAccess, canAccessPath, isOwner } from '@/lib/roles'
 
 const primaryCards = [
   {
@@ -132,9 +132,12 @@ export default function HomePage() {
           })}
         </div>
 
-        <div>
-          <h2 className="text-sm font-bold text-gray-700">Kewajiban Pembayaran & Biaya Operasional</h2>
-        </div>
+        {/* Payment obligations section is owner-only; admin keeps only the non-finance cards below */}
+        {isOwner(appUser.role) && (
+          <div>
+            <h2 className="text-sm font-bold text-gray-700">Kewajiban Pembayaran & Biaya Operasional</h2>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           {secondaryCards.filter(card => canAccessPath(appUser.role, card.href)).map(card => {
