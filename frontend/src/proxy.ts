@@ -45,5 +45,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // icon.png / apple-icon.png (home screen icons) are fetched without a session
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon\\.png$|apple-icon\\.png$).*)'],
 }
