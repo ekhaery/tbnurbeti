@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { toTitleCase } from '@/lib/utils'
 import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
 import ProductTabs from '@/lib/ProductTabs'
+import { hasAdminAccess } from '@/lib/roles'
 
 type Category = {
   id: number
@@ -69,7 +70,7 @@ export default function BulkInputPage() {
   const [unitQuery, setUnitQuery] = useState('')
   const [unitDropdown, setUnitDropdown] = useState(false)
 
-  const isAdmin = appUser?.role === 'admin'
+  const isAdmin = hasAdminAccess(appUser?.role)
 
 
   useEffect(() => {

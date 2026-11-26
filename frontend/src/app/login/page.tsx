@@ -3,6 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
+import Image from 'next/image'
+// Static import → served from /_next/static, which proxy.ts lets through
+// before login (a /public file would be redirected to /login).
+import logo from '@/assets/logo-nurbeti.png'
 
 export default function LoginPage() {
   const supabase = createClient()
@@ -38,7 +42,9 @@ export default function LoginPage() {
     if (authError) {
       setError('Password salah.')
     } else {
-      router.push('/products/bulk-input')
+      // Land on Home (Aktifitas Harian). Home itself sends the "user" role on
+      // to the product list, since Home is for owner/admin only.
+      router.push('/')
       router.refresh()
     }
   }
@@ -46,7 +52,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4 -mt-20">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-6">
-        <div className="mb-6">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <Image src={logo} alt="Logo TB Nurbeti" width={120} height={109} priority className="mb-3" />
           <h1 className="text-2xl font-bold text-gray-900">Selamat datang</h1>
           <p className="text-sm text-gray-500 mt-1">Masuk ke akun Anda</p>
         </div>

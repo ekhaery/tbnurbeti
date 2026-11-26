@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { hasAdminAccess } from '@/lib/roles'
 
 const navItems = [
   {
@@ -38,7 +39,7 @@ export default function TopNav() {
 
   if (pathname === '/login') return null
 
-  const isAdmin = appUser?.role === 'admin'
+  const isAdmin = hasAdminAccess(appUser?.role)
   const pageTitle = pageTitles[pathname] ?? 'Produk'
 
   return (

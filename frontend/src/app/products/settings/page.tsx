@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase-browser'
 import ProductTabs from '@/lib/ProductTabs'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faXmark } from '@fortawesome/free-solid-svg-icons'
+import { hasAdminAccess } from '@/lib/roles'
 
 type NoStockProduct = { id: number; name: string; base_price: number; price: number }
 const fmt = (n: number) => n.toLocaleString('id-ID')
@@ -86,7 +87,7 @@ export default function ProductSettingsPage() {
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-sm text-gray-400">Memuat...</div>
-  if (!appUser || appUser.role !== 'admin') { router.push('/products/list'); return null }
+  if (!appUser || !hasAdminAccess(appUser.role)) { router.push('/products/list'); return null }
 
   return (
     <div className="min-h-screen bg-gray-50">

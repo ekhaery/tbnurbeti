@@ -182,6 +182,18 @@ export default function ReceiveDeliveryOrderModal({
       setError(`Qty ${fractionalItem.name} menghasilkan pecahan (${baseQtyFor(fractionalItem)}) setelah dikonversi ke ${fractionalItem.baseAbbr || 'unit dasar'}. Ubah qty-nya.`)
       return
     }
+    if (!invoiceNo.trim()) {
+      setError('Isi No Faktur.')
+      return
+    }
+    if (!dueDate) {
+      setError('Isi Tanggal Jatuh Tempo.')
+      return
+    }
+    if (dueDate < receivedDateStr) {
+      setError('Tanggal Jatuh Tempo tidak boleh sebelum hari ini.')
+      return
+    }
     setSubmitting(true)
 
     const p_items = includedItems.map(i => ({
@@ -195,8 +207,8 @@ export default function ReceiveDeliveryOrderModal({
     const { data: receiptId, error: rpcErr } = await supabase.rpc('receive_delivery_order', {
       p_purchasing_id: purchasing.id,
       p_items,
-      p_invoice_no: invoiceNo.trim() || null,
-      p_due_date: dueDate || null,
+      p_invoice_no: invoiceNo.trim(),
+      p_due_date: dueDate,
       p_warehouse_id: null,
       p_created_by: appUser?.id ?? null,
     })
@@ -370,13 +382,13 @@ export default function ReceiveDeliveryOrderModal({
 
         <div className="px-5 py-3 border-t border-gray-100 space-y-3">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">No Faktur</label>
+            <label className="block text-xs text-gray-500 mb-1">No Faktur <span className="text-red-500">*</span></label>
             <input type="text" value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)}
-              placeholder="Opsional"
+              placeholder="Masukkan no faktur"
               className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Tanggal Jatuh Tempo</label>
+            <label className="block text-xs text-gray-500 mb-1">Tanggal Jatuh Tempo <span className="text-red-500">*</span></label>
             <input type="date" value={dueDate} min={receivedDateStr}
               onChange={e => setDueDate(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#121358]" />

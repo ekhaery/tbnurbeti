@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { isOwner } from '@/lib/roles'
 
 const adminClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
     .single()
 
   const role = (caller?.roles as unknown as { name: string } | null)?.name
-  if (role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!isOwner(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Create the new user
   const { name, password, role_id } = await req.json()

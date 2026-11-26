@@ -7,7 +7,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
 import ReceiveDeliveryOrderModal from '@/components/ReceiveDeliveryOrderModal'
 import EditOrderModal from '@/components/EditOrderModal'
+import AnimatedCheck from '@/components/AnimatedCheck'
 import { logActivity, USER_ACTIVITY } from '@/lib/userActivity'
+import { hasAdminAccess } from '@/lib/roles'
 
 type OrderItem = {
   id: number
@@ -33,7 +35,7 @@ type Warehouse = { id: number; name: string; code: string }
 export default function OrderPage() {
   const supabase = createClient()
   const { appUser } = useAuth()
-  const isAdmin = appUser?.role === 'admin'
+  const isAdmin = hasAdminAccess(appUser?.role)
   const [list, setList] = useState<Order[]>([])
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [fetching, setFetching] = useState(true)
@@ -42,6 +44,7 @@ export default function OrderPage() {
   const [deleting, setDeleting] = useState<Order | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   const fetchData = async () => {
     const { data } = await supabase
@@ -79,6 +82,14 @@ export default function OrderPage() {
     return isAlt ? `${item.entered_qty} ${altAbbr} (${base})` : base
   }
 
+  // Matches the supplier (distributor) name or any product name in the order.
+  const q = search.trim().toLowerCase()
+  const filtered = q
+    ? list.filter(p =>
+        (p.suppliers?.name ?? '').toLowerCase().includes(q) ||
+        p.purchasing_items.some(i => (i.products?.name ?? '').toLowerCase().includes(q)))
+    : list
+
   const handleDelete = async () => {
     if (!deleting) return
     setConfirmingDelete(true)
@@ -98,16 +109,28 @@ export default function OrderPage() {
       <div className="px-4 pt-3 pb-10 max-w-xl mx-auto space-y-4">
         <div>
           <h2 className="text-lg font-bold text-gray-800">Order</h2>
-          <p className="text-xs text-gray-500 mt-0.5">{fetching ? '...' : `${list.length} pesanan menunggu barang`}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{fetching ? '...' : `${list.length} pesanan menunggu barang${q ? ` · ${filtered.length} cocok` : ''}`}</p>
         </div>
+
+        {!fetching && list.length > 0 && (
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Cari nama distributor atau barang..."
+            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#121358] shadow-sm"
+          />
+        )}
 
         {fetching ? (
           <div className="text-center text-sm text-gray-400 py-10">Memuat...</div>
         ) : list.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-10">Tidak ada pesanan yang menunggu barang.</div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center text-sm text-gray-400 py-10">Tidak ada order yang cocok dengan &quot;{search.trim()}&quot;.</div>
         ) : (
           <div className="space-y-2">
-            {list.map(p => (
+            {filtered.map(p => (
               <div key={p.id} className="bg-white rounded-xl shadow-sm transition hover:bg-gray-50">
                 <button
                   onClick={() => setSelected(p)}
@@ -119,17 +142,43 @@ export default function OrderPage() {
                       <p className="text-xs text-gray-500 mt-0.5">
                         {new Date(p.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
+                      {hasReceived(p) && (
+                        <p className="text-[11px] font-semibold text-[#121358] mt-0.5">
+                          {p.purchasing_items.filter(i => i.receipt_id == null).length} dari {p.purchasing_items.length} barang belum diterima
+                        </p>
+                      )}
                     </div>
                     <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#121358]/10 text-[#121358] font-mono shrink-0">
                       {p.code}
                     </span>
                   </div>
                   <div className="mt-2 space-y-0.5">
-                    {p.purchasing_items.map(item => (
-                      <p key={item.id} className="text-xs text-gray-600 truncate">
-                        · {item.products?.name ?? '-'} <span className="text-gray-400">({qtyLabel(item)})</span>
-                      </p>
-                    ))}
+                    {hasReceived(p) ? (
+                      // Partially received: pending lines first, received ones ticked off below.
+                      // Delay is capped so long orders (30+ lines) still finish animating quickly.
+                      [...p.purchasing_items]
+                        .sort((a, b) => Number(a.receipt_id != null) - Number(b.receipt_id != null))
+                        .map((item, i) => item.receipt_id != null ? (
+                        <div key={item.id} className="flex items-center gap-1.5 text-xs text-gray-400 min-w-0">
+                          <AnimatedCheck delay={Math.min(i, 10) * 50} title="Sudah diterima" />
+                          <span className="truncate">{item.products?.name ?? '-'} ({qtyLabel(item)})</span>
+                        </div>
+                      ) : (
+                        <div key={item.id} className="flex items-center gap-1.5 text-xs min-w-0">
+                          <span className="w-3.5 h-3.5 rounded-full border-2 border-[#121358] shrink-0" aria-hidden="true" />
+                          <span className="truncate font-medium text-gray-800">
+                            {item.products?.name ?? '-'} <span className="font-normal text-gray-400">({qtyLabel(item)})</span>
+                          </span>
+                          <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#FCB7C7] text-[#121358]">Belum diterima</span>
+                        </div>
+                      ))
+                    ) : (
+                      p.purchasing_items.map(item => (
+                        <p key={item.id} className="text-xs text-gray-600 truncate">
+                          · {item.products?.name ?? '-'} <span className="text-gray-400">({qtyLabel(item)})</span>
+                        </p>
+                      ))
+                    )}
                   </div>
                 </button>
                 {isAdmin && (

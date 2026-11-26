@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { hasAdminAccess } from '@/lib/roles'
 
 const tabs = [
   { label: 'Daftar Produk', href: '/products/list' },
@@ -12,7 +13,7 @@ const tabs = [
 export default function ProductTabs() {
   const pathname = usePathname()
   const { appUser } = useAuth()
-  const isAdmin = appUser?.role === 'admin'
+  const isAdmin = hasAdminAccess(appUser?.role)
 
   const visibleTabs = isAdmin
     ? [...tabs, { label: 'Setting', href: '/products/settings' }]

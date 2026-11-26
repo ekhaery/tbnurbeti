@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext'
 import DateRangeFilter from '@/components/DateRangeFilter'
 import { nowWIB } from '@/lib/date'
 import DeleteConfirmPopup from '@/components/DeleteConfirmPopup'
+import { hasAdminAccess } from '@/lib/roles'
 
 type TransactionItem = {
   id: number
@@ -53,7 +54,7 @@ const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, 
 function RiwayatTransaksiContent() {
   const supabase = createClient()
   const { appUser } = useAuth()
-  const isAdmin = appUser?.role === 'admin'
+  const isAdmin = hasAdminAccess(appUser?.role)
   const searchParams = useSearchParams()
 
   const [dateFrom, setDateFrom] = useState(searchParams.get('from') ?? todayStr)

@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPenToSquare, faArrowUpAZ, faTrash, faXmark, faChevronLeft, faEye, faCheck } from '@fortawesome/free-solid-svg-icons'
 import ProductTabs from '@/lib/ProductTabs'
+import { hasAdminAccess } from '@/lib/roles'
 
 type Product = {
   id: number
@@ -64,7 +65,7 @@ export default function ProductListPage() {
   const PAGE_SIZE = 25
   const sortRef = useRef<HTMLDivElement>(null)
 
-  const isAdmin = appUser?.role === 'admin'
+  const isAdmin = hasAdminAccess(appUser?.role)
 
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
   const [deleteInput, setDeleteInput] = useState('')

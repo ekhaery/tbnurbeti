@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { hasAdminAccess } from '@/lib/roles'
 
 const adminClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,7 +32,7 @@ export async function GET() {
     .single()
 
   const role = (caller?.roles as unknown as { name: string } | null)?.name
-  if (role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!hasAdminAccess(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data, error } = await adminClient.rpc('get_products_no_stock')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

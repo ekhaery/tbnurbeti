@@ -32,6 +32,8 @@ type PurchasingRow = {
   due_date: string | null
   total: number
   status: string
+  invoice_no: string | null
+  purchasing_receipts: { invoice_no: string | null }[] | null
   suppliers: { name: string; bank_detail: { bank?: string; no_rek?: string; rek_name?: string } | null } | null
 }
 
@@ -50,6 +52,18 @@ function computeDistribution(bills: Bill[], totalAmount: number) {
 }
 
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+
+// All faktur numbers entered when the goods were received (one per receipt, since
+// a supplier can split one order across several fakturs). Falls back to
+// purchasing.invoice_no for orders received before purchasing_receipts existed.
+const invoiceNos = (p: PurchasingRow): string[] => {
+  const fromReceipts = (p.purchasing_receipts ?? [])
+    .map(r => r.invoice_no?.trim() ?? '')
+    .filter(Boolean)
+  const own = p.invoice_no?.trim()
+  const list = fromReceipts.length > 0 ? fromReceipts : own ? [own] : []
+  return Array.from(new Set(list))
+}
 
 // Sort: month → supplier name → bill_no → installment_due_date
 function sortBills(bills: Bill[]): Bill[] {
@@ -246,7 +260,7 @@ if (error) { setError(error.message); setMarkingLunas(false); return }
     setFetchingPurchasing(true)
     supabase
       .from('purchasing')
-      .select('id, code, date, due_date, total, status, suppliers(name, bank_detail)')
+      .select('id, code, date, due_date, total, status, invoice_no, purchasing_receipts(invoice_no), suppliers(name, bank_detail)')
       .not('due_date', 'is', null)
       .order('due_date', { ascending: true })
       .then(({ data }: { data: PurchasingRow[] | null }) => {
@@ -595,6 +609,9 @@ if (error) { setError(error.message); setMarkingLunas(false); return }
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-800">{p.suppliers?.name ?? '-'}</p>
                         <p className="text-xs text-gray-400 font-mono mt-0.5">{p.code}</p>
+                        {invoiceNos(p).length > 0 && (
+                          <p className="text-xs text-gray-500 mt-0.5">No Faktur: <span className="font-medium text-gray-700">{invoiceNos(p).join(', ')}</span></p>
+                        )}
                         <p className="text-xs text-gray-500 mt-0.5">Tanggal: {fmtDate(p.date)}</p>
                         {p.due_date && <p className="text-xs text-gray-500 mt-0.5">Jatuh tempo: {fmtDate(p.due_date)}</p>}
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -1148,6 +1165,9 @@ if (error) { setError(error.message); setMarkingLunas(false); return }
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-white">{selectedPurchasing.suppliers?.name ?? '-'}</p>
                   <p className="text-xs font-mono text-white/60 mt-0.5">{selectedPurchasing.code}</p>
+                  {invoiceNos(selectedPurchasing).length > 0 && (
+                    <p className="text-xs text-white/60 mt-0.5">No Faktur: <span className="text-white/90">{invoiceNos(selectedPurchasing).join(', ')}</span></p>
+                  )}
                   {selectedPurchasing.due_date && (
                     <p className="text-xs text-white/60 mt-0.5">JT: {fmtDate(selectedPurchasing.due_date)}</p>
                   )}
